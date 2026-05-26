@@ -1,0 +1,1623 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CD GAM — Acompanhamento de Produtividade</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13px;min-height:100vh}
+.hdr{background:#0a2340;padding:5px 10px;display:flex;align-items:center;gap:8px;border-bottom:3px solid #e94560;position:sticky;top:0;z-index:100}
+.hdr-logo{background:#e94560;color:#fff;padding:4px 10px;border-radius:4px;font-weight:900;font-size:13px;letter-spacing:1px;white-space:nowrap}
+.hdr-title{flex:1;text-align:center;font-size:15px;font-weight:bold;color:#ffd700;letter-spacing:.8px}
+.hdr-date{font-size:11px;color:#aaa;min-width:80px;text-align:right}
+/* KPI BARS */
+.kpi-bar{background:#0b1d2e;display:grid;gap:2px;padding:4px 8px;border-bottom:1px solid #1e4a72}
+.kpi{background:#122033;padding:4px 5px;text-align:center;border-radius:3px;border:1px solid #1a3550;min-width:0}
+.kpi-lbl{font-size:9px;color:#6a9fc0;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.kpi-val{font-size:13px;font-weight:bold;line-height:1.3;color:#ffd700}
+.kpi-val.g{color:#00e676}.kpi-val.r{color:#ff4c4c}.kpi-val.o{color:#ff9500}.kpi-val.c{color:#00e5ff}.kpi-val.w{color:#fff}
+.kpi-pbar{height:4px;background:#1e3a55;border-radius:2px;margin-top:3px;overflow:hidden}
+.kpi-pfill{height:100%;border-radius:2px;transition:width .4s}
+.kpi-pend{display:flex;gap:2px;margin-top:3px}
+.kpi-pend-done{height:6px;border-radius:2px;transition:width .3s}
+.kpi-pend-left{height:6px;border-radius:2px;background:#1e3a55}
+/* FLOW BAR */
+.flow-bar{background:#071525;padding:4px 8px;display:flex;gap:4px;align-items:stretch;border-bottom:2px solid #1e4a72;overflow-x:auto}
+.flow-stage{border-radius:5px;padding:5px 10px;display:flex;flex-direction:column;gap:2px;min-width:140px;flex:1}
+.flow-stage.correia{background:rgba(255,149,0,.12);border:1px solid rgba(255,149,0,.4)}
+.flow-stage.checkout{background:rgba(0,229,255,.1);border:1px solid rgba(0,229,255,.35)}
+.flow-stage.expedicao{background:rgba(0,230,118,.1);border:1px solid rgba(0,230,118,.35)}
+.flow-stage-title{font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:.5px;margin-bottom:2px}
+.flow-stage.correia .flow-stage-title{color:#ff9500}
+.flow-stage.checkout .flow-stage-title{color:#00e5ff}
+.flow-stage.expedicao .flow-stage-title{color:#00e676}
+.flow-row{display:flex;justify-content:space-between;font-size:10px;gap:4px}
+.flow-lbl{color:#6a9fc0}.flow-val{font-weight:bold;color:#fff}
+.flow-arrow{display:flex;align-items:center;color:#1e4a72;font-size:20px;padding:0 2px}
+.pbar-mini{height:5px;background:#1e3a55;border-radius:2px;margin-top:3px;overflow:hidden;position:relative}
+.pbar-mini-fill{height:100%;border-radius:2px;transition:width .4s}
+/* TABS */
+.tabs{display:flex;gap:3px;padding:6px 8px 0;background:#0b1d2e;border-bottom:2px solid #1e4a72}
+.tab{padding:5px 14px;border-radius:4px 4px 0 0;cursor:pointer;font-size:11px;background:#122033;color:#6a9fc0;border:1px solid #1e4a72;border-bottom:none;transition:all .15s}
+.tab:hover{color:#aad4f0}
+.tab.act{background:#0e1621;color:#ffd700;font-weight:bold;border-color:#ffd700;border-bottom:2px solid #0e1621}
+.tab-body{display:none}.tab-body.act{display:block}
+/* CHARTS */
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px}
+.chart-box{background:#122033;border-radius:6px;padding:8px;border:1px solid #1a3550}
+.chart-ttl{font-size:10px;color:#6a9fc0;font-weight:bold;text-transform:uppercase;margin-bottom:6px;border-bottom:1px solid #1a3550;padding-bottom:4px;display:flex;align-items:center;justify-content:space-between;gap:6px}
+/* TABLES */
+.tbl-wrap{margin:8px;background:#122033;border-radius:6px;border:1px solid #1a3550;overflow-x:auto}
+.tbl-wrap table{width:100%;border-collapse:collapse;font-size:11px;min-width:900px}
+.tbl-wrap th{background:#0a2340;color:#6a9fc0;padding:4px 6px;text-align:center;font-size:10px;border:1px solid #1a3550;white-space:nowrap}
+.tbl-wrap td{padding:3px 6px;text-align:center;border:1px solid #162a3d}
+.tbl-wrap tr:nth-child(odd) td{background:#0d1c2e}
+.tbl-wrap tr:nth-child(even) td{background:#122033}
+.row-lbl{text-align:left!important;color:#89b4d4;background:#0a1825!important;font-weight:bold;white-space:nowrap}
+.tbl-wrap tr:hover td{background:#1a3048}
+/* HIST */
+.hist-wrap{padding:8px}
+.hist-day-card{background:#122033;border:1px solid #1a3550;border-radius:6px;margin-bottom:8px;overflow:hidden}
+.hist-day-hdr{display:flex;align-items:center;gap:10px;padding:8px 12px;background:#0a2340;cursor:pointer;user-select:none}
+.hist-day-hdr:hover{background:#0d2d55}
+.hist-day-title{font-weight:bold;color:#ffd700;font-size:13px}
+.hist-day-badges{display:flex;gap:6px;flex-wrap:wrap}
+.badge{font-size:10px;padding:2px 8px;border-radius:10px;font-weight:bold}
+.badge.g{background:#003d2a;color:#00e676;border:1px solid #00e676}
+.badge.o{background:#3d2800;color:#ff9500;border:1px solid #ff9500}
+.badge.r{background:#3d0a0a;color:#ff4c4c;border:1px solid #ff4c4c}
+.badge.c{background:#003040;color:#00e5ff;border:1px solid #00e5ff}
+.badge.y{background:#2d2800;color:#ffd700;border:1px solid #ffd700}
+.hist-day-body{display:none;padding:10px}
+.hist-day-body.open{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.hist-mini-chart{position:relative;height:160px}
+.hist-kpi-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:5px}
+.hist-kpi{background:#0d1c2e;border-radius:4px;padding:5px 8px;text-align:center}
+.hist-kpi .l{font-size:9px;color:#6a9fc0;text-transform:uppercase}
+.hist-kpi .v{font-size:14px;font-weight:bold;color:#ffd700}
+.hist-tbl-area{grid-column:1/-1}
+.btn-view-day{background:#4a90d9;border:none;color:#fff;padding:3px 10px;border-radius:3px;cursor:pointer;font-size:10px;margin-left:auto}
+/* ADMIN */
+.adm{background:#0c1923;border:1px solid #e94560;border-radius:6px;margin:8px;padding:12px}
+.adm h3{color:#e94560;font-size:13px;margin-bottom:10px;border-bottom:1px solid #e94560;padding-bottom:6px}
+.adm-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.adm-group{background:#122033;border-radius:4px;padding:8px;border:1px solid #1a3550}
+.adm-group h4{color:#ffd700;font-size:11px;margin-bottom:8px;text-transform:uppercase;border-bottom:1px solid #1a3550;padding-bottom:4px}
+.adm-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:5px}
+.adm-row label{font-size:11px;color:#89b4d4;flex:1}
+.adm-row input,.adm-row select{background:#0d1c2e;border:1px solid #1e4a72;color:#fff;padding:3px 6px;border-radius:3px;width:100px;font-size:11px;text-align:right}
+.adm-row input:focus{outline:none;border-color:#ffd700}
+.prev-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-top:4px}
+.prev-item{background:#0a1825;border-radius:3px;padding:4px 8px;border:1px solid #1a3550}
+.prev-item label{font-size:10px;color:#6a9fc0;display:block;margin-bottom:2px}
+.prev-item input{background:#0d1c2e;border:1px solid #1e4a72;color:#ffd700;padding:2px 5px;border-radius:3px;width:100%;font-size:11px;text-align:right;font-weight:bold}
+.prev-item input:focus{outline:none;border-color:#ffd700}
+.hora-tbl-wrap{margin-top:10px;background:#122033;border-radius:4px;padding:8px;border:1px solid #1a3550;overflow-x:auto}
+.hora-tbl-wrap h4{color:#ffd700;font-size:11px;margin-bottom:6px;text-transform:uppercase}
+.hora-tbl-wrap table{border-collapse:collapse;font-size:10px;min-width:1100px}
+.hora-tbl-wrap th{background:#0a2340;color:#6a9fc0;padding:3px 6px;text-align:center;border:1px solid #1a3550;white-space:nowrap}
+.hora-tbl-wrap td{border:1px solid #1a3550;padding:1px 2px}
+.hora-tbl-wrap .hlbl{color:#89b4d4;background:#0a1825;padding:3px 6px;white-space:nowrap;font-weight:bold}
+.hora-tbl-wrap input{width:58px;background:#0d1c2e;border:none;color:#fff;padding:2px 4px;font-size:10px;text-align:center}
+.hora-tbl-wrap input:focus{outline:1px solid #ffd700;background:#162a3d}
+.btn-row{display:flex;gap:8px;margin-top:10px;justify-content:flex-end;flex-wrap:wrap}
+.btn{padding:6px 16px;border-radius:4px;border:none;cursor:pointer;font-size:12px;font-weight:bold;transition:opacity .15s}
+.btn:hover{opacity:.85}
+.btn-save{background:#00b894;color:#fff}.btn-del{background:#e94560;color:#fff}
+.btn-newday{background:#ffd700;color:#000}.btn-lock{background:#444;color:#fff}
+.btn-export{background:#4a90d9;color:#fff}.btn-import{background:#9b59b6;color:#fff}
+/* LOCK */
+.lock-ov{display:none;position:fixed;inset:0;background:rgba(0,0,0,.85);z-index:9999;align-items:center;justify-content:center}
+.lock-ov.on{display:flex}
+.lock-box{background:#0a2340;border:2px solid #e94560;border-radius:8px;padding:28px;text-align:center;width:320px}
+.lock-box h3{color:#ffd700;margin-bottom:10px;font-size:15px}
+.lock-box p{color:#89b4d4;font-size:12px;margin-bottom:14px}
+.lock-box input{background:#0d1c2e;border:1px solid #1e4a72;color:#fff;padding:9px;border-radius:4px;width:100%;margin-bottom:10px;font-size:14px;text-align:center;letter-spacing:3px}
+.lock-box input:focus{outline:none;border-color:#ffd700}
+.lock-box .btn-enter{background:#e94560;color:#fff;border:none;padding:9px 28px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:bold;width:100%}
+.lock-box .hint{font-size:10px;color:#555;margin-top:8px}
+.day-nav{display:flex;align-items:center;gap:6px;padding:5px 8px;background:#0b1d2e;border-bottom:1px solid #1e4a72;overflow-x:auto}
+.day-nav-lbl{font-size:10px;color:#6a9fc0;white-space:nowrap}
+.day-btn{background:#122033;border:1px solid #1a3550;color:#89b4d4;padding:3px 10px;border-radius:3px;cursor:pointer;font-size:10px;white-space:nowrap}
+.day-btn:hover{background:#1e3a55;color:#ffd700}
+.day-btn.cur{background:#ffd700;color:#000;font-weight:bold;border-color:#ffd700}
+.separator{background:#0a2340;padding:3px 12px;font-size:9px;color:#6a9fc0;text-transform:uppercase;letter-spacing:1px;border-top:1px solid #1a3550}
+.edit-btn-float{position:fixed;bottom:16px;right:16px;background:#e94560;color:#fff;border:none;border-radius:50%;width:48px;height:48px;font-size:20px;cursor:pointer;box-shadow:0 3px 12px rgba(233,69,96,.5);z-index:200;display:flex;align-items:center;justify-content:center}
+.today-badge{background:#e94560;color:#fff;font-size:9px;padding:1px 5px;border-radius:2px;margin-left:4px;vertical-align:middle}
+.live-badge{background:#00e676;color:#000;font-size:9px;padding:1px 6px;border-radius:3px;font-weight:bold;animation:blink 1.4s infinite}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.4}}
+.no-data{padding:40px;text-align:center;color:#445;font-size:14px}
+.real-auto-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px}
+.real-auto-item{background:#0a1825;border-radius:3px;padding:4px 8px;display:flex;justify-content:space-between;align-items:center;border:1px solid #1a3550}
+/* ROTAS TABLE */
+.rotas-wrap{margin:8px;background:#0a1825;border-radius:6px;border:1px solid rgba(0,230,118,.3);overflow:hidden}
+.rotas-hdr{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:rgba(0,230,118,.1);border-bottom:1px solid rgba(0,230,118,.25)}
+.rotas-hdr-title{font-size:11px;font-weight:bold;color:#00e676;text-transform:uppercase;letter-spacing:.5px}
+.rotas-kpis{display:flex;gap:12px;font-size:10px}
+.rotas-kpi{text-align:center}
+.rotas-kpi .v{font-weight:bold;font-size:13px}
+.rotas-kpi .l{color:#6a9fc0;font-size:9px}
+.rotas-tbl{overflow-x:auto}
+.rotas-tbl table{width:100%;border-collapse:collapse;font-size:11px;min-width:900px}
+.rotas-tbl th{background:#071525;color:#6a9fc0;padding:5px 8px;text-align:center;border:1px solid #1a3550;font-size:10px;white-space:nowrap}
+.rotas-tbl td{padding:4px 8px;text-align:center;border:1px solid #122033;white-space:nowrap}
+.rotas-tbl tr:hover td{background:#0d2035}
+.rotas-tbl .td-rota{text-align:left;font-weight:bold;color:#c0d8f0;background:#071525}
+.rotas-tbl .td-cidade{text-align:left;color:#89b4d4;background:#071525}
+.st-ok{background:#003d20;color:#00e676;font-weight:bold;padding:3px 12px;border-radius:4px;font-size:10px;letter-spacing:.3px}
+.st-atrasado{background:#3d0a0a;color:#ff4c4c;font-weight:bold;padding:3px 12px;border-radius:4px;font-size:10px;letter-spacing:.3px}
+.st-pendente{background:#1a2a3a;color:#6a9fc0;padding:3px 12px;border-radius:4px;font-size:10px}
+.st-critico{background:#3d1a00;color:#ff9500;font-weight:bold;padding:3px 12px;border-radius:4px;font-size:10px;letter-spacing:.3px;animation:blink 1.4s infinite}
+</style>
+</head>
+<body>
+
+<!-- Firebase sync — sem necessidade de configuração manual -->
+<div class="lock-ov" id="syncOv" style="display:none!important">
+  <div class="lock-box" style="width:420px">
+    <h3>☁️ Configurar Sincronização em Tempo Real</h3>
+    <p style="color:#89b4d4;font-size:11px;margin-bottom:14px;line-height:1.6">
+      Use o <b style="color:#ffd700">Supabase</b> (gratuito) para sincronizar entre todos os computadores.<br>
+      <a href="https://supabase.com" target="_blank" style="color:#00e5ff">supabase.com</a> → Criar conta → Novo projeto → Copiar URL e chave anon.
+    </p>
+    <div style="text-align:left;margin-bottom:8px">
+      <div style="font-size:10px;color:#6a9fc0;margin-bottom:3px">URL do projeto (ex: https://xyzxyz.supabase.co)</div>
+      <input id="sbUrlIn" type="text" placeholder="https://xxxxxxxx.supabase.co" style="background:#0d1c2e;border:1px solid #1e4a72;color:#fff;padding:7px;border-radius:4px;width:100%;font-size:12px;margin-bottom:8px"/>
+      <div style="font-size:10px;color:#6a9fc0;margin-bottom:3px">Chave anon/public</div>
+      <input id="sbKeyIn" type="text" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." style="background:#0d1c2e;border:1px solid #1e4a72;color:#fff;padding:7px;border-radius:4px;width:100%;font-size:12px;margin-bottom:12px"/>
+    </div>
+    <div style="background:#071525;border-radius:4px;padding:8px;margin-bottom:12px;font-size:10px;color:#6a9fc0;text-align:left;line-height:1.7">
+      <b style="color:#ffd700">Passo a passo:</b><br>
+      1. Acesse <b>supabase.com</b> e crie uma conta gratuita<br>
+      2. Crie um novo projeto (nome: cdgam, qualquer senha)<br>
+      3. Vá em <b>Settings → API</b> e copie a <b>Project URL</b> e a <b>anon public key</b><br>
+      4. Vá em <b>Table Editor → New Table</b>, nome: <b>cdgam_data</b><br>
+      5. Adicione as colunas: <b>id</b> (text, primary key), <b>payload</b> (text), <b>updated_at</b> (text)<br>
+      6. Cole a URL e a chave aqui e clique Salvar<br>
+      7. Faça isso em todos os computadores com as mesmas credenciais
+    </div>
+    <div style="display:flex;gap:8px">
+      <button onclick="saveSyncConfig()" style="flex:1;background:#00b894;color:#fff;border:none;padding:9px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold">💾 Salvar e Conectar</button>
+      <button onclick="clearSyncConfig()" style="background:#e94560;color:#fff;border:none;padding:9px 14px;border-radius:4px;cursor:pointer;font-size:12px">🗑 Limpar</button>
+      <button onclick="document.getElementById('syncOv').classList.remove('on')" style="background:#444;color:#fff;border:none;padding:9px 14px;border-radius:4px;cursor:pointer;font-size:12px">Fechar</button>
+    </div>
+    <div id="syncTestResult" style="font-size:11px;margin-top:10px;min-height:16px"></div>
+  </div>
+</div>
+
+<div class="lock-ov" id="lockOv">
+  <div class="lock-box">
+    <h3>🔒 CD GAM — Acesso Restrito</h3>
+    <p>Somente o responsável GAM pode editar os dados.</p>
+    <input type="password" id="pwdIn" placeholder="••••••••" onkeydown="if(event.key==='Enter')tryUnlock()"/>
+    <button class="btn-enter" onclick="tryUnlock()">ENTRAR</button>
+    <div class="hint" id="pwdHint">Senha: gam2025</div>
+  </div>
+</div>
+
+<!-- HEADER -->
+<div class="hdr">
+  <div class="hdr-logo">GAM</div>
+  <div class="hdr-title">ACOMPANHAMENTO DE PRODUTIVIDADE — CD GAM (GENESIO A. MENDES)</div>
+  <span class="live-badge" id="liveBadge" style="display:none">⬤ AO VIVO</span>
+  <span id="syncStatus" style="font-size:10px;color:#89b4d4;padding:2px 8px;background:#122033;border-radius:3px;" title="Status da sincronização">☁ Conectando...</span>
+  <div class="hdr-date" id="hdrDate"></div>
+</div>
+
+<!-- KPI BAR 1: indicadores gerais -->
+<div class="kpi-bar" id="kpiBar1" style="grid-template-columns:repeat(10,1fr)">
+  <div class="kpi" style="border-color:#ffd700"><div class="kpi-lbl" style="color:#ffd700">Prev. Noturna (vol)</div><div class="kpi-val" style="color:#ffd700" id="kPN">—</div></div>
+  <div class="kpi" style="border-color:#ffd700"><div class="kpi-lbl" style="color:#ffd700">Prev. Noturna (unid)</div><div class="kpi-val" style="color:#ffd700" id="kPNU">—</div></div>
+  <div class="kpi"><div class="kpi-lbl">Venda (unid.)</div><div class="kpi-val o" id="kVenda">—</div></div>
+  <div class="kpi"><div class="kpi-lbl">Acumulado</div><div class="kpi-val g" id="kAcum">—</div></div>
+  <div class="kpi"><div class="kpi-lbl">À Processar</div><div class="kpi-val r" id="kProc">—</div></div>
+  <div class="kpi"><div class="kpi-lbl">Meta Proj. Unid.</div><div class="kpi-val c" id="kMeta">—</div></div>
+  <div class="kpi"><div class="kpi-lbl">O.S. Impressas</div><div class="kpi-val w" id="kOsImp">—</div></div>
+  <div class="kpi"><div class="kpi-lbl">O.S. Finalizadas</div><div class="kpi-val g" id="kOsFin">—</div></div>
+  <div class="kpi"><div class="kpi-lbl">O.S. À Produzir</div><div class="kpi-val r" id="kOsProd">—</div></div>
+  <div class="kpi"><div class="kpi-lbl">% Produzido</div><div class="kpi-val o" id="kPerc">—</div><div class="kpi-pbar"><div class="kpi-pfill" id="kPercBar" style="width:0%;background:#ff9500"></div></div></div>
+</div>
+
+<!-- FLOW BAR: CORREIA → CHECKOUT → EXPEDIÇÃO com pendentes -->
+<div class="flow-bar" id="flowBar">
+  <!-- CORREIA -->
+  <div class="flow-stage correia" id="fsCorreia">
+    <div class="flow-stage-title">🔴 Correia (Separação)</div>
+    <div class="flow-row"><span class="flow-lbl">Med. Prev.</span><span class="flow-val" id="fsCMedPrev">—</span></div>
+    <div class="flow-row"><span class="flow-lbl">Med. Real.</span><span class="flow-val" id="fsCMedReal">—</span></div>
+    <div class="pbar-mini"><div class="pbar-mini-fill" id="fsCMedBar" style="width:0%;background:#ff9500"></div></div>
+    <div class="flow-row" style="margin-top:4px"><span class="flow-lbl">Perf. Prev.</span><span class="flow-val" id="fsCPerfPrev">—</span></div>
+    <div class="flow-row"><span class="flow-lbl">Perf. Real.</span><span class="flow-val" id="fsCPerfReal">—</span></div>
+    <div class="pbar-mini"><div class="pbar-mini-fill" id="fsCPerfBar" style="width:0%;background:#ff9500"></div></div>
+    <div class="flow-row" style="margin-top:4px"><span class="flow-lbl">Início</span><span class="flow-val" id="kCMed">—:—</span></div>
+  </div>
+  <div class="flow-arrow">→</div>
+  <!-- CHECKOUT -->
+  <div class="flow-stage checkout" id="fsCheckout" style="flex:1.4">
+    <div class="flow-stage-title">🔵 Checkout (Conferência)</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px">
+      <div><div class="flow-row"><span class="flow-lbl">Vol. CK</span><span class="flow-val" id="fsCKVol">—</span></div><div class="pbar-mini"><div class="pbar-mini-fill" id="fsCKVolBar" style="width:0%;background:#00e5ff"></div></div></div>
+      <div><div class="flow-row"><span class="flow-lbl">Psico</span><span class="flow-val" id="fsCKPsi">—</span></div><div class="pbar-mini"><div class="pbar-mini-fill" id="fsCKPsiBar" style="width:0%;background:#00e5ff"></div></div></div>
+      <div><div class="flow-row"><span class="flow-lbl">Gel.</span><span class="flow-val" id="fsCKGel">—</span></div><div class="pbar-mini"><div class="pbar-mini-fill" id="fsCKGelBar" style="width:0%;background:#00e5ff"></div></div></div>
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:3px;margin-top:3px">
+      <div><div class="flow-row"><span class="flow-lbl">Especial</span><span class="flow-val" id="fsCKEsp">—</span></div></div>
+      <div><div class="flow-row"><span class="flow-lbl">Fralda Frac.</span><span class="flow-val" id="fsCKFrFc">—</span></div></div>
+      <div><div class="flow-row"><span class="flow-lbl">Fralda Fech.</span><span class="flow-val" id="fsCKFrF">—</span></div></div>
+    </div>
+    <div class="flow-row" style="margin-top:4px"><span class="flow-lbl">Início CK</span><span class="flow-val" id="kCkOut">—:—</span></div>
+  </div>
+  <div class="flow-arrow">→</div>
+  <!-- EXPEDIÇÃO -->
+  <div class="flow-stage expedicao" id="fsExp">
+    <div class="flow-stage-title">🟢 Expedição (DOCA)</div>
+    <div class="flow-row"><span class="flow-lbl">Vol. Total Prev.</span><span class="flow-val" id="fsExpPrev">—</span></div>
+    <div class="flow-row"><span class="flow-lbl">Vol. Expedido</span><span class="flow-val" id="fsExpReal">—</span></div>
+    <div class="pbar-mini"><div class="pbar-mini-fill" id="fsExpBar" style="width:0%;background:#00e676"></div></div>
+    <div class="flow-row" style="margin-top:4px"><span class="flow-lbl">Pendente Doca</span><span class="flow-val r" id="fsExpPend">—</span></div>
+    <div class="flow-row"><span class="flow-lbl">Início</span><span class="flow-val" id="kExp">—:—</span></div>
+    <div id="fsExpAlert" style="font-size:9px;margin-top:4px;padding:2px 6px;border-radius:3px;display:none"></div>
+  </div>
+</div>
+
+<!-- DAY NAV -->
+<div class="day-nav">
+  <div class="day-nav-lbl">📅 DIAS SALVOS:</div>
+  <div id="dayBtns" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+</div>
+
+<!-- TABS -->
+<div class="tabs">
+  <div class="tab act" onclick="switchTab('dash')">📊 Dashboard</div>
+  <div class="tab" onclick="switchTab('hist')">📅 Histórico</div>
+  <div class="tab" onclick="switchTab('comp')">📈 Comparativo</div>
+  <div class="tab" onclick="switchTab('rotas')">🚛 Rotas</div>
+  <div class="tab" id="tabAdm" onclick="switchTab('adm')" style="display:none">⚙️ Editar Dados</div>
+</div>
+
+<!-- TAB DASHBOARD -->
+<div class="tab-body act" id="tb-dash">
+  <div class="chart-grid">
+    <div class="chart-box">
+      <div class="chart-ttl">Produção hora a hora — Correia Med. / Perf. / Vol. Checkout</div>
+      <div style="position:relative;height:220px"><canvas id="cHora" role="img" aria-label="Producao por hora"></canvas></div>
+    </div>
+    <div class="chart-box">
+      <div class="chart-ttl">
+        <span>Volumes por Tipo — Realizado vs Previsão Noturna</span>
+        <span style="font-size:9px;font-weight:normal"><span style="color:#ff9500">■</span>Correia <span style="color:#9b59b6">■</span>Especial <span style="color:#4a90d9">■</span>Fralda <span style="color:#00e5ff">■</span>Gelad. <span style="color:#00e676">■</span>CK <span style="color:#e94560">■</span>Doca &nbsp;|&nbsp; <span style="color:#ffd700">■</span>atenção <span style="color:#e94560">■</span>crítico <span style="color:rgba(255,255,255,.15)">■</span>pendente</span>
+      </div>
+      <div style="position:relative;height:310px"><canvas id="cVolTipo" role="img" aria-label="Volumes por tipo"></canvas></div>
+    </div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-box">
+      <div class="chart-ttl">
+        <span>Expedição hora a hora — Impacto nas Rotas</span>
+        <span style="font-size:9px;font-weight:normal">🟢 dentro meta &nbsp;🟡 atenção &nbsp;🔴 abaixo</span>
+      </div>
+      <div style="position:relative;height:200px"><canvas id="cExp" role="img" aria-label="Expedicao hora a hora"></canvas></div>
+      <div id="rotaAlerta" style="margin-top:5px;font-size:10px;padding:5px 10px;border-radius:3px;display:none;font-weight:bold"></div>
+    </div>
+    <div class="chart-box">
+      <div class="chart-ttl">Meta Acumulada vs Produção Acumulada (Linhas Med.)</div>
+      <div style="position:relative;height:200px"><canvas id="cAcum" role="img" aria-label="Meta vs producao acumulada"></canvas></div>
+    </div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-box">
+      <div class="chart-ttl">Conferentes Planejado vs Ativo por Hora</div>
+      <div style="position:relative;height:180px"><canvas id="cConf" role="img" aria-label="Conferentes"></canvas></div>
+    </div>
+    <div class="chart-box">
+      <div class="chart-ttl"><span>EPM e Vales por Hora</span><span style="font-size:9px;color:#6a9fc0;font-weight:normal">EPM máx 2.500/h | Vale máx 1/h</span></div>
+      <div style="position:relative;height:180px"><canvas id="cEPM" role="img" aria-label="EPM e vales"></canvas></div>
+    </div>
+  </div>
+  <div class="separator">Quadro de Conferentes por Hora</div>
+  <div class="tbl-wrap" id="confTbl"></div>
+  <div class="separator">Produção Hora a Hora — Todos os Indicadores</div>
+  <div class="tbl-wrap" id="horaTbl"></div>
+  <div class="separator">🚛 Controle de Saída das Rotas — Eficiência da Expedição</div>
+  <div class="rotas-wrap">
+    <div class="rotas-hdr">
+      <div class="rotas-hdr-title">🚛 Saída das Rotas por Caminhão</div>
+      <div class="rotas-kpis">
+        <div class="rotas-kpi"><div class="v" id="rotasTotalVol">—</div><div class="l">Vol. Total</div></div>
+        <div class="rotas-kpi"><div class="v" style="color:#00e676" id="rotasOkCount">—</div><div class="l">No Prazo</div></div>
+        <div class="rotas-kpi"><div class="v" style="color:#ff4c4c" id="rotasAtrasCount">—</div><div class="l">Atrasados</div></div>
+        <div class="rotas-kpi"><div class="v" style="color:#ff9500" id="rotasPendCount">—</div><div class="l">Pendentes</div></div>
+        <div class="rotas-kpi"><div class="v" style="color:#ffd700" id="rotasEfic">—</div><div class="l">Eficiência</div></div>
+      </div>
+    </div>
+    <div class="rotas-tbl" id="rotasTbl"></div>
+  </div>
+</div>
+
+<!-- TAB ROTAS -->
+<div class="tab-body" id="tb-rotas">
+  <div style="padding:8px">
+    <div style="background:#0a2340;border-radius:6px;padding:8px 14px;margin-bottom:8px;border:1px solid rgba(0,230,118,.3);display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+      <div style="font-size:11px;font-weight:bold;color:#00e676">🚛 CONTROLE DE SAÍDA DAS ROTAS</div>
+      <div style="font-size:10px;color:#6a9fc0">Horários previstos são fixos. Preencha apenas: Placa, Volumes, Paletes, Hr Realizado e Obs.</div>
+      <button id="rotasUnlockBtn" onclick="unlockRotas()" style="background:#e94560;color:#fff;border:none;padding:4px 14px;border-radius:4px;cursor:pointer;font-size:11px;margin-left:auto">🔓 Habilitar Edição</button>
+      <span id="rotasEditandoLbl" style="display:none;background:#00e676;color:#000;padding:3px 10px;border-radius:4px;font-size:10px;font-weight:bold">✏️ EDITANDO</span>
+    </div>
+    <div class="rotas-wrap" style="margin:0">
+      <div class="rotas-hdr">
+        <div class="rotas-hdr-title">📋 Rotas do Turno — <span id="rotasDateLbl" style="font-weight:normal;color:#89b4d4"></span></div>
+        <div class="rotas-kpis">
+          <div class="rotas-kpi"><div class="v" id="rotasTotalVol2">—</div><div class="l">Vol. Total</div></div>
+          <div class="rotas-kpi"><div class="v" style="color:#00e676" id="rotasOkCount2">—</div><div class="l">No Prazo</div></div>
+          <div class="rotas-kpi"><div class="v" style="color:#ff4c4c" id="rotasAtrasCount2">—</div><div class="l">Atrasados</div></div>
+          <div class="rotas-kpi"><div class="v" style="color:#ff9500" id="rotasPendCount2">—</div><div class="l">Pendentes</div></div>
+          <div class="rotas-kpi"><div class="v" style="color:#ffd700" id="rotasEfic2">—</div><div class="l">Eficiência</div></div>
+          <div class="rotas-kpi"><div class="v" id="rotasTotalPal2">—</div><div class="l">Paletes</div></div>
+        </div>
+      </div>
+      <div class="rotas-tbl" id="rotasTblFull"></div>
+    </div>
+  </div>
+</div>
+
+<!-- TAB HISTÓRICO -->
+<div class="tab-body" id="tb-hist"><div class="hist-wrap" id="histWrap"></div></div>
+
+<!-- TAB COMPARATIVO -->
+<div class="tab-body" id="tb-comp">
+  <div class="chart-grid">
+    <div class="chart-box"><div class="chart-ttl">% Produzido por Dia</div><div style="position:relative;height:220px"><canvas id="cCompPerc" role="img" aria-label="Percentual por dia"></canvas></div></div>
+    <div class="chart-box"><div class="chart-ttl">Venda vs Acumulado</div><div style="position:relative;height:220px"><canvas id="cCompVA" role="img" aria-label="Venda vs acumulado"></canvas></div></div>
+  </div>
+  <div class="chart-grid">
+    <div class="chart-box"><div class="chart-ttl">O.S. Impressas vs Finalizadas</div><div style="position:relative;height:200px"><canvas id="cCompOS" role="img" aria-label="OS"></canvas></div></div>
+    <div class="chart-box"><div class="chart-ttl">Faltas por Dia</div><div style="position:relative;height:200px"><canvas id="cCompFlt" role="img" aria-label="Faltas"></canvas></div></div>
+  </div>
+  <div class="separator">Tabela Resumo — Todos os Dias</div>
+  <div class="tbl-wrap" id="compTbl"></div>
+</div>
+
+<!-- TAB ADMIN -->
+<div class="tab-body" id="tb-adm">
+  <div class="adm">
+    <h3>⚙️ INSERIR / EDITAR DADOS DO DIA <span id="admDayLbl" style="color:#89b4d4;font-size:11px;font-weight:normal"></span></h3>
+    <div class="adm-grid">
+
+      <!-- COL 1: DATA + PREVISÃO NOTURNA -->
+      <div class="adm-group" style="grid-column:1/-1">
+        <h4>🌙 Previsão Noturna — Preencher antes da operação começar</h4>
+        <div style="display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start">
+          <div>
+            <div class="adm-row" style="margin-bottom:8px"><label style="font-size:12px;font-weight:bold;color:#ffd700">Data do Turno</label><input type="date" id="iData" oninput="liveUpdate()" style="width:130px"/></div>
+            <div class="adm-row"><label>Venda — Volumetria Total</label><input type="number" id="iPNVol" placeholder="0" oninput="liveUpdate()" style="border-color:#ffd700"/></div>
+            <div class="adm-row"><label>Venda — Unidades</label><input type="number" id="iPNUnid" placeholder="0" oninput="liveUpdate()" style="border-color:#ffd700"/></div>
+          </div>
+          <div>
+            <div style="font-size:10px;color:#6a9fc0;margin-bottom:5px;text-transform:uppercase;font-weight:bold">Volumes previstos por tipo (do gráfico do sistema)</div>
+            <div class="prev-grid">
+              <div class="prev-item"><label>Correia (vol.)</label><input type="number" id="iPNCorreia" placeholder="0" oninput="liveUpdate()"/></div>
+              <div class="prev-item"><label>Cx Fechada Psico (vol.)</label><input type="number" id="iPNPsico" placeholder="0" oninput="liveUpdate()"/></div>
+              <div class="prev-item"><label>Especial (vol.)</label><input type="number" id="iPNEspecial" placeholder="0" oninput="liveUpdate()"/></div>
+              <div class="prev-item"><label>Especial Fracionado (vol.)</label><input type="number" id="iPNEspFrac" placeholder="0" oninput="liveUpdate()"/></div>
+              <div class="prev-item"><label>Especial Medicamento (vol.)</label><input type="number" id="iPNEspMed" placeholder="0" oninput="liveUpdate()"/></div>
+              <div class="prev-item"><label>Especial Perfumaria (vol.)</label><input type="number" id="iPNEspPerf" placeholder="0" oninput="liveUpdate()"/></div>
+              <div class="prev-item"><label>Fraldas (vol.)</label><input type="number" id="iPNFralda" placeholder="0" oninput="liveUpdate()"/></div>
+              <div class="prev-item"><label>Fraldas Cx Fechada (vol.)</label><input type="number" id="iPNFraldaF" placeholder="0" oninput="liveUpdate()"/></div>
+              <div class="prev-item"><label>Geladeira (vol.)</label><input type="number" id="iPNGel" placeholder="0" oninput="liveUpdate()"/></div>
+              <div class="prev-item"><label>Oncológico (vol.)</label><input type="number" id="iPNOnco" placeholder="0" oninput="liveUpdate()"/></div>
+              <div class="prev-item"><label>Oncológico Termolábil (vol.)</label><input type="number" id="iPNOncoT" placeholder="0" oninput="liveUpdate()"/></div>
+              <div class="prev-item"><label>Junção (vol.)</label><input type="number" id="iPNJuncao" placeholder="0" oninput="liveUpdate()"/></div>
+              <div class="prev-item"><label>Doca (vol.)</label><input type="number" id="iPNDoca" placeholder="0" oninput="liveUpdate()"/></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- COL 1: RESUMO OPERACIONAL -->
+      <div class="adm-group">
+        <h4>📋 Resumo Operacional</h4>
+        <div class="adm-row"><label>Acumulado produzido</label><input type="number" id="iAcum" placeholder="0" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Meta Proj. Unid. (acum.)</label><input type="number" id="iMeta" placeholder="0" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>O.S. Impressas</label><input type="number" id="iOsImp" placeholder="0" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>O.S. Finalizadas</label><input type="number" id="iOsFin" placeholder="0" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>O.S. À Produzir</label><input type="number" id="iOsProd" placeholder="0" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Média Itens/O.S.</label><input type="number" id="iMedIt" step="0.1" placeholder="0.0" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Faltas no dia</label><input type="number" id="iFaltas" placeholder="0" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Observações</label></div>
+        <textarea id="iObs" style="width:100%;background:#0d1c2e;border:1px solid #1e4a72;color:#fff;border-radius:3px;padding:5px;font-size:11px;resize:vertical;min-height:50px" oninput="liveUpdate()"></textarea>
+      </div>
+
+      <!-- COL 2: HORÁRIOS E CAPACIDADE/HORA -->
+      <div class="adm-group">
+        <h4>🕐 Horários de Início dos Processos</h4>
+        <div class="adm-row"><label>Correia Perfumaria</label><input type="time" id="iCPer" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Correia Medicamentos</label><input type="time" id="iCMed" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Check-Out</label><input type="time" id="iCkOut" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Especial</label><input type="time" id="iEsp" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Fralda Fechado</label><input type="time" id="iFrF" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Fralda Fracionado</label><input type="time" id="iFrFc" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Expedição</label><input type="time" id="iExp" oninput="liveUpdate()"/></div>
+        <h4 style="margin-top:10px">⚡ Capacidade por Hora <span style="color:#6a9fc0;font-size:9px;font-weight:normal">(configura 1x)</span></h4>
+        <div class="adm-row"><label>Linhas Med. /h</label><input type="number" id="iCapLM" value="3500" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Linhas Perf. /h</label><input type="number" id="iCapLP" value="3000" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>EPM máx /h <span style="color:#ff4c4c;font-size:9px">(máximo)</span></label><input type="number" id="iCapErros" value="2500" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Vol. Checkout /h</label><input type="number" id="iCapVC" value="1280" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Linhas Checkout /h</label><input type="number" id="iCapLC" value="6500" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Unid. Checkout /h</label><input type="number" id="iCapUC" value="20800" oninput="liveUpdate()"/></div>
+
+        <div class="adm-row"><label>Vales máx /h <span style="color:#ff4c4c;font-size:9px">(máximo)</span></label><input type="number" id="iCapVales" value="1" oninput="liveUpdate()"/></div>
+        <div style="background:#071525;border-radius:3px;padding:5px 8px;margin-top:4px;border:1px solid rgba(0,230,118,.2)">
+          <div style="font-size:9px;color:#00e676;font-weight:bold;margin-bottom:4px">EXPEDIÇÃO — capacidade /hora</div>
+          <div class="adm-row"><label>Vol. Especial /h</label><input type="number" id="iCapEsp" value="340" oninput="liveUpdate()"/></div>
+          <div class="adm-row"><label>Vol. Esp. Frac. /h</label><input type="number" id="iCapEspFrac" value="0" oninput="liveUpdate()"/></div>
+          <div class="adm-row"><label>Vol. Esp. Med. /h</label><input type="number" id="iCapEspMed" value="0" oninput="liveUpdate()"/></div>
+          <div class="adm-row"><label>Vol. Esp. Perf. /h</label><input type="number" id="iCapEspPerf" value="0" oninput="liveUpdate()"/></div>
+          <div class="adm-row"><label>Fraldas Cx Fech. /h</label><input type="number" id="iCapFrF" value="114" oninput="liveUpdate()"/></div>
+          <div class="adm-row"><label>Fraldas Frac. /h</label><input type="number" id="iCapFrFc" value="89" oninput="liveUpdate()"/></div>
+          <div class="adm-row"><label>Vol. Doca /h</label><input type="number" id="iCapVE" value="1303" oninput="liveUpdate()"/></div>
+        </div>
+      </div>
+
+      <!-- COL 3: REALIZADO AUTOMÁTICO -->
+      <div class="adm-group">
+        <h4>✅ Realizado Total <span style="color:#00e676;font-size:9px;font-weight:normal">(automático da tabela hora a hora)</span></h4>
+        <div class="real-auto-grid" id="realAutoGrid"></div>
+        <div style="border-top:1px solid #1a3550;padding-top:6px;margin-top:4px">
+          <h4 style="color:#89b4d4;font-size:10px;margin-bottom:6px">MANUAL — volumes sem linha hora a hora</h4>
+          <div class="adm-row"><label>Real. Oncológico (vol.)</label><input type="number" id="iROnco" placeholder="0" oninput="liveUpdate()"/></div>
+          <div class="adm-row"><label>Real. Onco Termolábil</label><input type="number" id="iROncoT" placeholder="0" oninput="liveUpdate()"/></div>
+          <div class="adm-row"><label>Real. Junção (vol.)</label><input type="number" id="iRJuncao" placeholder="0" oninput="liveUpdate()"/></div>
+          <div class="adm-row"><label>Real. Doca (vol.)</label><input type="number" id="iRDoc" placeholder="0" oninput="liveUpdate()"/></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- TABELA HORA A HORA -->
+    <div class="hora-tbl-wrap">
+      <h4>⏱️ PRODUÇÃO HORA A HORA — CORREIA/CHECKOUT: turno normal 17:30→23:00 <span style='color:rgba(255,149,0,.8);font-size:9px'>⚡ colunas laranja = hora extra (preencher se necessário)</span> | EXPEDIÇÃO: até 04:00
+        <span style="margin-left:10px;font-size:9px;font-weight:normal">
+          <span style="background:rgba(0,180,80,.35);padding:1px 6px;border-radius:2px;color:#00e676">▲ Acima</span>
+          <span style="background:rgba(0,120,60,.3);padding:1px 6px;border-radius:2px;color:#7ddc9f;margin-left:3px">✔ Meta</span>
+          <span style="background:rgba(180,130,0,.3);padding:1px 6px;border-radius:2px;color:#ffd700;margin-left:3px">⚠ Abaixo</span>
+          <span style="background:rgba(180,30,30,.35);padding:1px 6px;border-radius:2px;color:#ff7070;margin-left:3px">✖ Crítico</span>
+          <span style="background:rgba(180,30,30,.55);padding:1px 6px;border-radius:2px;color:#ff4c4c;margin-left:6px">🔴 Acima limite</span>
+        </span>
+      </h4>
+      <div style="overflow-x:auto">
+        <table id="hTbl"><thead><tr id="hTblHdr"></tr></thead><tbody id="hTblBody"></tbody></table>
+      </div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn-export" onclick="doExportCSV()">⬇ CSV</button>
+      <button class="btn btn-import" onclick="doImportJSON()">⬆ Importar</button>
+      <button class="btn btn-export" onclick="doExportJSON()">💾 Backup</button>
+      <button class="btn btn-del" onclick="delCurrentDay()" id="btnDel" style="display:none">🗑 Excluir Dia</button>
+      <button class="btn btn-newday" onclick="prepNewDay()">➕ Novo Dia</button>
+      <button class="btn btn-save" onclick="saveDay()">💾 Salvar Dia</button>
+      <button class="btn btn-lock" onclick="doLock()">🔒 Bloquear</button>
+    </div>
+  </div>
+</div>
+
+<button class="edit-btn-float" id="floatBtn" onclick="openAdmin()" title="Editar dados">✏️</button>
+<input type="file" id="importFile" accept=".json" style="display:none" onchange="doImportFile(event)"/>
+
+<script>
+// ── CONSTANTES ────────────────────────────────────────────
+// 11 períodos: 17:30-18:00, 18:00-19:00, 19:00-20:00, 20:00-21:00, 21:00-22:00, 22:00-23:00, 23:00-00:00, 00:00-01:00, 01:00-02:00, 02:00-03:00, 03:00-04:00
+const HOURS=['17:30→18h','18→19h','19→20h','20→21h','21→22h','22→23h','23→00h','00→01h','01→02h','02→03h','03→04h'];
+const HOURS_LABEL=['17:30','18:00','19:00','20:00','21:00','22:00','23:00','00:00','01:00','02:00','03:00','04:00']; // início de cada slot
+const H_CK=7;  // correia/checkout: turno normal até 23:00 (slots 0-6); slots ≥7 = hora extra (laranja)
+const H_EX=HOURS.length; // expedição: todos os 11 slots
+
+// MÉTRICAS hora a hora — 3 estágios do fluxo
+const MHORA=[
+  // CORREIA (separação) — encerra ~23:00
+  'Linhas Med.','Linhas Perf.','Erros Sep. Med.',
+  // CHECKOUT (conferência) — encerra ~23:00 — apenas os 3 volumes principais
+  'Vol. Checkout','Linhas Checkout','Unid. Checkout',
+  // EXPEDIÇÃO (DOCA) — vai até 04:00 — todos os tipos de volume
+  'Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.',
+  'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.',
+  'Vol. Doca',
+  // CONTROLE
+  'Vales','Conf. Planejado','Conf. Ativo'
+];
+const MHORA_INV=['Erros Sep. Med.','Vales'];
+const CAP_MAP={
+  'Linhas Med.':'iCapLM','Linhas Perf.':'iCapLP','Erros Sep. Med.':'iCapErros',
+  'Vol. Checkout':'iCapVC','Linhas Checkout':'iCapLC','Unid. Checkout':'iCapUC',
+  'Vol. Especial':'iCapEsp','Vol. Esp. Frac.':'iCapEspFrac',
+  'Vol. Esp. Med.':'iCapEspMed','Vol. Esp. Perf.':'iCapEspPerf',
+  'Vol. Fraldas Cx Fech.':'iCapFrF','Vol. Fraldas Frac.':'iCapFrFc',
+  'Vol. Doca':'iCapVE',
+  'Vales':'iCapVales'
+};
+// métricas que somam automaticamente no "Realizado Total"
+const REAL_AUTO=[
+  {id:'aLM',   lbl:'Linhas Med.',       m:'Linhas Med.'},
+  {id:'aLP',   lbl:'Linhas Perf.',      m:'Linhas Perf.'},
+  {id:'aVC',   lbl:'Vol. Checkout',     m:'Vol. Checkout'},
+  {id:'aLC',   lbl:'Lin. Checkout',     m:'Linhas Checkout'},
+  {id:'aUC',   lbl:'Unid. Checkout',    m:'Unid. Checkout'},
+  {id:'aEsp',  lbl:'Vol. Especial',     m:'Vol. Especial'},
+  {id:'aEspFr',lbl:'Esp. Frac.',        m:'Vol. Esp. Frac.'},
+  {id:'aEspMd',lbl:'Esp. Med.',         m:'Vol. Esp. Med.'},
+  {id:'aEspPf',lbl:'Esp. Perf.',        m:'Vol. Esp. Perf.'},
+  {id:'aFrF',  lbl:'Fraldas Cx Fech.', m:'Vol. Fraldas Cx Fech.'},
+  {id:'aFrFc', lbl:'Fraldas Frac.',     m:'Vol. Fraldas Frac.'},
+  {id:'aDoca', lbl:'Vol. Doca',         m:'Vol. Doca'},
+  {id:'aErros',lbl:'Erros Sep.',        m:'Erros Sep. Med.'},
+  {id:'aVales',lbl:'Vales',          m:'Vales'},
+];
+
+const SK='cdgam_v6';
+const PWD='gam2025';
+let db={days:[]};
+let curDate=null;
+let adminOk=false;
+let CH={};
+let histCharts={};
+let liveTimer=null;
+let syncTimer=null;
+let lastSyncHash='';
+
+// ── FIREBASE CONFIG ────────────────────────────────────────
+const FB_CONFIG={
+  apiKey:"AIzaSyCkqDak4jXeRyzgJ3qaY6WPv4IC1N8q5vo",
+  authDomain:"gam-sjp.firebaseapp.com",
+  databaseURL:"https://gam-sjp-default-rtdb.firebaseio.com",
+  projectId:"gam-sjp",
+  appId:"1:444201184007:web:27194758b5528dfd7973a2"
+};
+const FB_PATH='cdgam/data';
+let fbDb=null;
+let fbConnected=false;
+
+function initFirebase(){
+  try{
+    if(!firebase.apps||!firebase.apps.length)firebase.initializeApp(FB_CONFIG);
+    fbDb=firebase.database();
+    fbConnected=true;
+    showSyncStatus('☁ Firebase conectado');
+  }catch(e){fbConnected=false;console.warn('Firebase init error:',e);}
+}
+
+function showSyncStatus(msg,isErr){
+  const el=document.getElementById('syncStatus');if(!el)return;
+  el.textContent=msg;el.style.color=isErr?'#ff4c4c':'#00e676';
+  setTimeout(()=>{if(el){el.textContent=fbConnected?'☁ Nuvem ativa':'💾 Local';el.style.color=fbConnected?'#00e676':'#89b4d4';}},3000);
+}
+
+function startAutoSync(){
+  if(!fbConnected||!fbDb)return;
+  // Firebase Realtime Database listener — atualiza instantaneamente quando alguém salvar
+  fbDb.ref(FB_PATH).on('value',snapshot=>{
+    const remote=snapshot.val();
+    if(!remote||!remote.days)return;
+    const h=JSON.stringify(remote);
+    if(h===lastSyncHash)return;
+    lastSyncHash=h;
+    remote.days.forEach(rd=>{
+      const idx=db.days.findIndex(d=>d.date===rd.date);
+      if(idx>=0)db.days[idx]=rd;else db.days.push(rd);
+    });
+    db.days.sort((a,b)=>a.date.localeCompare(b.date));
+    localStorage.setItem(SK,JSON.stringify(db));
+    const day=getDay(curDate);
+    buildDayNav();
+    if(day){renderKPIs(day);renderFlowBar(day);renderDashCharts(day);renderDashTables(day);renderRotasTbl(day,'rotasTblFull');updateRotasKPIs(day);}
+    showSyncStatus('🔄 Atualizado em tempo real');
+  });
+}
+
+// ── STORAGE ────────────────────────────────────────────────
+function load(){
+  try{const r=localStorage.getItem(SK);if(r)db=JSON.parse(r);if(!db.days)db.days=[];}catch(e){db={days:[]};}
+  if(fbConnected&&fbDb){
+    fbDb.ref(FB_PATH).once('value').then(snapshot=>{
+      const remote=snapshot.val();
+      if(!remote||!remote.days)return;
+      remote.days.forEach(rd=>{const idx=db.days.findIndex(d=>d.date===rd.date);if(idx>=0)db.days[idx]=rd;else db.days.push(rd);});
+      db.days.sort((a,b)=>a.date.localeCompare(b.date));
+      localStorage.setItem(SK,JSON.stringify(db));
+      const day=getDay(curDate)||latestDay();
+      if(day){curDate=day.date;buildDayNav();renderKPIs(day);renderFlowBar(day);renderDashCharts(day);renderDashTables(day);}
+      lastSyncHash=JSON.stringify(remote);
+      showSyncStatus('☁ Dados carregados da nuvem');
+    });
+  }
+}
+
+function save(){
+  localStorage.setItem(SK,JSON.stringify(db));
+  if(fbConnected&&fbDb){
+    fbDb.ref(FB_PATH).set(db)
+      .then(()=>showSyncStatus('☁ Salvo na nuvem'))
+      .catch(()=>showSyncStatus('⚠ Erro ao salvar',true));
+  }
+}
+
+// ── EMPTY DAY ─────────────────────────────────────────────
+function emptyDay(dt){
+  const hd={};MHORA.forEach(m=>{hd[m]=new Array(HOURS.length).fill('');});
+  return{
+    date:dt||today(),
+    pnVol:0,pnUnid:0,
+    pnCorreia:0,pnPsico:0,pnEspecial:0,pnEspFrac:0,pnEspMed:0,pnEspPerf:0,
+    pnFralda:0,pnFraldaF:0,pnGel:0,pnOnco:0,pnOncoT:0,pnJuncao:0,pnDoca:0,
+    acum:0,meta:0,osImp:0,osFin:0,osProd:0,medIt:0,faltas:0,obs:'',
+    cPer:'',cMed:'',ckOut:'',esp:'',frF:'',frFc:'',exp:'',
+    capLM:3500,capLP:3000,capErros:2500,capVC:1280,capLC:6500,capUC:20800,
+    capVales:1,
+    capEsp:340,capEspFrac:0,capEspMed:0,capEspPerf:0,capFrF:114,capFrFc:89,capVE:1303,
+    rOnco:0,rOncoT:0,rJuncao:0,rDoc:0,
+    hd
+  };
+}
+function today(){return new Date().toISOString().slice(0,10);}
+function fmtDate(d){return new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'});}
+function fmtDateShort(d){return new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});}
+function getDay(dt){return db.days.find(d=>d.date===dt)||null;}
+function sortedDays(){return [...db.days].sort((a,b)=>a.date.localeCompare(b.date));}
+function latestDay(){const s=sortedDays();return s.length?s[s.length-1]:null;}
+
+// ── SOMA HORA A HORA ──────────────────────────────────────
+function sumHoraField(metric,hd){
+  if(!hd||!hd[metric])return 0;
+  return hd[metric].reduce((s,v)=>s+(v!==''&&v!==null&&v!==undefined?+v:0),0);
+}
+function sumHoraInput(metric){
+  let s=0;
+  document.querySelectorAll(`#hTblBody input[data-m="${metric}"]`).forEach(inp=>{if(inp.value!=='')s+=+inp.value;});
+  return s;
+}
+
+// ── AUTH ──────────────────────────────────────────────────
+function tryUnlock(){
+  if(document.getElementById('pwdIn').value===PWD){
+    adminOk=true;
+    document.getElementById('lockOv').classList.remove('on');
+    document.getElementById('tabAdm').style.display='';
+    document.getElementById('floatBtn').style.display='none';
+    document.getElementById('pwdIn').value='';
+    switchTab('adm');
+    loadFormFrom(getDay(curDate)||emptyDay(curDate));
+  }else{
+    document.getElementById('pwdHint').textContent='❌ Senha incorreta!';
+    document.getElementById('pwdHint').style.color='#e94560';
+  }
+}
+function openAdmin(){if(adminOk)switchTab('adm');else document.getElementById('lockOv').classList.add('on');}
+function doLock(){adminOk=false;document.getElementById('tabAdm').style.display='none';document.getElementById('floatBtn').style.display='flex';switchTab('dash');}
+
+// ── LIVE UPDATE ───────────────────────────────────────────
+function liveUpdate(){
+  clearTimeout(liveTimer);
+  liveTimer=setTimeout(()=>{
+    updateRealAuto();
+    const day=readFormAsDay();
+    if(day){
+      document.getElementById('liveBadge').style.display='inline';
+      renderKPIs(day);
+      renderFlowBar(day);
+      renderDashCharts(day);
+      renderDashTables(day);
+    }
+  },300);
+}
+function updateRealAuto(){
+  const grid=document.getElementById('realAutoGrid');
+  if(!grid)return;
+  grid.innerHTML='';
+  REAL_AUTO.forEach(({lbl,m})=>{
+    const val=sumHoraInput(m);
+    const div=document.createElement('div');
+    div.className='real-auto-item';
+    div.innerHTML=`<span style="font-size:10px;color:#89b4d4">${lbl}</span><span style="font-size:12px;font-weight:bold;color:#00e676">${val.toLocaleString('pt-BR')}</span>`;
+    grid.appendChild(div);
+  });
+}
+
+// ── TABS ──────────────────────────────────────────────────
+function switchTab(id){
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    const ids=['dash','hist','comp','rotas','adm'];t.classList.toggle('act',ids[i]===id);
+  });
+  document.querySelectorAll('.tab-body').forEach(t=>t.classList.remove('act'));
+  const el=document.getElementById('tb-'+id);if(el)el.classList.add('act');
+  if(id==='hist')renderHist();
+  if(id==='comp')renderComp();
+  if(id==='rotas'){renderRotasTab();}
+}
+
+// ── DAY NAV ───────────────────────────────────────────────
+function buildDayNav(){
+  const days=sortedDays();const btns=document.getElementById('dayBtns');btns.innerHTML='';
+  if(!days.length){btns.innerHTML='<span style="color:#445;font-size:11px">Sem dias salvos</span>';return;}
+  days.forEach(d=>{
+    const b=document.createElement('button');
+    b.className='day-btn'+(d.date===curDate?' cur':'');
+    b.innerHTML=fmtDateShort(d.date)+(d.date===today()?'<span class="today-badge">HOJE</span>':'');
+    b.onclick=()=>selectDay(d.date);btns.appendChild(b);
+  });
+}
+function selectDay(dt){
+  curDate=dt;buildDayNav();
+  const day=getDay(dt);
+  if(day){renderKPIs(day);renderFlowBar(day);renderDashCharts(day);renderDashTables(day);renderRotasTbl(day,'rotasTblFull');updateRotasKPIs(day);}
+  if(adminOk)loadFormFrom(day||emptyDay(dt));
+}
+
+// ── KPIs ──────────────────────────────────────────────────
+function renderKPIs(day){
+  const perc=day.meta>0?Math.round(day.acum/day.meta*100):0;
+  document.getElementById('hdrDate').textContent=fmtDate(day.date||today());
+  document.getElementById('kPN').textContent=(day.pnVol||0).toLocaleString('pt-BR');
+  document.getElementById('kPNU').textContent=(day.pnUnid||0).toLocaleString('pt-BR');
+  document.getElementById('kVenda').textContent=(day.pnUnid||0).toLocaleString('pt-BR');
+  document.getElementById('kAcum').textContent=(day.acum||0).toLocaleString('pt-BR');
+  // À Processar = Previsto Doca - já expedido (vol)
+  const aProcessarVol=Math.max((day.pnDoca||day.pnVol||0)-sumHoraField('Vol. Doca',day.hd||{}),0);
+  document.getElementById('kProc').textContent=aProcessarVol.toLocaleString('pt-BR');
+  document.getElementById('kMeta').textContent=(day.meta||0).toLocaleString('pt-BR');
+  document.getElementById('kOsImp').textContent=(day.osImp||0).toLocaleString('pt-BR');
+  document.getElementById('kOsFin').textContent=(day.osFin||0).toLocaleString('pt-BR');
+  document.getElementById('kOsProd').textContent=(day.osProd||0).toLocaleString('pt-BR');
+  document.getElementById('kPerc').textContent=perc+'%';
+  document.getElementById('kPercBar').style.width=Math.min(perc,100)+'%';
+  document.getElementById('kPercBar').style.background=perc>=90?'#00e676':perc>=70?'#ff9500':'#ff4c4c';
+}
+
+// ── FLOW BAR (Correia → Checkout → Expedição) ────────────
+function renderFlowBar(day){
+  const hd=day.hd||{};
+  const sumH=m=>sumHoraField(m,hd);
+  // Correia
+  const medReal=sumH('Linhas Med.'),medPrev=day.pnCorreia||0;
+  const perfReal=sumH('Linhas Perf.'),perfPrev=day.pnCorreia||0;
+  document.getElementById('fsCMedPrev').textContent=(day.pnCorreia||0).toLocaleString('pt-BR');
+  document.getElementById('fsCMedReal').textContent=medReal.toLocaleString('pt-BR');
+  const capMed=(day.capLM||3500)*H_CK;
+  const pMed=capMed>0?Math.min(Math.round(medReal/capMed*100),100):0;
+  const barMed=document.getElementById('fsCMedBar');
+  barMed.style.width=pMed+'%';barMed.style.background=pMed>=90?'#00e676':pMed>=70?'#ffd700':'#ff4c4c';
+
+  document.getElementById('fsCPerfPrev').textContent=(day.pnCorreia||0).toLocaleString('pt-BR');
+  document.getElementById('fsCPerfReal').textContent=sumH('Linhas Perf.').toLocaleString('pt-BR');
+  const capPerf=(day.capLP||3000)*H_CK;
+  const pPerf=capPerf>0?Math.min(Math.round(sumH('Linhas Perf.')/capPerf*100),100):0;
+  const barPerf=document.getElementById('fsCPerfBar');
+  barPerf.style.width=pPerf+'%';barPerf.style.background=pPerf>=90?'#00e676':pPerf>=70?'#ffd700':'#ff4c4c';
+  document.getElementById('kCMed').textContent=day.cMed||'—:—';
+
+  // Checkout
+  const ckVol=sumH('Vol. Checkout');
+  const capCK=(day.capVC||1280)*H_CK;
+  document.getElementById('fsCKVol').textContent=ckVol.toLocaleString('pt-BR');
+  const pCK=capCK>0?Math.min(Math.round(ckVol/capCK*100),100):0;
+  const bCK=document.getElementById('fsCKVolBar');
+  if(bCK){bCK.style.width=pCK+'%';bCK.style.background=pCK>=90?'#00e5ff':pCK>=70?'#ffd700':'#ff4c4c';}
+  if(document.getElementById('fsCKPsi'))document.getElementById('fsCKPsi').textContent='—';
+  if(document.getElementById('fsCKGel'))document.getElementById('fsCKGel').textContent='—';
+  // Checkout = Correia + Junção
+  const prevCKtotal=(day.pnCorreia||0)+(day.pnJuncao||0);
+  document.getElementById('fsCKEsp').textContent='Prev: '+(day.pnCorreia||0).toLocaleString('pt-BR');
+  document.getElementById('fsCKFrFc').textContent='Junção: '+(day.pnJuncao||0).toLocaleString('pt-BR');
+  document.getElementById('fsCKFrF').textContent='Total: '+prevCKtotal.toLocaleString('pt-BR');
+  document.getElementById('kCkOut').textContent=day.ckOut||'—:—';
+
+  // Expedição
+  // DOCA = total de todos os volumes expedidos
+  const expReal=sumH('Vol. Especial')+sumH('Vol. Esp. Frac.')+sumH('Vol. Esp. Med.')+sumH('Vol. Esp. Perf.')+sumH('Vol. Fraldas Cx Fech.')+sumH('Vol. Fraldas Frac.')+sumH('Vol. Doca');
+  // DOCA = todos os volumes (previsto = pnDoca)
+  const expPrev=day.pnDoca||day.pnVol||0;
+  const expPend=Math.max(expPrev-expReal,0);
+  const capExp=(day.capVE||1303)*H_EX;
+  const pExp=expPrev>0?Math.min(Math.round(expReal/expPrev*100),100):capExp>0?Math.min(Math.round(expReal/capExp*100),100):0;
+  document.getElementById('fsExpPrev').textContent=expPrev.toLocaleString('pt-BR');
+  document.getElementById('fsExpReal').textContent=expReal.toLocaleString('pt-BR');
+  document.getElementById('fsExpPend').textContent=expPend.toLocaleString('pt-BR');
+  const barExp=document.getElementById('fsExpBar');
+  barExp.style.width=pExp+'%';
+  barExp.style.background=expReal>=expPrev?'#00e676':pExp>=70?'#00e676':'#ff4c4c';
+  document.getElementById('kExp').textContent=day.exp||'—:—';
+  const alertEl=document.getElementById('fsExpAlert');
+  if(expReal>0){
+    alertEl.style.display='block';
+    if(expReal>=expPrev&&expPrev>0){alertEl.style.background='rgba(0,180,80,.3)';alertEl.style.color='#00e676';alertEl.textContent='✅ Meta atingida';}
+    else if(expReal>capExp){alertEl.style.background='rgba(0,150,255,.2)';alertEl.style.color='#00e5ff';alertEl.textContent='📢 Acima da cap. — verificar reforço';}
+    else if(pExp>=70){alertEl.style.background='rgba(180,130,0,.2)';alertEl.style.color='#ffd700';alertEl.textContent=`⚠️ ${pExp}% — monitorar rotas`;}
+    else{alertEl.style.background='rgba(180,30,30,.3)';alertEl.style.color='#ff4c4c';alertEl.textContent=`🚨 ${pExp}% — risco atraso nas rotas`;}
+  }else{alertEl.style.display='none';}
+}
+
+// ── DASHBOARD CHARTS ──────────────────────────────────────
+function dv(hd,m){return HOURS.map((_,i)=>{const v=hd&&hd[m]?hd[m][i]:'';return(v!==''&&v!==null)?+v:null;});}
+function renderDashCharts(day){
+  const hd=day.hd||{};
+  const lm=dv(hd,'Linhas Med.'),lp=dv(hd,'Linhas Perf.'),vc=dv(hd,'Vol. Checkout');
+  const capLM=day.capLM||3500,capLP=day.capLP||3000,capVC=day.capVC||1280;
+
+  if(CH.hora)CH.hora.destroy();
+  CH.hora=new Chart(document.getElementById('cHora'),{type:'bar',
+    data:{labels:HOURS,datasets:[
+      {label:'Linhas Med.',data:lm,backgroundColor:lm.map(v=>v===null?'transparent':v>=capLM*.9?'#ff9500':'#c04000'),borderRadius:3},
+      {label:'Linhas Perf.',data:lp,backgroundColor:lp.map(v=>v===null?'transparent':v>=capLP*.9?'#00e5ff':'#006080'),borderRadius:3},
+      {label:'Vol. Checkout',data:vc,backgroundColor:vc.map(v=>v===null?'transparent':v>=capVC*.9?'#00e676':'#004030'),borderRadius:3}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},
+      scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},
+              y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'}}}}});
+
+  // Volumes por Tipo — usa previsão noturna como 100%
+  const sumH=m=>sumHoraField(m,hd);
+
+  // AGRUPAMENTOS conforme fluxo real da operação:
+  // Correia = Linhas Med. + Linhas Perf. → vai para o Checkout
+  const rCorreia = sumH('Linhas Med.') + sumH('Linhas Perf.');
+  // Especial = Especial + Cx Fech. Psico + Espec. Frac. + Espec. Med. + Espec. Perf. + Fraldas Cx Fech.
+  const rEspecial = (day.pnEspecial||0)>0 ? sumH('Vol. Psico CK') : 0; // hora a hora do grupo especial via Psico CK
+  const prevEspecial = (day.pnEspecial||0)+(day.pnPsico||0)+(day.pnEspFrac||0)+(day.pnEspMed||0)+(day.pnEspPerf||0)+(day.pnFraldaF||0);
+  // Geladeira = Geladeira + Oncológico + Onco Termolábil
+  const rGeladeira = (day.rOnco||0) + (day.rOncoT||0);
+  const prevGeladeira = (day.pnGel||0)+(day.pnOnco||0)+(day.pnOncoT||0);
+  // Checkout = Correia + Junção (o que passa pelo checkout)
+  const prevCheckout = (day.pnCorreia||0)+(day.pnJuncao||0);
+  // DOCA = tudo expedido (soma de todos os setores)
+  const rDoca = sumH('Vol. Expedição');
+  const prevDoca = day.pnDoca||0;
+
+  const volDefs=[
+    {lbl:'01 - CORREIA',              real:rCorreia,              prev:day.pnCorreia||0,  cor:'correia'},
+    {lbl:'09 - CX FECH. PSICO',       real:day.rJuncao||0,        prev:day.pnPsico||0,    cor:'especial'},
+    {lbl:'02 - ESPECIAL',             real:0,                     prev:day.pnEspecial||0, cor:'especial'},
+    {lbl:'14 - ESPECIAL FRAC.',       real:0,                     prev:day.pnEspFrac||0,  cor:'especial'},
+    {lbl:'04 - ESPECIAL MED.',        real:0,                     prev:day.pnEspMed||0,   cor:'especial'},
+    {lbl:'03 - ESPECIAL PERF.',       real:0,                     prev:day.pnEspPerf||0,  cor:'especial'},
+    {lbl:'06 - FRALDAS',              real:0,                     prev:day.pnFralda||0,   cor:'fralda'},
+    {lbl:'10 - FRALDAS CX FECH.',     real:0,                     prev:day.pnFraldaF||0,  cor:'especial'},
+    {lbl:'05 - GELADEIRA',            real:rGeladeira,            prev:day.pnGel||0,      cor:'gelad'},
+    {lbl:'15 - ONCOLÓGICO',           real:day.rOnco||0,          prev:day.pnOnco||0,     cor:'gelad'},
+    {lbl:'16 - ONCO TERMOLÁBIL',      real:day.rOncoT||0,         prev:day.pnOncoT||0,    cor:'gelad'},
+    {lbl:'22 - CONTROLE QUALIDADE',   real:sumH('Vol. Checkout'), prev:prevCheckout,      cor:'checkout'},
+    {lbl:'23 - JUNÇÃO',               real:day.rJuncao||0,        prev:day.pnJuncao||0,   cor:'checkout'},
+    {lbl:'24 - DOCA',                 real:rDoca,                 prev:prevDoca,          cor:'doca'},
+  ];
+
+  // cores por grupo
+  const corMap={
+    correia:'#ff9500',especial:'#9b59b6',fralda:'#4a90d9',
+    gelad:'#00e5ff',checkout:'#00e676',doca:'#e94560'
+  };
+  // Cada barra = realizado (colorido por grupo) + pendente (cinza)
+  // A largura total = valor previsto noturno (= 100%)
+  const realVals=volDefs.map(d=>d.prev>0?Math.min(d.real,d.prev):d.real);
+  const pendVals=volDefs.map(d=>d.prev>0?Math.max(d.prev-d.real,0):0);
+  // cor da barra: usa a cor do grupo, com opacidade indicando % atingida
+  const realColors=volDefs.map(d=>{
+    const base=corMap[d.cor]||'#4a90d9';
+    if(d.prev===0)return base+'99';
+    const p=d.real/d.prev;
+    // saturado=dentro/acima, amarelado=atenção, vermelho=crítico
+    return p>=0.95?base:p>=0.7?'#ffd700':'#e94560';
+  });
+  if(CH.volTipo)CH.volTipo.destroy();
+  CH.volTipo=new Chart(document.getElementById('cVolTipo'),{type:'bar',
+    data:{labels:volDefs.map(d=>d.lbl),datasets:[
+      {label:'Realizado',data:realVals,backgroundColor:realColors,borderRadius:0,barPercentage:0.82,
+       datalabels:{display:false}},
+      {label:'Pendente',data:pendVals,backgroundColor:'rgba(255,255,255,0.07)',borderRadius:0,barPercentage:0.82}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,indexAxis:'y',
+      plugins:{
+        legend:{display:false},
+        tooltip:{callbacks:{
+          title:(items)=>{const d=volDefs[items[0].dataIndex];return d.lbl;},
+          label:(ctx)=>{
+            const d=volDefs[ctx.dataIndex];
+            const p=d.prev>0?Math.round(d.real/d.prev*100):'—';
+            if(ctx.datasetIndex===0)return[
+              ` Realizado: ${d.real.toLocaleString('pt-BR')}`,
+              ` Previsto:  ${d.prev.toLocaleString('pt-BR')}`,
+              ` Progresso: ${p}%`
+            ];
+            return` Pendente: ${Math.max(d.prev-d.real,0).toLocaleString('pt-BR')}`;
+          }
+        }}
+      },
+      scales:{
+        x:{stacked:true,ticks:{color:'#6a9fc0',font:{size:8},callback:v=>v.toLocaleString('pt-BR')},
+           grid:{color:'rgba(255,255,255,0.07)'}},
+        y:{stacked:true,ticks:{color:'#c0d8f0',font:{size:10},padding:4},
+           grid:{color:'rgba(255,255,255,0.04)'}}
+      }
+    }
+  });
+  // Desenha labels com valor + % dentro das barras via plugin afterDraw
+  const volChart=CH.volTipo;
+  const origDraw=volChart.draw.bind(volChart);
+  volChart.draw=function(){
+    origDraw();
+    const ctx2=volChart.ctx;
+    ctx2.save();
+    volChart.data.datasets[0].data.forEach((val,i)=>{
+      if(val===0&&realVals[i]===0)return;
+      const d=volDefs[i];
+      const meta=volChart.getDatasetMeta(0);
+      const bar=meta.data[i];
+      if(!bar)return;
+      const p=d.prev>0?Math.round(d.real/d.prev*100):null;
+      const txt=d.real.toLocaleString('pt-BR')+(p!==null?' ('+p+'%)':'');
+      ctx2.fillStyle='#fff';
+      ctx2.font='bold 10px Arial';
+      ctx2.textAlign='left';
+      ctx2.textBaseline='middle';
+      const x=bar.x-bar.width/2+6;
+      if(bar.width>40)ctx2.fillText(txt,x,bar.y);
+    });
+    ctx2.restore();
+  };
+
+  // Expedição
+  const ve=dv(hd,'Vol. Doca');const capVEh=day.capVE||1303;
+  const veAcum=[];let runV=0;
+  ve.forEach(v=>{if(v!==null){runV+=v;veAcum.push(runV);}else veAcum.push(runV>0?runV:null);});
+  const totalExp=ve.reduce((s,v)=>s+(v||0),0);
+  const expPrev=day.pnDoca||day.pnVol||0; // DOCA = volume total a expedir
+  const expPct=expPrev>0?Math.round(totalExp/expPrev*100):(capVEh*H_EX>0?Math.round(totalExp/(capVEh*H_EX)*100):0);
+  if(CH.exp)CH.exp.destroy();
+  CH.exp=new Chart(document.getElementById('cExp'),{type:'bar',
+    data:{labels:HOURS,datasets:[
+      {label:'Meta/h',data:HOURS.map(()=>capVEh),type:'line',borderColor:'#ffd700',borderDash:[5,3],borderWidth:1.5,pointRadius:0,fill:false},
+      {label:'Vol. Expedição/h',data:ve,backgroundColor:ve.map(v=>v===null?'transparent':v>=capVEh?'#00e5ff':v>=capVEh*.9?'#00e676':v>=capVEh*.7?'#ffd700':'#ff4c4c'),borderRadius:3},
+      {label:'Acumulado',data:veAcum,type:'line',borderColor:'#00e5ff',borderWidth:2,pointRadius:2,fill:false,yAxisID:'y2'}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#89b4d4',font:{size:9}}}},
+      scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},
+              y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'},position:'left'},
+              y2:{ticks:{color:'#00e5ff',font:{size:9}},grid:{display:false},position:'right'}}}});
+  const alertEl=document.getElementById('rotaAlerta');
+  if(totalExp>0){
+    alertEl.style.display='block';
+    if(totalExp>=expPrev&&expPrev>0){alertEl.style.background='rgba(0,180,80,.25)';alertEl.style.color='#00e676';alertEl.textContent=`✅ Expedição 100% — todos os volumes expedidos no prazo.`;}
+    else if(totalExp>capVEh*H_EX){alertEl.style.background='rgba(0,150,255,.2)';alertEl.style.color='#00e5ff';alertEl.textContent=`📢 Volume ACIMA da capacidade horária — reforço necessário na expedição.`;}
+    else if(expPct>=90){alertEl.style.background='rgba(0,180,80,.2)';alertEl.style.color='#00e676';alertEl.textContent=`✅ Expedição dentro da meta (${expPct}%) — rotas no prazo.`;}
+    else if(expPct>=70){alertEl.style.background='rgba(180,130,0,.2)';alertEl.style.color='#ffd700';alertEl.textContent=`⚠️ Expedição a ${expPct}% — monitorar rotas com saída próxima.`;}
+    else{alertEl.style.background='rgba(180,30,30,.3)';alertEl.style.color='#ff4c4c';alertEl.textContent=`🚨 Expedição crítica (${expPct}%) — risco de atraso nas rotas!`;}
+  }else{alertEl.style.display='none';}
+
+  // Meta acumulada
+  const meta=HOURS.map((_,i)=>day.meta?Math.round(day.meta*(i+1)/HOURS.length):null);
+  const prodA=[];let run=0;
+  lm.forEach(v=>{if(v!==null){run+=v;prodA.push(run);}else prodA.push(run>0?run:null);});
+  if(CH.acum)CH.acum.destroy();
+  CH.acum=new Chart(document.getElementById('cAcum'),{type:'line',
+    data:{labels:HOURS,datasets:[
+      {label:'Meta Acumulada',data:meta,borderColor:'#e94560',borderDash:[5,3],borderWidth:2,pointRadius:2,fill:false,tension:.3},
+      {label:'Prod. Acumulada',data:prodA,borderColor:'#00e676',borderWidth:2,pointRadius:3,fill:false,tension:.3}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},
+      scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},
+              y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'}}}}});
+
+  // Conferentes
+  const cp=dv(hd,'Conf. Planejado'),ca=dv(hd,'Conf. Ativo');
+  if(CH.conf)CH.conf.destroy();
+  CH.conf=new Chart(document.getElementById('cConf'),{type:'bar',
+    data:{labels:HOURS,datasets:[
+      {label:'Planejado',data:cp,backgroundColor:'rgba(0,229,255,.2)',borderColor:'#00e5ff',borderWidth:1},
+      {label:'Ativo',data:ca,backgroundColor:ca.map((v,i)=>{if(v===null)return'transparent';const p=cp[i];return(p&&v<p*.8)?'#ff4c4c':v>=p?'#ffd700':'#ff9500';}),borderRadius:2}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},
+      scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},
+              y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'}}}}});
+
+  // EPM e Vales
+  const epm=dv(hd,'Erros Sep. Med.'),vals=dv(hd,'Vales');
+  const capEPM=day.capErros||2500,capVales=day.capVales||1;
+  if(CH.epm)CH.epm.destroy();
+  CH.epm=new Chart(document.getElementById('cEPM'),{type:'bar',
+    data:{labels:HOURS,datasets:[
+      {label:`EPM (máx ${capEPM.toLocaleString('pt-BR')})`,data:epm,backgroundColor:epm.map(v=>v===null?'transparent':v>capEPM?'#ff4c4c':v>capEPM*.8?'#ffd700':'#00e676'),borderRadius:3,yAxisID:'y'},
+      {label:`Vales (máx ${capVales})`,data:vals,backgroundColor:vals.map(v=>v===null?'transparent':v>capVales?'#ff4c4c':'#00e676'),borderRadius:3,yAxisID:'y2'}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#89b4d4',font:{size:9}}}},
+      scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},
+              y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'},position:'left'},
+              y2:{ticks:{color:'#ffd700',font:{size:9}},grid:{display:false},position:'right'}}}});
+}
+
+// ── DASHBOARD TABLES ──────────────────────────────────────
+function renderDashTables(day){
+  const hd=day.hd||{};
+  const CAP_VALS={'Linhas Med.':day.capLM,'Linhas Perf.':day.capLP,'Erros Sep. Med.':day.capErros,
+    'Vol. Checkout':day.capVC,'Linhas Checkout':day.capLC,'Unid. Checkout':day.capUC,
+    'Vol. Psico CK':day.capVPsi,'Unid. Psico CK':day.capUPsi,'Vol. Gel. CK':day.capVGel,
+    'Vales':day.capVales,'Vol. Expedição':day.capVE,'Vol. Especial':day.capEsp,
+    'Vol. Fralda Frac.':day.capFrFc,'Vol. Fralda Fech.':day.capFrF};
+  const cp=hd['Conf. Planejado']||new Array(HOURS.length).fill('');
+  const ca=hd['Conf. Ativo']||new Array(HOURS.length).fill('');
+  let h=`<table><thead><tr><th style="text-align:left">Conferentes</th>${HOURS.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>`;
+  h+=`<tr><td class="row-lbl">Planejado</td>${cp.map(v=>`<td>${v!==''?v:'-'}</td>`).join('')}</tr>`;
+  h+=`<tr><td class="row-lbl">Ativo</td>${ca.map((v,i)=>{
+    const pl=cp[i]!==''?+cp[i]:null,re=v!==''?+v:null;
+    let col='#fff';if(re!==null&&pl!==null){col=re>=pl?'#00e676':re>=pl*.8?'#ffd700':'#ff4c4c';}
+    return`<td style="color:${col};font-weight:bold">${v!==''?v:'-'}</td>`;
+  }).join('')}</tr></tbody></table>`;
+  document.getElementById('confTbl').innerHTML=h;
+
+  const DASH_GROUPS=[
+    {title:'🔴 CORREIA — Separação',    bg:'rgba(255,149,0,.12)',
+     metrics:['Linhas Med.','Linhas Perf.','Erros Sep. Med.']},
+    {title:'🔵 CHECKOUT — Conferência', bg:'rgba(0,229,255,.08)',
+     metrics:['Vol. Checkout','Linhas Checkout','Unid. Checkout']},
+    {title:'🟢 EXPEDIÇÃO — DOCA (vai até 04:00)', bg:'rgba(0,230,118,.1)',
+     metrics:['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.',
+              'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca']},
+    {title:'📋 CONTROLE',               bg:'rgba(100,100,180,.08)',
+     metrics:['Vales','Conf. Planejado','Conf. Ativo']},
+  ];
+  let h2=`<table><thead><tr><th style="text-align:left;min-width:140px">Indicador</th>${HOURS.map((x,i)=>`<th style="min-width:52px;font-size:9px">${x}</th>`).join('')}</tr></thead><tbody>`;
+  DASH_GROUPS.forEach(group=>{
+    h2+=`<tr><td colspan="${HOURS.length+1}" style="background:${group.bg};color:#89b4d4;font-size:9px;font-weight:bold;padding:3px 8px;letter-spacing:.5px;border-top:2px solid rgba(255,255,255,.08)">${group.title}</td></tr>`;
+    group.metrics.forEach(m=>{
+      const cap=CAP_VALS[m]||null;const isInv=MHORA_INV.includes(m);
+      const isCK=['Linhas Med.','Linhas Perf.','Erros Sep. Med.','Vol. Checkout','Linhas Checkout','Unid. Checkout'].includes(m);
+      const vals=hd[m]||new Array(HOURS.length).fill('');
+      const capLbl=cap?`<span style="font-size:9px;color:#6a9fc0;font-weight:normal;display:block">${isInv?'máx':'meta'}: ${cap.toLocaleString('pt-BR')}/h</span>`:'';
+      h2+=`<tr><td class="row-lbl">${m}${capLbl}</td>`;
+      vals.forEach((v,i)=>{
+        const dimmed=isCK&&i>=H_CK;
+        let bg='',style='';
+        if(dimmed){bg='background:#071525';style='color:#2a3a4a';}
+        else if(cap&&v!==''){
+          const n=+v;
+          if(isInv){bg=n>cap?'background:rgba(200,20,20,.5)':n>cap*.8?'background:rgba(180,130,0,.25)':'background:rgba(0,120,60,.25)';style=n>cap?'color:#ff4c4c;font-weight:bold':n>cap*.8?'color:#ffd700':'color:#00e676';}
+          else{const p=n/cap;bg=p>=1.05?'background:rgba(0,180,80,.3)':p>=.9?'background:rgba(0,120,60,.2)':p>=.7?'background:rgba(180,130,0,.2)':'background:rgba(180,30,30,.3)';style=p>=1.05?'color:#00e676;font-weight:bold':p>=.9?'color:#7ddc9f':p>=.7?'color:#ffd700':'color:#ff7070';}
+        }
+        h2+=`<td style="text-align:center;${bg}" title="${isExtra?'⚡ Hora extra':''}"><span style="${style}">${v!==''?v:isExtra?'·':'-'}</span></td>`;
+      });
+      h2+='</tr>';
+    });
+  });
+  h2+='</tbody></table>';
+  document.getElementById('horaTbl').innerHTML=h2;
+  // render rotas summary in dashboard tab
+  renderRotasTbl(day,'rotasTbl');
+  updateRotasKPIs(day);
+}
+
+// ── HISTÓRICO ─────────────────────────────────────────────
+function renderHist(){
+  const wrap=document.getElementById('histWrap');
+  const days=[...sortedDays()].reverse();
+  if(!days.length){wrap.innerHTML='<div class="no-data">📭 Nenhum dia cadastrado.</div>';return;}
+  wrap.innerHTML='';
+  days.forEach(day=>{
+    const perc=day.meta>0?Math.round(day.acum/day.meta*100):0;
+    const pc=perc>=90?'g':perc>=70?'o':'r';
+    const div=document.createElement('div');div.className='hist-day-card';
+    div.innerHTML=`
+      <div class="hist-day-hdr" onclick="toggleHistCard('${day.date}')">
+        <div style="flex:1"><span class="hist-day-title">${fmtDate(day.date)}</span>${day.date===today()?'<span class="today-badge">HOJE</span>':''}</div>
+        <div class="hist-day-badges">
+          <span class="badge y">Prev.Vol: ${(day.pnVol||0).toLocaleString('pt-BR')}</span>
+          <span class="badge g">Acum: ${(day.acum||0).toLocaleString('pt-BR')}</span>
+          <span class="badge ${pc}">% Prod: ${perc}%</span>
+          <span class="badge c">O.S.: ${day.osImp||0}/${day.osFin||0}</span>
+          ${(day.faltas||0)>0?`<span class="badge r">Faltas: ${day.faltas}</span>`:''}
+        </div>
+        <button class="btn-view-day" onclick="event.stopPropagation();selectDay('${day.date}');switchTab('dash')">📊 Dashboard</button>
+        <span style="color:#6a9fc0;margin-left:10px;font-size:14px" id="ico_${day.date}">▶</span>
+      </div>
+      <div class="hist-day-body" id="hdb_${day.date}">
+        <div><div class="hist-kpi-grid" id="hkpi_${day.date}"></div>${day.obs?`<div style="margin-top:8px;background:#0d1c2e;border-radius:4px;padding:8px;font-size:11px;color:#89b4d4"><b style="color:#ffd700">Obs:</b> ${day.obs}</div>`:''}</div>
+        <div><div class="hist-mini-chart"><canvas id="hmini_${day.date}" role="img" aria-label="mini"></canvas></div></div>
+        <div class="hist-tbl-area" id="htbl_${day.date}"></div>
+      </div>`;
+    wrap.appendChild(div);
+  });
+}
+function toggleHistCard(dt){
+  const body=document.getElementById('hdb_'+dt),ico=document.getElementById('ico_'+dt);
+  const open=body.classList.toggle('open');ico.textContent=open?'▼':'▶';
+  if(open){const day=getDay(dt);if(day)buildHistContent(day);}
+}
+function buildHistContent(day){
+  const dt=day.date;const hd=day.hd||{};
+  const sumH=m=>sumHoraField(m,hd);
+  document.getElementById('hkpi_'+dt).innerHTML=[
+    ['Prev. Vol',(day.pnVol||0).toLocaleString('pt-BR')],['Prev. Unid',(day.pnUnid||0).toLocaleString('pt-BR')],
+    ['Acumulado',(day.acum||0).toLocaleString('pt-BR')],['Meta',(day.meta||0).toLocaleString('pt-BR')],
+    ['% Prod',day.meta>0?Math.round(day.acum/day.meta*100)+'%':'—'],
+    ['Linhas Med.',sumH('Linhas Med.').toLocaleString('pt-BR')],
+    ['Vol. Expedição',sumH('Vol. Expedição').toLocaleString('pt-BR')],
+    ['Erros',sumH('Erros Sep. Med.').toLocaleString('pt-BR')],
+    ['Vales',sumH('Vales').toLocaleString('pt-BR')],
+    ['Faltas',day.faltas||0],['O.S. Imp.',day.osImp||0],['Exp. Início',day.exp||'—']
+  ].map(([l,v])=>`<div class="hist-kpi"><div class="l">${l}</div><div class="v">${v}</div></div>`).join('');
+  const cid='hmini_'+dt;if(histCharts[cid])histCharts[cid].destroy();
+  const lm=dv(hd,'Linhas Med.'),lp=dv(hd,'Linhas Perf.');
+  histCharts[cid]=new Chart(document.getElementById(cid),{type:'bar',
+    data:{labels:HOURS,datasets:[{label:'Linhas Med.',data:lm,backgroundColor:'#ff9500',borderRadius:2},{label:'Linhas Perf.',data:lp,backgroundColor:'#00e5ff',borderRadius:2}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#89b4d4',font:{size:9}},position:'bottom'}},
+      scales:{x:{ticks:{color:'#6a9fc0',font:{size:8},maxRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#6a9fc0',font:{size:8}},grid:{color:'rgba(255,255,255,0.07)'}}}}});
+  let ht=`<table style="width:100%;border-collapse:collapse;font-size:10px"><thead><tr><th style="background:#0a2340;color:#6a9fc0;padding:2px 4px;text-align:left">Indicador</th>${HOURS.map(x=>`<th style="background:#0a2340;color:#6a9fc0;padding:2px 4px">${x}</th>`).join('')}</tr></thead><tbody>`;
+  MHORA.forEach(m=>{
+    const vals=hd[m]||new Array(HOURS.length).fill('');
+    ht+=`<tr><td style="padding:2px 4px;color:#89b4d4;background:#0a1825;white-space:nowrap;font-weight:bold">${m}</td>${vals.map(v=>`<td style="padding:2px 4px;text-align:center;border:1px solid #162a3d">${v!==''?v:'-'}</td>`).join('')}</tr>`;
+  });
+  ht+='</tbody></table>';document.getElementById('htbl_'+dt).innerHTML=ht;
+}
+
+// ── COMPARATIVO ───────────────────────────────────────────
+function renderComp(){
+  const days=sortedDays();
+  if(!days.length){document.getElementById('compTbl').innerHTML='<div class="no-data">Sem dados</div>';return;}
+  const labels=days.map(d=>fmtDateShort(d.date));
+  const percs=days.map(d=>d.meta>0?Math.round(d.acum/d.meta*100):0);
+  if(CH.cPerc)CH.cPerc.destroy();
+  CH.cPerc=new Chart(document.getElementById('cCompPerc'),{type:'bar',
+    data:{labels,datasets:[{label:'% Produzido',data:percs,backgroundColor:percs.map(p=>p>=90?'#00e676':p>=70?'#ff9500':'#ff4c4c'),borderRadius:4}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},
+      scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'}},y:{max:110,ticks:{color:'#6a9fc0',font:{size:9},callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.07)'}}}}});
+  if(CH.cVA)CH.cVA.destroy();
+  CH.cVA=new Chart(document.getElementById('cCompVA'),{type:'line',
+    data:{labels,datasets:[{label:'Prev.Vol',data:days.map(d=>d.pnVol||0),borderColor:'#ffd700',borderWidth:2,pointRadius:3,fill:false,tension:.3},{label:'Acumulado',data:days.map(d=>d.acum||0),borderColor:'#00e676',borderWidth:2,pointRadius:3,fill:false,tension:.3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'}}}}});
+  if(CH.cOS)CH.cOS.destroy();
+  CH.cOS=new Chart(document.getElementById('cCompOS'),{type:'bar',
+    data:{labels,datasets:[{label:'O.S. Impressas',data:days.map(d=>d.osImp||0),backgroundColor:'rgba(0,229,255,.3)',borderColor:'#00e5ff',borderWidth:1},{label:'O.S. Finalizadas',data:days.map(d=>d.osFin||0),backgroundColor:'#00e676',borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'}}}}});
+  if(CH.cFlt)CH.cFlt.destroy();
+  CH.cFlt=new Chart(document.getElementById('cCompFlt'),{type:'bar',
+    data:{labels,datasets:[{label:'Faltas',data:days.map(d=>d.faltas||0),backgroundColor:days.map(d=>(d.faltas||0)>3?'#ff4c4c':(d.faltas||0)>0?'#ffd700':'#00e676'),borderRadius:3}]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'}}}}});
+  const cols=['Data','Prev.Vol','Prev.Unid','Acumulado','Meta','% Prod.','O.S.Imp.','O.S.Fin.','Faltas','Correia Med.','Expedição','Obs'];
+  let t=`<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>`;
+  [...days].reverse().forEach(d=>{
+    const hd=d.hd||{};const perc=d.meta>0?Math.round(d.acum/d.meta*100):0;const pc=perc>=90?'#00e676':perc>=70?'#ffd700':'#ff4c4c';
+    t+=`<tr><td style="white-space:nowrap;font-weight:bold;color:#ffd700">${fmtDateShort(d.date)}</td>
+      <td>${(d.pnVol||0).toLocaleString('pt-BR')}</td><td>${(d.pnUnid||0).toLocaleString('pt-BR')}</td>
+      <td style="color:#00e676">${(d.acum||0).toLocaleString('pt-BR')}</td><td>${(d.meta||0).toLocaleString('pt-BR')}</td>
+      <td style="color:${pc};font-weight:bold">${perc}%</td><td>${d.osImp||0}</td><td>${d.osFin||0}</td>
+      <td style="color:${(d.faltas||0)>3?'#ff4c4c':(d.faltas||0)>0?'#ffd700':'#00e676'}">${d.faltas||0}</td>
+      <td>${sumHoraField('Linhas Med.',hd).toLocaleString('pt-BR')}</td>
+      <td>${sumHoraField('Vol. Expedição',hd).toLocaleString('pt-BR')}</td>
+      <td style="font-size:10px;color:#6a9fc0;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.obs||''}</td>
+    </tr>`;
+  });
+  t+='</tbody></table>';document.getElementById('compTbl').innerHTML=t;
+}
+
+// ── ADMIN FORM ────────────────────────────────────────────
+function getCapacities(){
+  const caps={};
+  Object.entries(CAP_MAP).forEach(([m,id])=>{const el=document.getElementById(id);caps[m]=el&&el.value!==''?+el.value:null;});
+  return caps;
+}
+function buildHoraTable(hd){
+  const hdr=document.getElementById('hTblHdr'),body=document.getElementById('hTblBody');
+  hdr.innerHTML='<th style="text-align:left;padding:3px 8px;min-width:140px">Indicador</th>'+HOURS.map(h=>`<th style="min-width:62px;white-space:nowrap">${h}</th>`).join('');
+  body.innerHTML='';
+  const caps=getCapacities();
+  // Group separators
+  const MHORA_GROUPS=[
+    {title:'🔴 CORREIA — Separação', color:'rgba(255,149,0,.15)',
+     metrics:['Linhas Med.','Linhas Perf.','Erros Sep. Med.']},
+    {title:'🔵 CHECKOUT — Conferência', color:'rgba(0,229,255,.1)',
+     metrics:['Vol. Checkout','Linhas Checkout','Unid. Checkout']},
+    {title:'🟢 EXPEDIÇÃO — DOCA (vai até 04:00)', color:'rgba(0,230,118,.12)',
+     metrics:['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.',
+              'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca']},
+    {title:'📋 CONTROLE', color:'rgba(100,100,180,.1)',
+     metrics:['Vales','Conf. Planejado','Conf. Ativo']},
+  ];
+  MHORA_GROUPS.forEach(group=>{
+    // separator header row
+    const sepTr=document.createElement('tr');
+    sepTr.innerHTML=`<td colspan="${HOURS.length+1}" style="background:${group.color};color:#89b4d4;font-size:9px;font-weight:bold;padding:3px 8px;text-transform:uppercase;letter-spacing:.5px;border-top:2px solid rgba(255,255,255,.08)">${group.title}</td>`;
+    body.appendChild(sepTr);
+    group.metrics.forEach(m=>{
+    const cap=caps[m]||null;const isInv=MHORA_INV.includes(m);
+    const tr=document.createElement('tr');
+    let html=`<td class="hlbl">${m}${cap?`<span style="font-size:9px;color:#6a9fc0;font-weight:normal;display:block">${isInv?'máx':'meta'}: ${cap.toLocaleString('pt-BR')}/h</span>`:''}</td>`;
+    HOURS.forEach((_,i)=>{
+      const v=(hd&&hd[m]&&hd[m][i]!==''&&hd[m][i]!==null&&hd[m][i]!==undefined)?hd[m][i]:'';
+      let bg='';
+      if(cap&&v!==''){
+        const n=+v;
+        if(isInv){bg=n>cap?'background:rgba(200,20,20,.55)':n>cap*.8?'background:rgba(180,130,0,.4)':'background:rgba(0,100,50,.45)';}
+        else{const p=n/cap;bg=p>=1.05?'background:rgba(0,180,80,.45)':p>=.9?'background:rgba(0,120,60,.35)':p>=.7?'background:rgba(180,130,0,.4)':'background:rgba(180,20,20,.5)';}
+      }
+      // Correia/checkout: colunas 23→00h em diante são hora extra (fundo diferente, mas editáveis)
+      const isCKMetric=['Linhas Med.','Linhas Perf.','Erros Sep. Med.','Vol. Checkout','Linhas Checkout','Unid. Checkout'].includes(m);
+      const isExtra=isCKMetric&&i>=H_CK;
+      const extraStyle=isExtra&&!bg?'background:rgba(255,149,0,.06);border-left:2px solid rgba(255,149,0,.2)':'';
+      html+=`<td style="${bg};${extraStyle}" title="${isExtra?'⚡ Hora extra':''}"><input type="number" data-m="${m}" data-i="${i}" value="${v}" placeholder="-" oninput="colorCell(this);liveUpdate()" style="${isExtra?'opacity:0.75':''}"/></td>`;
+    });
+    tr.innerHTML=html;body.appendChild(tr);
+    }); // end group.metrics
+  }); // end MHORA_GROUPS
+}
+function colorCell(inp){
+  const m=inp.dataset.m;const isInv=MHORA_INV.includes(m);
+  const capEl=document.getElementById(CAP_MAP[m]);const cap=capEl&&capEl.value!==''?+capEl.value:null;
+  if(!cap){inp.parentNode.style.background='';return;}
+  const v=inp.value!==''?+inp.value:null;if(v===null){inp.parentNode.style.background='';return;}
+  if(isInv){inp.parentNode.style.background=v>cap?'rgba(200,20,20,.55)':v>cap*.8?'rgba(180,130,0,.4)':'rgba(0,100,50,.45)';}
+  else{const p=v/cap;inp.parentNode.style.background=p>=1.05?'rgba(0,180,80,.45)':p>=.9?'rgba(0,120,60,.35)':p>=.7?'rgba(180,130,0,.4)':'rgba(180,20,20,.5)';}
+}
+function readHoraData(){
+  const hd={};MHORA.forEach(m=>{hd[m]=new Array(HOURS.length).fill('');});
+  document.querySelectorAll('#hTblBody input').forEach(inp=>{
+    const m=inp.dataset.m,i=+inp.dataset.i;hd[m][i]=inp.value!==''?+inp.value:'';
+  });return hd;
+}
+function readFormAsDay(){
+  const dt=document.getElementById('iData').value;if(!dt)return null;
+  return{
+    date:dt,
+    pnVol:+document.getElementById('iPNVol').value||0,
+    pnUnid:+document.getElementById('iPNUnid').value||0,
+    pnCorreia:+document.getElementById('iPNCorreia').value||0,
+    pnPsico:+document.getElementById('iPNPsico').value||0,
+    pnEspecial:+document.getElementById('iPNEspecial').value||0,
+    pnEspFrac:+document.getElementById('iPNEspFrac').value||0,
+    pnEspMed:+document.getElementById('iPNEspMed').value||0,
+    pnEspPerf:+document.getElementById('iPNEspPerf').value||0,
+    pnFralda:+document.getElementById('iPNFralda').value||0,
+    pnFraldaF:+document.getElementById('iPNFraldaF').value||0,
+    pnGel:+document.getElementById('iPNGel').value||0,
+    pnOnco:+document.getElementById('iPNOnco').value||0,
+    pnOncoT:+document.getElementById('iPNOncoT').value||0,
+    pnJuncao:+document.getElementById('iPNJuncao').value||0,
+    pnDoca:+document.getElementById('iPNDoca').value||0,
+    acum:+document.getElementById('iAcum').value||0,
+    meta:+document.getElementById('iMeta').value||0,
+    osImp:+document.getElementById('iOsImp').value||0,
+    osFin:+document.getElementById('iOsFin').value||0,
+    osProd:+document.getElementById('iOsProd').value||0,
+    medIt:+document.getElementById('iMedIt').value||0,
+    faltas:+document.getElementById('iFaltas').value||0,
+    obs:document.getElementById('iObs').value,
+    cPer:document.getElementById('iCPer').value,cMed:document.getElementById('iCMed').value,
+    ckOut:document.getElementById('iCkOut').value,esp:document.getElementById('iEsp').value,
+    frF:document.getElementById('iFrF').value,frFc:document.getElementById('iFrFc').value,
+    exp:document.getElementById('iExp').value,
+    capLM:+document.getElementById('iCapLM').value||3500,capLP:+document.getElementById('iCapLP').value||3000,
+    capErros:+document.getElementById('iCapErros').value||2500,capVC:+document.getElementById('iCapVC').value||1280,
+    capLC:+document.getElementById('iCapLC').value||6500,capUC:+document.getElementById('iCapUC').value||20800,
+    capVales:+document.getElementById('iCapVales').value||1,
+    capEsp:+document.getElementById('iCapEsp').value||340,
+    capEspFrac:+document.getElementById('iCapEspFrac').value||0,
+    capEspMed:+document.getElementById('iCapEspMed').value||0,
+    capEspPerf:+document.getElementById('iCapEspPerf').value||0,
+    capFrF:+document.getElementById('iCapFrF').value||114,
+    capFrFc:+document.getElementById('iCapFrFc').value||89,
+    capVE:+document.getElementById('iCapVE').value||1303,
+    rOnco:+document.getElementById('iROnco').value||0,rOncoT:+document.getElementById('iROncoT').value||0,
+    rJuncao:+document.getElementById('iRJuncao').value||0,rDoc:+document.getElementById('iRDoc').value||0,
+    hd:readHoraData()
+  };
+}
+function loadFormFrom(day){
+  if(!day)day=emptyDay();
+  const s=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
+  s('iData',day.date);
+  s('iPNVol',day.pnVol||'');s('iPNUnid',day.pnUnid||'');
+  s('iPNCorreia',day.pnCorreia||'');s('iPNPsico',day.pnPsico||'');
+  s('iPNEspecial',day.pnEspecial||'');s('iPNEspFrac',day.pnEspFrac||'');
+  s('iPNEspMed',day.pnEspMed||'');s('iPNEspPerf',day.pnEspPerf||'');
+  s('iPNFralda',day.pnFralda||'');s('iPNFraldaF',day.pnFraldaF||'');
+  s('iPNGel',day.pnGel||'');s('iPNOnco',day.pnOnco||'');
+  s('iPNOncoT',day.pnOncoT||'');s('iPNJuncao',day.pnJuncao||'');
+  s('iPNDoca',day.pnDoca||'');
+  s('iAcum',day.acum||'');s('iMeta',day.meta||'');
+  s('iOsImp',day.osImp||'');s('iOsFin',day.osFin||'');s('iOsProd',day.osProd||'');
+  s('iMedIt',day.medIt||'');s('iFaltas',day.faltas||'');
+  document.getElementById('iObs').value=day.obs||'';
+  s('iCPer',day.cPer||'');s('iCMed',day.cMed||'');s('iCkOut',day.ckOut||'');
+  s('iEsp',day.esp||'');s('iFrF',day.frF||'');s('iFrFc',day.frFc||'');s('iExp',day.exp||'');
+  s('iCapLM',day.capLM||3500);s('iCapLP',day.capLP||3000);s('iCapErros',day.capErros||2500);
+  s('iCapVC',day.capVC||1280);s('iCapLC',day.capLC||6500);s('iCapUC',day.capUC||20800);
+  s('iCapVales',day.capVales||1);
+  s('iCapEsp',day.capEsp||340);s('iCapEspFrac',day.capEspFrac||0);
+  s('iCapEspMed',day.capEspMed||0);s('iCapEspPerf',day.capEspPerf||0);
+  s('iCapFrF',day.capFrF||114);s('iCapFrFc',day.capFrFc||89);
+  s('iCapVE',day.capVE||1303);
+  s('iROnco',day.rOnco||'');s('iROncoT',day.rOncoT||'');
+  s('iRJuncao',day.rJuncao||'');s('iRDoc',day.rDoc||'');
+  buildHoraTable(day.hd);
+  const existing=!!getDay(day.date);
+  document.getElementById('btnDel').style.display=existing?'':'none';
+  document.getElementById('admDayLbl').textContent=existing?`(editando: ${fmtDate(day.date)})`:'(novo dia)';
+  setTimeout(updateRealAuto,100);
+}
+function prepNewDay(){loadFormFrom(emptyDay(today()));}
+function saveDay(){
+  const day=readFormAsDay();if(!day){alert('⚠️ Informe a data!');return;}
+  const idx=db.days.findIndex(d=>d.date===day.date);
+  if(idx>=0)db.days[idx]=day;else db.days.push(day);
+  db.days.sort((a,b)=>a.date.localeCompare(b.date));
+  save();curDate=day.date;buildDayNav();
+  renderKPIs(day);renderFlowBar(day);renderDashCharts(day);renderDashTables(day);renderRotasTbl(day,'rotasTblFull');updateRotasKPIs(day);
+  document.getElementById('liveBadge').style.display='none';
+  document.getElementById('btnDel').style.display='';
+  document.getElementById('admDayLbl').textContent=`(editando: ${fmtDate(day.date)})`;
+  alert('✅ Dia salvo! '+fmtDate(day.date));
+}
+function delCurrentDay(){
+  const dt=document.getElementById('iData').value;if(!dt)return;
+  if(!confirm(`Excluir ${fmtDate(dt)}?`))return;
+  db.days=db.days.filter(d=>d.date!==dt);save();
+  const latest=latestDay();curDate=latest?latest.date:null;buildDayNav();
+  if(latest){renderKPIs(latest);renderFlowBar(latest);renderDashCharts(latest);renderDashTables(latest);}
+  prepNewDay();alert('🗑 Dia excluído.');
+}
+function doExportCSV(){
+  if(!db.days.length){alert('Sem dados.');return;}
+  let csv='Data;Prev.Vol;Prev.Unid;Acumulado;Meta;%Prod;OS_Imp;OS_Fin;Faltas;Exp.Inicio\n';
+  sortedDays().forEach(d=>{const hd=d.hd||{};const perc=d.meta>0?Math.round(d.acum/d.meta*100):0;
+    csv+=`${d.date};${d.pnVol||0};${d.pnUnid||0};${d.acum||0};${d.meta||0};${perc}%;${d.osImp||0};${d.osFin||0};${d.faltas||0};${d.exp||''}\n`;});
+  blobDl('\ufeff'+csv,'cd_gam.csv','text/csv;charset=utf-8;');
+}
+function doExportJSON(){blobDl(JSON.stringify(db,null,2),'cd_gam_backup_'+today()+'.json','application/json');}
+function doImportJSON(){document.getElementById('importFile').click();}
+function doImportFile(e){
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();r.onload=ev=>{
+    try{const imp=JSON.parse(ev.target.result);if(!imp.days)throw new Error('inválido');
+      if(!confirm(`Importar ${imp.days.length} dia(s)?`))return;
+      imp.days.forEach(d=>{const idx=db.days.findIndex(x=>x.date===d.date);if(idx>=0)db.days[idx]=d;else db.days.push(d);});
+      db.days.sort((a,b)=>a.date.localeCompare(b.date));save();init();alert('✅ Importado!');
+    }catch(err){alert('Erro: '+err.message);}
+  };r.readAsText(f);e.target.value='';
+}
+function blobDl(content,name,type){
+  const b=new Blob([content],{type}),u=URL.createObjectURL(b);
+  const a=document.createElement('a');a.href=u;a.download=name;a.click();URL.revokeObjectURL(u);
+}
+// ── ROTAS ────────────────────────────────────────────────────
+// Rotas com horários fixos — só muda placa, vol, paletes, hReal, obs
+const ROTAS_FIXAS=[{"cod": "128", "cidade": "MATO GROSSO DO SUL", "hPrev": "19:15"}, {"cod": "81", "cidade": "CRAVINHOS SP", "hPrev": "19:30"}, {"cod": "105", "cidade": "FOZ DO IGUAÇU", "hPrev": "20:30"}, {"cod": "122", "cidade": "CIANORTE/PARANAVAÍ/MARINGÁ", "hPrev": "22:00"}, {"cod": "123", "cidade": "CAMPO MOURÃO/UMUARAMA", "hPrev": "22:30"}, {"cod": "116", "cidade": "PATO BRANCO/FRANCISCO BELTRÃO", "hPrev": "22:30"}, {"cod": "80", "cidade": "CASCAVEL/TOLEDO", "hPrev": "22:30"}, {"cod": "82", "cidade": "SANTANA DE PARNAÍBA", "hPrev": "23:00"}, {"cod": "106", "cidade": "APUCARANA/LONDRINA", "hPrev": "23:30"}, {"cod": "117", "cidade": "MARINGÁ", "hPrev": "00:30"}, {"cod": "118", "cidade": "TELÊMACO BORBA/IBAITI", "hPrev": "00:30"}, {"cod": "125", "cidade": "GUARAPUAVA", "hPrev": "01:30"}, {"cod": "126", "cidade": "UNIÃO DA VITÓRIA/SÃO MATEUS", "hPrev": "02:00"}, {"cod": "127", "cidade": "IRATI/PONTA GROSSA", "hPrev": "03:00"}, {"cod": "79", "cidade": "MAFRA/COLOMBO/CURITIBA", "hPrev": "03:00"}, {"cod": "86", "cidade": "CAMPO GRANDE INTERIOR", "hPrev": "03:00"}, {"cod": "78", "cidade": "CURITIBA", "hPrev": "05:00"}];
+
+let rotasAdminOk=false;
+
+function unlockRotas(){
+  if(rotasAdminOk){doLockRotas();return;}
+  const pwd=prompt('Senha para habilitar edição das rotas:');
+  if(pwd===PWD){
+    rotasAdminOk=true;
+    document.getElementById('rotasUnlockBtn').textContent='🔒 Bloquear Edição';
+    document.getElementById('rotasEditandoLbl').style.display='inline';
+    renderRotasTblFull(getDay(curDate));
+  }else alert('Senha incorreta!');
+}
+
+function doLockRotas(){
+  rotasAdminOk=false;
+  document.getElementById('rotasUnlockBtn').textContent='🔓 Habilitar Edição';
+  document.getElementById('rotasEditandoLbl').style.display='none';
+  renderRotasTblFull(getDay(curDate));
+}
+
+// Build merged list: fixed routes + saved data for current day
+function buildRotasMerged(day){
+  const saved=day&&day.rotas?day.rotas:[];
+  return ROTAS_FIXAS.map(rf=>{
+    const s=saved.find(r=>r.cod===rf.cod)||{};
+    return{cod:rf.cod,cidade:rf.cidade,hPrev:rf.hPrev,
+      tipo:s.tipo||'TRUCK',placa:s.placa||'',
+      vol:s.vol||0,paletes:s.paletes||0,
+      hReal:s.hReal||'',obs:s.obs||''};
+  });
+}
+
+function saveRotaField(cod,field,val){
+  // Se não existe dia salvo, cria automaticamente com a data atual
+  let day=getDay(curDate);
+  if(!day){
+    day=emptyDay(curDate||today());
+    db.days.push(day);
+    db.days.sort((a,b)=>a.date.localeCompare(b.date));
+    buildDayNav();
+  }
+  if(!day.rotas)day.rotas=[];
+  let r=day.rotas.find(x=>x.cod===cod);
+  if(!r){r={cod};day.rotas.push(r);}
+  r[field]=field==='vol'||field==='paletes'?+val:val;
+  save();
+  updateRotasKPIs(day);
+  renderRotasTbl(day,'rotasTbl');
+  renderRotasTbl(day,'rotasTblFull');
+}
+
+function calcAtraso(hPrev,hReal){
+  if(!hPrev||!hReal)return null;
+  // convert HH:MM to minutes, handling midnight crossing
+  const toMin=h=>{const[hh,mm]=h.split(':').map(Number);return hh*60+mm;};
+  let prev=toMin(hPrev),real=toMin(hReal);
+  // if real < 12:00, it's next day
+  if(real<360&&prev>360)real+=1440;
+  if(prev<360&&real>1080)prev+=1440;
+  return real-prev; // positive = atrasado, negative = adiantado
+}
+
+function fmtAtraso(min){
+  if(min===null)return'—';
+  if(min===0)return'00:00:00';
+  const abs=Math.abs(min);
+  const h=Math.floor(abs/60).toString().padStart(2,'0');
+  const m=(abs%60).toString().padStart(2,'0');
+  return(min>0?'+':'-')+h+':'+m+':00';
+}
+
+// Inline input style helper
+const inpS='background:#0d1c2e;border:1px solid #1e4a72;color:#fff;padding:2px 4px;border-radius:3px;font-size:10px;width:100%;box-sizing:border-box';
+const inpSG=inpS.replace('#fff','#00e676'); // green for horário realizado
+
+function renderRotasTbl(day,tblId){
+  const el=document.getElementById(tblId);if(!el)return;
+  const rotas=buildRotasMerged(day);
+  const editable=tblId==='rotasTblFull'&&rotasAdminOk;
+  let html=`<table>
+    <thead><tr>
+      <th style="min-width:60px">Cód.</th>
+      <th style="text-align:left;min-width:200px">Cidade / Destino</th>
+      <th style="min-width:90px">Placa</th>
+      <th style="min-width:80px">Volumes</th>
+      <th style="min-width:70px">Paletes</th>
+      <th style="min-width:90px">Hr Previsto CD</th>
+      <th style="min-width:100px">Hr Realizado</th>
+      <th style="min-width:90px">Tempo Atraso</th>
+      <th style="min-width:160px">Status</th>
+      <th style="text-align:left;min-width:160px">Obs</th>
+    </tr></thead><tbody>`;
+  rotas.forEach(r=>{
+    const atr=calcAtraso(r.hPrev,r.hReal);
+    let stClass,stLabel;
+    if(!r.hReal){
+      // Sem horário realizado = sempre PENDENTE, independente da hora atual
+      stClass='st-pendente';stLabel='— PENDENTE';
+    }else if(atr>0){stClass='st-atrasado';stLabel='✖ FORA DO HORÁRIO';}
+    else{stClass='st-ok';stLabel='✔ DENTRO DO HORÁRIO';}
+    const atrColor=atr===null?'#445':atr>0?'#ff4c4c':'#00e676';
+    const rowBg=stClass==='st-atrasado'?'background:rgba(180,20,20,.12)':stClass==='st-critico'?'background:rgba(180,80,0,.12)':'';
+    html+=`<tr style="${rowBg}">
+      <td style="font-weight:bold;color:#ffd700;text-align:center">${r.cod}</td>
+      <td class="td-cidade">${r.cidade}</td>
+      <td style="text-align:center">
+        ${editable
+          ?`<input type="text" value="${r.placa}" onchange="saveRotaField('${r.cod}','placa',this.value.toUpperCase())" style="${inpS};text-transform:uppercase;text-align:center" placeholder="PLACA"/>`
+          :`<span style="font-family:monospace;color:#c0d8f0">${r.placa||'—'}</span>`}
+      </td>
+      <td style="text-align:center">
+        ${editable
+          ?`<input type="number" value="${r.vol||''}" oninput="saveRotaField('${r.cod}','vol',+this.value)" style="${inpS};text-align:center" placeholder="0"/>`
+          :`<span style="font-weight:bold">${r.vol?r.vol.toLocaleString('pt-BR'):'—'}</span>`}
+      </td>
+      <td style="text-align:center">
+        ${editable
+          ?`<input type="number" value="${r.paletes||''}" oninput="saveRotaField('${r.cod}','paletes',+this.value)" style="${inpS};text-align:center" placeholder="0"/>`
+          :`${r.paletes||'—'}`}
+      </td>
+      <td style="color:#ffd700;font-weight:bold;text-align:center">${r.hPrev}</td>
+      <td style="text-align:center">
+        ${editable
+          ?`<input type="time" value="${r.hReal}" oninput="saveRotaField('${r.cod}','hReal',this.value)" style="${inpSG};text-align:center"/>`
+          :`<span style="color:#00e676;font-weight:bold">${r.hReal||'—'}</span>`}
+      </td>
+      <td style="text-align:center;color:${atrColor};font-weight:bold">${fmtAtraso(atr)}</td>
+      <td style="text-align:center"><span class="${stClass}">${stLabel}</span></td>
+      <td style="text-align:left">
+        ${editable
+          ?`<input type="text" value="${r.obs||''}" onchange="saveRotaField('${r.cod}','obs',this.value)" style="${inpS}" placeholder="Observação..."/>`
+          :`<span style="color:#89b4d4;font-size:10px">${r.obs||''}</span>`}
+      </td>
+    </tr>`;
+  });
+  const totalVol=rotas.reduce((s,r)=>s+(r.vol||0),0);
+  const totalPal=rotas.reduce((s,r)=>s+(r.paletes||0),0);
+  html+=`<tr style="background:#071525;border-top:2px solid #1e4a72">
+    <td colspan="2" style="text-align:left;color:#6a9fc0;padding:5px 10px;font-weight:bold">TOTAL — ${rotas.length} rotas</td>
+    <td></td>
+    <td style="color:#ffd700;font-weight:bold;text-align:center">${totalVol.toLocaleString('pt-BR')}</td>
+    <td style="color:#ffd700;font-weight:bold;text-align:center">${totalPal}</td>
+    <td colspan="3"></td>
+    <td></td><td></td>
+  </tr>`;
+  html+='</tbody></table>';
+  el.innerHTML=html;
+}
+
+function renderRotasTblFull(day){
+  renderRotasTbl(day,'rotasTblFull');
+  if(day)updateRotasKPIs(day);
+  const lbl=document.getElementById('rotasDateLbl');
+  if(lbl&&day)lbl.textContent=fmtDate(day.date);
+}
+
+function updateRotasKPIs(day){
+  const rotas=day&&day.rotas?day.rotas:[];
+  const total=rotas.reduce((s,r)=>s+(r.vol||0),0);
+  const ok=rotas.filter(r=>r.hReal&&calcAtraso(r.hPrev,r.hReal)<=0).length;
+  const atras=rotas.filter(r=>r.hReal&&calcAtraso(r.hPrev,r.hReal)>0).length;
+  const pend=rotas.filter(r=>!r.hReal).length;
+  const finalizadas=rotas.filter(r=>r.hReal).length;
+  const efic=finalizadas>0?Math.round(ok/finalizadas*100):0;
+  const totalPal=rotas.reduce((s,r)=>s+(r.paletes||0),0);
+  ['','2'].forEach(s=>{
+    const sv=id=>document.getElementById(id+s);
+    if(sv('rotasTotalVol'))sv('rotasTotalVol').textContent=total.toLocaleString('pt-BR');
+    if(sv('rotasOkCount'))sv('rotasOkCount').textContent=ok;
+    if(sv('rotasAtrasCount'))sv('rotasAtrasCount').textContent=atras;
+    if(sv('rotasPendCount'))sv('rotasPendCount').textContent=pend;
+    if(sv('rotasEfic'))sv('rotasEfic').textContent=efic+'%';
+    if(sv('rotasTotalPal'))sv('rotasTotalPal').textContent=totalPal;
+  });
+}
+
+function renderRotasTab(){
+  const day=getDay(curDate);
+  renderRotasTblFull(day);
+}
+
+function openSyncConfig(){
+  document.getElementById('sbUrlIn').value=localStorage.getItem('gam_sb_url')||'';
+  document.getElementById('sbKeyIn').value=localStorage.getItem('gam_sb_key')||'';
+  document.getElementById('syncOv').classList.add('on');
+}
+async function saveSyncConfig(){
+  const url=document.getElementById('sbUrlIn').value.trim();
+  const key=document.getElementById('sbKeyIn').value.trim();
+  if(!url||!key){alert('Preencha URL e chave!');return;}
+  localStorage.setItem('gam_sb_url',url);
+  localStorage.setItem('gam_sb_key',key);
+  document.getElementById('syncTestResult').textContent='⏳ Testando conexão...';
+  document.getElementById('syncTestResult').style.color='#ffd700';
+  // Test connection
+  try{
+    const r=await fetch(`${url}/rest/v1/cdgam_data?id=eq.main&select=id`,
+      {headers:{'apikey':key,'Authorization':'Bearer '+key}});
+    if(r.ok){
+      document.getElementById('syncTestResult').textContent='✅ Conexão OK! Recarregando...';
+      document.getElementById('syncTestResult').style.color='#00e676';
+      setTimeout(()=>location.reload(),1500);
+    }else{
+      const err=await r.json();
+      document.getElementById('syncTestResult').textContent='❌ Erro: '+(err.message||r.status)+' — Verifique a tabela cdgam_data e as credenciais.';
+      document.getElementById('syncTestResult').style.color='#ff4c4c';
+    }
+  }catch(e){
+    document.getElementById('syncTestResult').textContent='❌ Erro de conexão: '+e.message;
+    document.getElementById('syncTestResult').style.color='#ff4c4c';
+  }
+}
+function clearSyncConfig(){
+  if(!confirm('Remover configuração de nuvem? Dados locais ficam intactos.'))return;
+  localStorage.removeItem('gam_sb_url');localStorage.removeItem('gam_sb_key');
+  location.reload();
+}
+
+function init(){
+  initFirebase();
+  load();const latest=latestDay();curDate=latest?latest.date:today();buildDayNav();
+  if(latest){renderKPIs(latest);renderFlowBar(latest);renderDashCharts(latest);renderDashTables(latest);}
+  else document.getElementById('hdrDate').textContent='Nenhum dado — clique em ✏️ para começar';
+}
+init();
+</script>
+</body>
+</html>
