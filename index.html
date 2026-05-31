@@ -152,77 +152,47 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
 .st-atrasado{background:#3d0a0a;color:#ff4c4c;font-weight:bold;padding:3px 12px;border-radius:4px;font-size:10px;letter-spacing:.3px}
 .st-pendente{background:#1a2a3a;color:#6a9fc0;padding:3px 12px;border-radius:4px;font-size:10px}
 .st-critico{background:#3d1a00;color:#ff9500;font-weight:bold;padding:3px 12px;border-radius:4px;font-size:10px;letter-spacing:.3px;animation:blink 1.4s infinite}
-/* LOGIN */
-.login-ov{display:flex;position:fixed;inset:0;background:#0a1220;z-index:20000;align-items:center;justify-content:center}
-.login-box{background:#0a2340;border:2px solid #e94560;border-radius:10px;padding:36px;width:360px;text-align:center}
-.login-logo{background:#e94560;color:#fff;padding:5px 18px;border-radius:4px;font-weight:900;font-size:18px;letter-spacing:2px;display:inline-block;margin-bottom:14px}
-.login-box h2{color:#ffd700;font-size:16px;margin-bottom:4px}
-.login-box p{color:#6a9fc0;font-size:11px;margin-bottom:22px}
-.login-inp{background:#0d1c2e;border:1px solid #1e4a72;color:#fff;padding:10px;border-radius:4px;width:100%;margin-bottom:10px;font-size:13px;box-sizing:border-box}
-.login-inp:focus{outline:none;border-color:#ffd700}
-.login-btn{background:#e94560;color:#fff;border:none;padding:11px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:bold;width:100%;margin-top:4px}
-.login-btn:hover{opacity:.88}
-.login-err{font-size:11px;margin-top:10px;min-height:16px;color:#ff4c4c}
-/* USER BADGE */
-.user-badge{font-size:10px;padding:2px 10px;background:#122033;border-radius:3px;border:1px solid #1a3550;cursor:pointer;color:#89b4d4;white-space:nowrap}
-.user-badge:hover{border-color:#ffd700;color:#ffd700}
-.role-adm{color:#e94560!important;border-color:rgba(233,69,96,.4)!important}
-.role-sup{color:#ffd700!important;border-color:rgba(255,215,0,.4)!important}
-.role-op{color:#00e676!important;border-color:rgba(0,230,118,.4)!important}
-/* USERS PANEL */
-.users-tbl{width:100%;border-collapse:collapse;font-size:11px}
-.users-tbl th{background:#0a2340;color:#6a9fc0;padding:6px 10px;text-align:left;border:1px solid #1a3550}
-.users-tbl td{padding:6px 10px;border:1px solid #1a3550;color:#e0e8f0}
+/* ── SISTEMA DE LOGIN ─────────────────────────────────────── */
+.login-ov{display:flex;position:fixed;inset:0;background:#080f18;z-index:20000;align-items:center;justify-content:center}
+.login-box{background:#0a2340;border:2px solid #e94560;border-radius:10px;padding:36px 32px;width:340px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.7)}
+.login-logo{background:#e94560;color:#fff;padding:5px 18px;border-radius:4px;font-weight:900;font-size:18px;letter-spacing:2px;display:inline-block;margin-bottom:16px}
+.login-box h2{color:#ffd700;font-size:16px;margin-bottom:4px;letter-spacing:.5px}
+.login-box .sub{color:#6a9fc0;font-size:11px;margin-bottom:24px}
+.login-inp{background:#0d1c2e;border:1px solid #1e4a72;color:#fff;padding:10px 12px;border-radius:4px;width:100%;margin-bottom:10px;font-size:13px;box-sizing:border-box;transition:border-color .15s}
+.login-inp:focus{outline:none;border-color:#ffd700;background:#111e30}
+.login-btn{background:#e94560;color:#fff;border:none;padding:11px;border-radius:4px;cursor:pointer;font-size:13px;font-weight:bold;width:100%;margin-top:2px;letter-spacing:.5px;transition:opacity .15s}
+.login-btn:hover{opacity:.85}
+.login-err{font-size:11px;margin-top:12px;min-height:18px}
+/* badge de usuário no header */
+.user-badge{font-size:10px;padding:3px 10px;background:#122033;border-radius:3px;border:1px solid #1a3550;cursor:pointer;white-space:nowrap;transition:border-color .15s}
+.user-badge:hover{border-color:#ffd700}
+.rb-admin{color:#e94560;border-color:rgba(233,69,96,.5)}
+.rb-supervisor{color:#ffd700;border-color:rgba(255,215,0,.5)}
+.rb-operador{color:#00e676;border-color:rgba(0,230,118,.5)}
+/* painel de usuários */
+.users-tbl{width:100%;border-collapse:collapse;font-size:11px;margin-top:6px}
+.users-tbl th{background:#0a2340;color:#6a9fc0;padding:7px 10px;text-align:left;border:1px solid #1a3550;font-size:10px;text-transform:uppercase;letter-spacing:.3px}
+.users-tbl td{padding:7px 10px;border:1px solid #1a3550;vertical-align:middle}
 .users-tbl tr:nth-child(odd) td{background:#0d1c2e}
-.role-pill{padding:2px 10px;border-radius:10px;font-size:10px;font-weight:bold}
-.rp-admin{background:#3d0a1a;color:#e94560;border:1px solid #e94560}
-.rp-supervisor{background:#2d2800;color:#ffd700;border:1px solid #ffd700}
-.rp-operador{background:#003d1a;color:#00e676;border:1px solid #00e676}
+.users-tbl tr:hover td{background:#142233}
+.rpill{display:inline-block;padding:2px 10px;border-radius:10px;font-size:10px;font-weight:bold}
+.rpill-admin{background:#3d0a1a;color:#e94560;border:1px solid #e94560}
+.rpill-supervisor{background:#2d2800;color:#ffd700;border:1px solid #ffd700}
+.rpill-operador{background:#003d1a;color:#00e676;border:1px solid #00e676}
 </style>
 </head>
 <body>
-
-<!-- Firebase sync — sem necessidade de configuração manual -->
-<div class="lock-ov" id="syncOv" style="display:none!important">
-  <div class="lock-box" style="width:420px">
-    <h3>☁️ Configurar Sincronização em Tempo Real</h3>
-    <p style="color:#89b4d4;font-size:11px;margin-bottom:14px;line-height:1.6">
-      Use o <b style="color:#ffd700">Supabase</b> (gratuito) para sincronizar entre todos os computadores.<br>
-      <a href="https://supabase.com" target="_blank" style="color:#00e5ff">supabase.com</a> → Criar conta → Novo projeto → Copiar URL e chave anon.
-    </p>
-    <div style="text-align:left;margin-bottom:8px">
-      <div style="font-size:10px;color:#6a9fc0;margin-bottom:3px">URL do projeto (ex: https://xyzxyz.supabase.co)</div>
-      <input id="sbUrlIn" type="text" placeholder="https://xxxxxxxx.supabase.co" style="background:#0d1c2e;border:1px solid #1e4a72;color:#fff;padding:7px;border-radius:4px;width:100%;font-size:12px;margin-bottom:8px"/>
-      <div style="font-size:10px;color:#6a9fc0;margin-bottom:3px">Chave anon/public</div>
-      <input id="sbKeyIn" type="text" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." style="background:#0d1c2e;border:1px solid #1e4a72;color:#fff;padding:7px;border-radius:4px;width:100%;font-size:12px;margin-bottom:12px"/>
-    </div>
-    <div style="background:#071525;border-radius:4px;padding:8px;margin-bottom:12px;font-size:10px;color:#6a9fc0;text-align:left;line-height:1.7">
-      <b style="color:#ffd700">Passo a passo:</b><br>
-      1. Acesse <b>supabase.com</b> e crie uma conta gratuita<br>
-      2. Crie um novo projeto (nome: cdgam, qualquer senha)<br>
-      3. Vá em <b>Settings → API</b> e copie a <b>Project URL</b> e a <b>anon public key</b><br>
-      4. Vá em <b>Table Editor → New Table</b>, nome: <b>cdgam_data</b><br>
-      5. Adicione as colunas: <b>id</b> (text, primary key), <b>payload</b> (text), <b>updated_at</b> (text)<br>
-      6. Cole a URL e a chave aqui e clique Salvar<br>
-      7. Faça isso em todos os computadores com as mesmas credenciais
-    </div>
-    <div style="display:flex;gap:8px">
-      <button onclick="saveSyncConfig()" style="flex:1;background:#00b894;color:#fff;border:none;padding:9px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold">💾 Salvar e Conectar</button>
-      <button onclick="clearSyncConfig()" style="background:#e94560;color:#fff;border:none;padding:9px 14px;border-radius:4px;cursor:pointer;font-size:12px">🗑 Limpar</button>
-      <button onclick="document.getElementById('syncOv').classList.remove('on')" style="background:#444;color:#fff;border:none;padding:9px 14px;border-radius:4px;cursor:pointer;font-size:12px">Fechar</button>
-    </div>
-    <div id="syncTestResult" style="font-size:11px;margin-top:10px;min-height:16px"></div>
-  </div>
-</div>
 
 <!-- LOGIN OVERLAY -->
 <div class="login-ov" id="loginOv">
   <div class="login-box">
     <div class="login-logo">GAM</div>
-    <h2>CD GAM — Acesso</h2>
-    <p>Genesio A. Mendes · São José dos Pinhais</p>
-    <input class="login-inp" id="loginUser" type="text" placeholder="Usuário" autocomplete="username" onkeydown="if(event.key==='Enter')document.getElementById('loginPwd').focus()"/>
-    <input class="login-inp" id="loginPwd" type="password" placeholder="Senha" autocomplete="current-password" onkeydown="if(event.key==='Enter')doLogin()"/>
+    <h2>CD GAM</h2>
+    <div class="sub">Genesio A. Mendes · São José dos Pinhais</div>
+    <input class="login-inp" id="loginUser" type="text" placeholder="Usuário" autocomplete="username"
+      onkeydown="if(event.key==='Enter')document.getElementById('loginPwd').focus()"/>
+    <input class="login-inp" id="loginPwd" type="password" placeholder="Senha" autocomplete="current-password"
+      onkeydown="if(event.key==='Enter')doLogin()"/>
     <button class="login-btn" onclick="doLogin()">ENTRAR</button>
     <div class="login-err" id="loginErr"></div>
   </div>
@@ -234,7 +204,7 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
   <div class="hdr-title">ACOMPANHAMENTO DE PRODUTIVIDADE — CD GAM (GENESIO A. MENDES)</div>
   <span class="live-badge" id="liveBadge" style="display:none">⬤ AO VIVO</span>
   <span id="syncStatus" style="font-size:10px;color:#89b4d4;padding:2px 8px;background:#122033;border-radius:3px;">☁ Conectando...</span>
-  <span id="userBadge" class="user-badge" onclick="doLogout()" title="Clique para sair">—</span>
+  <span id="userBadge" class="user-badge" onclick="doLogout()" title="Clique para sair" style="display:none">—</span>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
 
@@ -412,16 +382,19 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
   <div class="tbl-wrap" id="compTbl"></div>
 </div>
 
-<!-- TAB PREENCHER (operador) -->
+<!-- TAB PREENCHER — operador -->
 <div class="tab-body" id="tb-preench">
   <div style="padding:8px">
-    <div style="background:#0a2340;border-radius:6px;padding:8px 14px;margin-bottom:8px;border:1px solid rgba(0,230,118,.3);display:flex;align-items:center;gap:10px">
+    <div style="background:#0a2340;border-radius:6px;padding:8px 14px;margin-bottom:8px;border:1px solid rgba(0,230,118,.3);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span style="font-size:11px;font-weight:bold;color:#00e676">⏱️ PRODUÇÃO HORA A HORA</span>
-      <span style="font-size:10px;color:#6a9fc0">Preencha o acumulado de cada período conforme a operação avança. Salvo automaticamente.</span>
-      <span id="preenchSyncMsg" style="font-size:10px;color:#ffd700;margin-left:auto"></span>
+      <span style="font-size:10px;color:#6a9fc0">Preencha o acumulado de cada período. Salvo automaticamente em 2s.</span>
+      <span id="preenchStatus" style="font-size:10px;color:#ffd700;margin-left:auto"></span>
     </div>
-    <div style="background:#122033;border-radius:6px;border:1px solid #1a3550;padding:8px;overflow-x:auto">
-      <table id="hTblPreench"><thead><tr id="hTblPreenchHdr"></tr></thead><tbody id="hTblPreenchBody"></tbody></table>
+    <div style="background:#122033;border-radius:6px;border:1px solid #1a3550;overflow-x:auto">
+      <table style="border-collapse:collapse;font-size:10px;min-width:1000px;width:100%">
+        <thead><tr id="preenchHdr"></tr></thead>
+        <tbody id="preenchBody"></tbody>
+      </table>
     </div>
   </div>
 </div>
@@ -433,7 +406,7 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
     <div class="adm-grid">
 
       <!-- COL 1: DATA + PREVISÃO NOTURNA -->
-      <div class="adm-group adm-group-restricted" style="grid-column:1/-1">
+      <div class="adm-group adm-restricted" style="grid-column:1/-1">
         <h4>🌙 Previsão Noturna — Preencher antes da operação começar</h4>
         <div style="display:grid;grid-template-columns:auto 1fr;gap:8px;align-items:start">
           <div>
@@ -463,7 +436,7 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
       </div>
 
       <!-- COL 1: RESUMO OPERACIONAL -->
-      <div class="adm-group adm-group-restricted">
+      <div class="adm-group adm-restricted">
         <h4>📋 Resumo Operacional</h4>
         <div class="adm-row"><label>Acumulado produzido</label><input type="number" id="iAcum" placeholder="0" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>Meta Proj. Unid. (acum.)</label><input type="number" id="iMeta" placeholder="0" oninput="liveUpdate()"/></div>
@@ -477,7 +450,7 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
       </div>
 
       <!-- COL 2: HORÁRIOS E CAPACIDADE/HORA -->
-      <div class="adm-group adm-group-restricted">
+      <div class="adm-group adm-restricted">
         <h4>🕐 Horários de Início dos Processos</h4>
         <div class="adm-row"><label>Correia Perfumaria</label><input type="time" id="iCPer" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>Correia Medicamentos</label><input type="time" id="iCMed" oninput="liveUpdate()"/></div>
@@ -547,49 +520,47 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
       <button class="btn btn-lock" onclick="doLogout()">🚪 Sair</button>
     </div>
 
-    <!-- PAINEL DE USUÁRIOS — só admin vê -->
-    <div id="usersPanelWrap" style="display:none;margin-top:16px;background:#071525;border:1px solid rgba(233,69,96,.4);border-radius:6px;padding:12px">
-      <h3 style="color:#e94560;font-size:13px;margin-bottom:12px;border-bottom:1px solid rgba(233,69,96,.3);padding-bottom:6px">👥 GERENCIAR USUÁRIOS</h3>
+    <!-- GERENCIAR USUÁRIOS — visível só para admin -->
+    <div id="usersPanelWrap" style="display:none;margin-top:20px;background:#071525;border:1px solid rgba(233,69,96,.35);border-radius:6px;padding:14px">
+      <h3 style="color:#e94560;font-size:13px;margin-bottom:14px;padding-bottom:8px;border-bottom:1px solid rgba(233,69,96,.25)">👥 GERENCIAR USUÁRIOS</h3>
 
-      <!-- Adicionar usuário -->
-      <div style="background:#0a2340;border-radius:4px;padding:10px;margin-bottom:12px;border:1px solid #1a3550">
-        <div style="font-size:11px;font-weight:bold;color:#ffd700;margin-bottom:8px">➕ Novo Usuário</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:8px;align-items:end">
+      <div style="background:#0a2340;border-radius:4px;padding:12px;margin-bottom:14px;border:1px solid #1a3550">
+        <div style="font-size:11px;font-weight:bold;color:#ffd700;margin-bottom:10px">➕ Novo usuário</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr 1fr 120px;gap:8px;align-items:end">
           <div>
-            <div style="font-size:10px;color:#6a9fc0;margin-bottom:3px">Usuário (login)</div>
-            <input id="newUserName" type="text" placeholder="ex: joao.silva" style="background:#0d1c2e;border:1px solid #1e4a72;color:#fff;padding:6px;border-radius:3px;width:100%;font-size:11px"/>
+            <div style="font-size:10px;color:#6a9fc0;margin-bottom:3px">Login</div>
+            <input id="nuLogin" type="text" placeholder="ex: joao.op" style="background:#0d1c2e;border:1px solid #1e4a72;color:#fff;padding:6px 8px;border-radius:3px;width:100%;font-size:11px"/>
           </div>
           <div>
             <div style="font-size:10px;color:#6a9fc0;margin-bottom:3px">Nome exibido</div>
-            <input id="newUserDisplay" type="text" placeholder="ex: João Silva" style="background:#0d1c2e;border:1px solid #1e4a72;color:#fff;padding:6px;border-radius:3px;width:100%;font-size:11px"/>
+            <input id="nuNome" type="text" placeholder="ex: João Silva" style="background:#0d1c2e;border:1px solid #1e4a72;color:#fff;padding:6px 8px;border-radius:3px;width:100%;font-size:11px"/>
           </div>
           <div>
             <div style="font-size:10px;color:#6a9fc0;margin-bottom:3px">Senha</div>
-            <input id="newUserPwd" type="password" placeholder="••••••••" style="background:#0d1c2e;border:1px solid #1e4a72;color:#fff;padding:6px;border-radius:3px;width:100%;font-size:11px"/>
+            <input id="nuSenha" type="password" placeholder="••••••••" style="background:#0d1c2e;border:1px solid #1e4a72;color:#fff;padding:6px 8px;border-radius:3px;width:100%;font-size:11px"/>
           </div>
           <div>
             <div style="font-size:10px;color:#6a9fc0;margin-bottom:3px">Perfil</div>
-            <select id="newUserRole" style="background:#0d1c2e;border:1px solid #1e4a72;color:#fff;padding:6px;border-radius:3px;font-size:11px">
+            <select id="nuPerfil" style="background:#0d1c2e;border:1px solid #1e4a72;color:#fff;padding:6px 8px;border-radius:3px;width:100%;font-size:11px">
               <option value="operador">Operador</option>
               <option value="supervisor">Supervisor</option>
               <option value="admin">Admin</option>
             </select>
           </div>
         </div>
-        <div style="display:flex;align-items:center;gap:10px;margin-top:8px">
-          <button onclick="addUserSubmit()" style="background:#00b894;color:#fff;border:none;padding:7px 20px;border-radius:3px;cursor:pointer;font-size:11px;font-weight:bold">✅ Criar Usuário</button>
-          <span id="newUserErr" style="font-size:11px"></span>
+        <div style="display:flex;align-items:center;gap:12px;margin-top:10px">
+          <button onclick="addUser()" style="background:#00b894;color:#fff;border:none;padding:7px 22px;border-radius:3px;cursor:pointer;font-size:11px;font-weight:bold">✅ Criar Usuário</button>
+          <span id="nuMsg" style="font-size:11px"></span>
         </div>
       </div>
 
-      <!-- Lista de usuários -->
-      <div style="font-size:11px;font-weight:bold;color:#6a9fc0;margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Usuários cadastrados</div>
-      <div id="usersPanel"></div>
+      <div style="font-size:10px;color:#6a9fc0;text-transform:uppercase;letter-spacing:.5px;margin-bottom:6px">Usuários cadastrados</div>
+      <div id="usersListEl"></div>
     </div>
   </div>
 </div>
 
-<button class="edit-btn-float" id="floatBtn" onclick="openAdmin()" title="Editar dados">✏️</button>
+<button class="edit-btn-float" id="floatBtn" onclick="openAdmin()" title="Editar dados" style="display:none">✏️</button>
 <input type="file" id="importFile" accept=".json" style="display:none" onchange="doImportFile(event)"/>
 
 <script>
@@ -698,13 +669,11 @@ function applyRemoteData(remote){
     renderKPIs(day);renderFlowBar(day);renderDashCharts(day);
     renderDashTables(day);renderRotasTbl(day,'rotasTblFull');
     updateRotasKPIs(day);
-    // só recarrega form e aba preencher se não estiver digitando
-    if(adminOk&&autoSaveTimer===null){
-      loadFormFrom(day);
-      // re-renderiza aba preencher se estiver ativa
-      if(document.getElementById('tb-preench')&&document.getElementById('tb-preench').classList.contains('act')){
-        renderPreenchTab();
-      }
+    // só recarrega form/preencher se não estiver digitando no momento
+    if(autoSaveTimer===null){
+      if(adminOk) loadFormFrom(day);
+      const preenchAtivo=document.getElementById('tb-preench');
+      if(preenchAtivo&&preenchAtivo.classList.contains('act')) renderPreench();
     }
   }
 }
@@ -890,10 +859,7 @@ function sumHoraInput(metric){
 }
 
 // ── AUTH ──────────────────────────────────────────────────
-function openAdmin(){
-  if(adminOk)switchTab('adm');
-  else document.getElementById('loginOv').style.display='flex';
-}
+function openAdmin(){if(adminOk)switchTab('adm');}
 
 // ── LIVE UPDATE ───────────────────────────────────────────
 function liveUpdate(){
@@ -927,14 +893,15 @@ function updateRealAuto(){
 // ── TABS ──────────────────────────────────────────────────
 function switchTab(id){
   document.querySelectorAll('.tab').forEach((t,i)=>{
-    const ids=['dash','hist','comp','rotas','preench','adm'];t.classList.toggle('act',ids[i]===id);
+    const ids=['dash','hist','comp','rotas','preench','adm'];
+    t.classList.toggle('act',ids[i]===id);
   });
   document.querySelectorAll('.tab-body').forEach(t=>t.classList.remove('act'));
   const el=document.getElementById('tb-'+id);if(el)el.classList.add('act');
   if(id==='hist')renderHist();
   if(id==='comp')renderComp();
   if(id==='rotas')renderRotasTab();
-  if(id==='preench')renderPreenchTab();
+  if(id==='preench')renderPreench();
 }
 
 // ── DAY NAV ───────────────────────────────────────────────
@@ -1775,310 +1742,320 @@ function renderRotasTab(){
   renderRotasTblFull(day);
 }
 
-function openSyncConfig(){
-  document.getElementById('sbUrlIn').value=localStorage.getItem('gam_sb_url')||'';
-  document.getElementById('sbKeyIn').value=localStorage.getItem('gam_sb_key')||'';
-  document.getElementById('syncOv').classList.add('on');
-}
-async function saveSyncConfig(){
-  const url=document.getElementById('sbUrlIn').value.trim();
-  const key=document.getElementById('sbKeyIn').value.trim();
-  if(!url||!key){alert('Preencha URL e chave!');return;}
-  localStorage.setItem('gam_sb_url',url);
-  localStorage.setItem('gam_sb_key',key);
-  document.getElementById('syncTestResult').textContent='⏳ Testando conexão...';
-  document.getElementById('syncTestResult').style.color='#ffd700';
-  // Test connection
-  try{
-    const r=await fetch(`${url}/rest/v1/cdgam_data?id=eq.main&select=id`,
-      {headers:{'apikey':key,'Authorization':'Bearer '+key}});
-    if(r.ok){
-      document.getElementById('syncTestResult').textContent='✅ Conexão OK! Recarregando...';
-      document.getElementById('syncTestResult').style.color='#00e676';
-      setTimeout(()=>location.reload(),1500);
-    }else{
-      const err=await r.json();
-      document.getElementById('syncTestResult').textContent='❌ Erro: '+(err.message||r.status)+' — Verifique a tabela cdgam_data e as credenciais.';
-      document.getElementById('syncTestResult').style.color='#ff4c4c';
-    }
-  }catch(e){
-    document.getElementById('syncTestResult').textContent='❌ Erro de conexão: '+e.message;
-    document.getElementById('syncTestResult').style.color='#ff4c4c';
-  }
-}
-function clearSyncConfig(){
-  if(!confirm('Remover configuração de nuvem? Dados locais ficam intactos.'))return;
-  localStorage.removeItem('gam_sb_url');localStorage.removeItem('gam_sb_key');
-  location.reload();
+
+// ══════════════════════════════════════════════════════════
+// SISTEMA DE AUTENTICAÇÃO E USUÁRIOS
+// ══════════════════════════════════════════════════════════
+const SESS_KEY  = 'cdgam_sess_v2';
+const USERS_FB  = 'cdgam/users';
+const USERS_LS  = 'cdgam_users_v2';
+
+let currentUser = null; // { username, role, displayName }
+
+// hash SHA-256 com salt fixo
+async function hashPwd(p){
+  const buf = await crypto.subtle.digest('SHA-256',
+    new TextEncoder().encode(p + '_gam_sjp_2026'));
+  return Array.from(new Uint8Array(buf))
+    .map(b=>b.toString(16).padStart(2,'0')).join('');
 }
 
-// ── AUTH / USUÁRIOS ────────────────────────────────────────
-const SESSION_KEY='cdgam_sess_v1';
-const USERS_FB='cdgam/users';
-const USERS_LS='cdgam_users_cache';
-let currentUser=null; // {username, role, displayName}
-
-async function hashPwd(pwd){
-  const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(pwd+'_cdgam_sjp_salt'));
-  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
-}
-
+// ── SESSÃO ─────────────────────────────────────────────────
 function checkSession(){
-  try{const s=sessionStorage.getItem(SESSION_KEY);if(s){currentUser=JSON.parse(s);return true;}}catch(e){}
+  try{
+    const s = sessionStorage.getItem(SESS_KEY);
+    if(s){ currentUser = JSON.parse(s); return true; }
+  }catch(e){}
   return false;
 }
-function setSession(u){currentUser=u;sessionStorage.setItem(SESSION_KEY,JSON.stringify(u));}
-function clearSession(){currentUser=null;sessionStorage.removeItem(SESSION_KEY);}
+function setSession(u){ currentUser=u; sessionStorage.setItem(SESS_KEY,JSON.stringify(u)); }
+function clearSession(){ currentUser=null; sessionStorage.removeItem(SESS_KEY); }
 
+// ── CARREGAR / SALVAR USUÁRIOS ──────────────────────────────
 async function getUsers(){
+  // tenta Firebase primeiro, cai para cache localStorage
   if(fbDb){
     try{
-      const snap=await fbDb.ref(USERS_FB).once('value');
-      const d=snap.val();
-      if(d){localStorage.setItem(USERS_LS,JSON.stringify(d));return d;}
+      const snap = await fbDb.ref(USERS_FB).once('value');
+      const d = snap.val();
+      if(d){ localStorage.setItem(USERS_LS, JSON.stringify(d)); return d; }
     }catch(e){}
   }
-  try{const c=localStorage.getItem(USERS_LS);if(c)return JSON.parse(c);}catch(e){}
+  try{ const c=localStorage.getItem(USERS_LS); if(c) return JSON.parse(c); }catch(e){}
   return {};
 }
-
 async function saveUsers(users){
-  localStorage.setItem(USERS_LS,JSON.stringify(users));
-  if(fbDb){try{await fbDb.ref(USERS_FB).set(users);}catch(e){console.error('saveUsers:',e);}}
+  localStorage.setItem(USERS_LS, JSON.stringify(users));
+  if(fbDb){ try{ await fbDb.ref(USERS_FB).set(users); }catch(e){} }
 }
 
+// ── LOGIN / LOGOUT ─────────────────────────────────────────
 async function doLogin(){
-  const u=document.getElementById('loginUser').value.trim().toLowerCase();
-  const p=document.getElementById('loginPwd').value;
-  const err=document.getElementById('loginErr');
-  if(!u||!p){err.textContent='Preencha usuário e senha.';err.style.color='#ff4c4c';return;}
-  err.textContent='⏳ Verificando...';err.style.color='#ffd700';
+  const u   = (document.getElementById('loginUser').value||'').trim().toLowerCase();
+  const pwd = document.getElementById('loginPwd').value;
+  const err = document.getElementById('loginErr');
 
-  // Aguarda Firebase conectar (máx 3s) para ter usuários atualizados
-  if(!fbDb){await new Promise(r=>setTimeout(r,1500));}
+  if(!u||!pwd){ _loginErr('Preencha usuário e senha.'); return; }
+  _loginErr('⏳ Verificando...','#ffd700');
 
-  let users=await getUsers();
+  // aguarda Firebase conectar (até 2s) para ter lista atualizada
+  if(!fbDb) await new Promise(r=>setTimeout(r,2000));
 
-  // Primeiro acesso: cria admin padrão
+  let users = await getUsers();
+
+  // primeira vez: cria admin padrão
   if(!Object.keys(users).length){
-    users['admin']={passwordHash:await hashPwd('gam2025'),role:'admin',displayName:'Admin'};
+    users['admin'] = { passwordHash: await hashPwd('gam2025'), role:'admin', displayName:'Admin' };
     await saveUsers(users);
   }
 
-  const usr=users[u];
-  if(!usr){err.textContent='❌ Usuário não encontrado.';err.style.color='#ff4c4c';return;}
-  if(await hashPwd(p)!==usr.passwordHash){err.textContent='❌ Senha incorreta.';err.style.color='#ff4c4c';return;}
+  const usr = users[u];
+  if(!usr){ _loginErr('❌ Usuário não encontrado.'); return; }
+  if(await hashPwd(pwd) !== usr.passwordHash){ _loginErr('❌ Senha incorreta.'); return; }
 
-  setSession({username:u,role:usr.role,displayName:usr.displayName||u});
-  document.getElementById('loginOv').style.display='none';
-  applyRoleUI();
-  updateUserBadge();
-  // Carrega painel de usuários se admin
-  if(currentUser.role==='admin'){
-    document.getElementById('usersPanelWrap').style.display='';
-    renderUsersPanel();
-  }
+  setSession({ username:u, role:usr.role, displayName:usr.displayName||u });
+  document.getElementById('loginOv').style.display = 'none';
+  afterLogin();
+}
+
+function _loginErr(msg, color='#ff4c4c'){
+  const el = document.getElementById('loginErr');
+  el.textContent = msg; el.style.color = color;
 }
 
 function doLogout(){
-  if(!confirm('Sair do sistema?'))return;
+  if(!confirm('Sair do sistema?')) return;
   clearSession();
   location.reload();
 }
 
-function applyRoleUI(){
-  if(!currentUser)return;
-  const r=currentUser.role;
-  const show=id=>{const e=document.getElementById(id);if(e)e.style.display='';};
-  const hide=id=>{const e=document.getElementById(id);if(e)e.style.display='none';};
-
-  if(r==='admin'){
-    adminOk=true;
-    show('tabAdm');show('floatBtn');hide('tabPreench');
-    document.querySelectorAll('.adm-group-restricted').forEach(e=>e.style.display='');
-    loadFormFrom(getDay(curDate)||emptyDay(curDate));
-  } else if(r==='supervisor'){
-    hide('floatBtn');hide('tabAdm');hide('tabPreench');
-    // todas as abas visíveis, sem edição
-  } else if(r==='operador'){
-    adminOk=true;
-    show('tabPreench');show('tabAdm');hide('floatBtn');
-    hide('tabHist');hide('tabComp');hide('tabRotas');
-    document.querySelectorAll('.adm-group-restricted').forEach(e=>e.style.display='none');
-    loadFormFrom(getDay(curDate)||emptyDay(curDate));
-    setTimeout(()=>{switchTab('preench');renderPreenchTab();},50);
+// ── PÓS-LOGIN: aplica UI por perfil ───────────────────────
+function afterLogin(){
+  updateUserBadge();
+  applyRoleUI();
+  // carrega formulário oculto para readFormAsDay() funcionar
+  const day = getDay(curDate)||emptyDay(curDate||today());
+  loadFormFrom(day);
+  // painel de usuários só para admin
+  if(currentUser.role==='admin'){
+    document.getElementById('usersPanelWrap').style.display='';
+    setTimeout(renderUsersList, 1200); // aguarda Firebase ter usuários
   }
 }
 
 function updateUserBadge(){
-  if(!currentUser)return;
-  const el=document.getElementById('userBadge');if(!el)return;
-  const labels={admin:'🔴 Admin',supervisor:'🟡 Supervisor',operador:'🟢 Operador'};
-  const cls={admin:'role-adm',supervisor:'role-sup',operador:'role-op'};
-  el.textContent=`${labels[currentUser.role]||currentUser.role} — ${currentUser.displayName}  (sair)`;
-  el.className='user-badge '+(cls[currentUser.role]||'');
+  const el = document.getElementById('userBadge'); if(!el) return;
+  const labels = { admin:'🔴 Admin', supervisor:'🟡 Supervisor', operador:'🟢 Operador' };
+  const cls    = { admin:'rb-admin',  supervisor:'rb-supervisor',  operador:'rb-operador' };
+  el.textContent = `${labels[currentUser.role]||currentUser.role} — ${currentUser.displayName}  (sair)`;
+  el.className   = `user-badge ${cls[currentUser.role]||''}`;
+  el.style.display = '';
 }
 
-// Renderiza tabela hora-a-hora simplificada na aba Preencher
-function renderPreenchTab(){
-  const day=getDay(curDate)||emptyDay(curDate);
-  const hdr=document.getElementById('hTblPreenchHdr');
-  const body=document.getElementById('hTblPreenchBody');
-  if(!hdr||!body)return;
+function applyRoleUI(){
+  const r = currentUser.role;
+  const show = id=>{ const e=document.getElementById(id); if(e) e.style.display=''; };
+  const hide = id=>{ const e=document.getElementById(id); if(e) e.style.display='none'; };
+
+  if(r==='admin'){
+    adminOk = true;
+    show('tabAdm'); show('floatBtn');
+    hide('tabPreench');
+    document.querySelectorAll('.adm-restricted').forEach(e=>e.style.display='');
+    return;
+  }
+  if(r==='supervisor'){
+    // vê tudo, mas sem edição
+    hide('floatBtn'); hide('tabAdm'); hide('tabPreench');
+    return;
+  }
+  if(r==='operador'){
+    adminOk = true;
+    show('tabPreench'); show('tabAdm');
+    hide('floatBtn'); hide('tabHist'); hide('tabComp'); hide('tabRotas');
+    document.querySelectorAll('.adm-restricted').forEach(e=>e.style.display='none');
+    // manda para aba Preencher
+    setTimeout(()=>switchTab('preench'), 80);
+  }
+}
+
+// ── ABA PREENCHER (operador) ───────────────────────────────
+function renderPreench(){
+  const day  = getDay(curDate) || emptyDay(curDate||today());
+  const hdr  = document.getElementById('preenchHdr');
+  const body = document.getElementById('preenchBody');
+  if(!hdr||!body) return;
+
   // cabeçalho
-  let h='<th class="hlbl" style="font-size:10px;color:#6a9fc0;background:#0a2340;padding:4px 8px;border:1px solid #1a3550">Métrica</th>';
+  let h = '<th style="background:#0a2340;color:#6a9fc0;padding:4px 8px;border:1px solid #1a3550;font-size:10px;text-align:left;white-space:nowrap">Métrica</th>';
   HOURS.forEach((lbl,i)=>{
-    const extra=i>=H_CK;
-    h+=`<th style="background:${extra?'rgba(255,149,0,.15)':'#0a2340'};color:${extra?'#ff9500':'#6a9fc0'};padding:3px 6px;border:1px solid #1a3550;font-size:9px;white-space:nowrap">${lbl}</th>`;
+    const extra = i>=H_CK;
+    h += `<th style="background:${extra?'rgba(255,149,0,.12)':'#0a2340'};color:${extra?'#ff9500':'#6a9fc0'};padding:3px 5px;border:1px solid #1a3550;font-size:9px;white-space:nowrap;text-align:center">${lbl}</th>`;
   });
-  hdr.innerHTML=h;
-  // linhas — apenas grupos CORREIA, CHECKOUT, EXPEDIÇÃO/DOCA, sem CONTROLE
-  const grupos=[
-    {lbl:'— CORREIA',metrics:['Linhas Med.','Linhas Perf.','Erros Sep. Med.'],color:'rgba(255,149,0,.6)'},
-    {lbl:'— CHECKOUT',metrics:['Vol. Checkout','Linhas Checkout','Unid. Checkout'],color:'rgba(0,229,255,.6)'},
-    {lbl:'— EXPEDIÇÃO',metrics:['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.','Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca'],color:'rgba(0,230,118,.6)'},
-    {lbl:'— CONTROLE',metrics:['Vales','Conf. Planejado','Conf. Ativo'],color:'rgba(150,150,150,.4)'},
+  hdr.innerHTML = h;
+
+  // grupos de métricas
+  const grupos = [
+    { lbl:'CORREIA',   cor:'rgba(255,149,0,.7)',  metrics:['Linhas Med.','Linhas Perf.','Erros Sep. Med.'] },
+    { lbl:'CHECKOUT',  cor:'rgba(0,229,255,.7)',  metrics:['Vol. Checkout','Linhas Checkout','Unid. Checkout'] },
+    { lbl:'EXPEDIÇÃO', cor:'rgba(0,230,118,.7)',  metrics:['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.','Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca'] },
+    { lbl:'CONTROLE',  cor:'rgba(170,170,170,.5)',metrics:['Vales','Conf. Planejado','Conf. Ativo'] },
   ];
-  let rows='';
+
+  // métricas que só vão até 23h (slot 6) no turno normal
+  const soCK = new Set(['Vol. Checkout','Linhas Checkout','Unid. Checkout',
+                        'Linhas Med.','Linhas Perf.','Erros Sep. Med.',
+                        'Vales','Conf. Planejado','Conf. Ativo']);
+
+  let rows = '';
   grupos.forEach(g=>{
-    rows+=`<tr><td colspan="${HOURS.length+1}" style="background:#071525;color:${g.color};font-size:9px;font-weight:bold;padding:3px 8px;border:1px solid #1a3550;letter-spacing:.5px;text-transform:uppercase">${g.lbl}</td></tr>`;
+    rows += `<tr><td colspan="${HOURS.length+1}" style="background:#071525;color:${g.cor};font-size:9px;font-weight:bold;padding:3px 8px;border:1px solid #1a3550;text-transform:uppercase;letter-spacing:.5px">${g.lbl}</td></tr>`;
     g.metrics.forEach(m=>{
-      const capId=CAP_MAP[m];
-      const cap=capId&&day[capId.replace('iCap','cap').replace('iCap','cap')]||(capId?+(document.getElementById(capId)||{value:0}).value:0);
-      const isInv=MHORA_INV.includes(m);
-      const isCK=m.startsWith('Vol. ')||m.startsWith('Linhas ')||m.startsWith('Unid. ');
-      const maxSlot=isCK&&!m.includes('Doca')&&!m.includes('Especial')&&!m.includes('Fralda')?H_CK:HOURS.length;
-      rows+=`<tr><td class="hlbl" style="font-size:10px;color:#89b4d4;background:#0a1825;padding:3px 8px;border:1px solid #1a3550;white-space:nowrap">${m}</td>`;
+      rows += `<tr><td style="background:#0a1825;color:#89b4d4;font-size:10px;font-weight:bold;padding:3px 8px;border:1px solid #1a3550;white-space:nowrap">${m}</td>`;
       HOURS.forEach((_,i)=>{
-        const val=day.hd&&day.hd[m]?day.hd[m][i]:'';
-        const extra=i>=H_CK;
-        const disabled=i>=maxSlot&&!extra;
-        if(disabled){
-          rows+=`<td style="background:#071520;border:1px solid #1a3550"></td>`;
-        }else{
-          const bg=extra?'rgba(255,149,0,.07)':'#0d1c2e';
-          rows+=`<td style="border:1px solid #1a3550;padding:1px 2px;background:${bg}">
+        const val     = (day.hd&&day.hd[m]) ? (day.hd[m][i]??'') : '';
+        const extra   = i>=H_CK;
+        const blocked = soCK.has(m) && i>=H_CK;
+        if(blocked){
+          rows += `<td style="background:#060e18;border:1px solid #1a3550"></td>`;
+        } else {
+          rows += `<td style="border:1px solid #1a3550;padding:1px 2px;background:${extra?'rgba(255,149,0,.06)':'#0d1c2e'}">
             <input type="number" value="${val}" data-m="${m}" data-i="${i}"
-              style="width:58px;background:transparent;border:none;color:#fff;padding:2px 4px;font-size:10px;text-align:center"
-              oninput="onPreenchInput(this)"
+              style="width:56px;background:transparent;border:none;color:#fff;padding:2px 4px;font-size:10px;text-align:center;outline:none"
               onfocus="this.style.outline='1px solid #ffd700'"
-              onblur="this.style.outline='none'"/>
+              onblur="this.style.outline='none'"
+              oninput="preenchInput(this)"/>
           </td>`;
         }
       });
-      rows+='</tr>';
+      rows += '</tr>';
     });
   });
-  body.innerHTML=rows;
+  body.innerHTML = rows;
 }
 
-function onPreenchInput(inp){
-  // Sincroniza com a tabela principal (hTblBody) e dispara save
-  const m=inp.dataset.m, i=+inp.dataset.i;
-  // atualiza no hTblBody também
-  const mainInp=document.querySelector(`#hTblBody input[data-m="${m}"][data-i="${i}"]`);
-  if(mainInp)mainInp.value=inp.value;
+function preenchInput(inp){
+  const m = inp.dataset.m, i = +inp.dataset.i;
+  // espelha no hTblBody para readFormAsDay() capturar
+  const main = document.querySelector(`#hTblBody input[data-m="${m}"][data-i="${i}"]`);
+  if(main) main.value = inp.value;
   updateRealAuto();
-  const msg=document.getElementById('preenchSyncMsg');
-  if(msg){msg.textContent='⏳ Salvando...';msg.style.color='#ffd700';}
+  const st = document.getElementById('preenchStatus');
+  if(st){ st.textContent='⏳ Salvando...'; st.style.color='#ffd700'; }
   autoSave();
-  setTimeout(()=>{if(msg)msg.textContent='';},3000);
+  setTimeout(()=>{ const s=document.getElementById('preenchStatus'); if(s) s.textContent=''; }, 3000);
 }
 
 // ── GERENCIAR USUÁRIOS ─────────────────────────────────────
-async function renderUsersPanel(){
-  const users=await getUsers();
-  const panel=document.getElementById('usersPanel');
-  if(!panel)return;
-  const rLabel={admin:'Admin',supervisor:'Supervisor',operador:'Operador'};
-  const rClass={admin:'rp-admin',supervisor:'rp-supervisor',operador:'rp-operador'};
-  let html=`<table class="users-tbl"><thead><tr>
-    <th>Usuário</th><th>Nome</th><th>Perfil</th><th style="text-align:center">Ações</th>
+async function renderUsersList(){
+  const users = await getUsers();
+  const el    = document.getElementById('usersListEl'); if(!el) return;
+  const rLabel = { admin:'Admin', supervisor:'Supervisor', operador:'Operador' };
+  const rClass = { admin:'rpill-admin', supervisor:'rpill-supervisor', operador:'rpill-operador' };
+  let html = `<table class="users-tbl"><thead><tr>
+    <th>Login</th><th>Nome</th><th>Perfil</th><th style="text-align:center">Ações</th>
   </tr></thead><tbody>`;
-  const entries=Object.entries(users);
-  if(!entries.length){html+='<tr><td colspan="4" style="color:#445;text-align:center;padding:12px">Nenhum usuário cadastrado.</td></tr>';}
+  const entries = Object.entries(users);
+  if(!entries.length){
+    html += '<tr><td colspan="4" style="color:#445;text-align:center;padding:14px">Nenhum usuário cadastrado.</td></tr>';
+  }
   entries.forEach(([uname,u])=>{
-    const isSelf=currentUser&&uname===currentUser.username;
-    html+=`<tr>
-      <td><b>${uname}</b>${isSelf?' <span style="font-size:9px;color:#6a9fc0">(você)</span>':''}</td>
+    const isSelf = currentUser && uname===currentUser.username;
+    html += `<tr>
+      <td style="color:#fff;font-weight:bold">${uname}${isSelf?' <span style="font-size:9px;color:#6a9fc0">(você)</span>':''}</td>
       <td style="color:#89b4d4">${u.displayName||uname}</td>
-      <td><span class="role-pill ${rClass[u.role]||''}">${rLabel[u.role]||u.role}</span></td>
-      <td style="text-align:center">
-        <button onclick="promptEditUser('${uname}')" style="background:#4a90d9;color:#fff;border:none;padding:3px 10px;border-radius:3px;cursor:pointer;font-size:10px;margin-right:4px">✏️ Editar</button>
-        ${isSelf?'<span style="font-size:10px;color:#445">—</span>':`<button onclick="deleteUser('${uname}')" style="background:#e94560;color:#fff;border:none;padding:3px 10px;border-radius:3px;cursor:pointer;font-size:10px">🗑 Excluir</button>`}
+      <td><span class="rpill ${rClass[u.role]||''}">${rLabel[u.role]||u.role}</span></td>
+      <td style="text-align:center;display:flex;gap:6px;justify-content:center">
+        <button onclick="editUser('${uname}')"
+          style="background:#4a90d9;color:#fff;border:none;padding:3px 10px;border-radius:3px;cursor:pointer;font-size:10px">
+          ✏️ Editar
+        </button>
+        ${isSelf ? '<span style="font-size:10px;color:#333">—</span>'
+          : `<button onclick="removeUser('${uname}')"
+              style="background:#e94560;color:#fff;border:none;padding:3px 10px;border-radius:3px;cursor:pointer;font-size:10px">
+              🗑 Excluir
+             </button>`}
       </td>
     </tr>`;
   });
-  html+='</tbody></table>';
-  panel.innerHTML=html;
+  html += '</tbody></table>';
+  el.innerHTML = html;
 }
 
-async function addUserSubmit(){
-  const uname=document.getElementById('newUserName').value.trim().toLowerCase();
-  const display=document.getElementById('newUserDisplay').value.trim();
-  const pwd=document.getElementById('newUserPwd').value;
-  const role=document.getElementById('newUserRole').value;
-  const err=document.getElementById('newUserErr');
-  if(!uname||!pwd){err.textContent='⚠ Preencha usuário e senha.';err.style.color='#ff4c4c';return;}
-  if(uname.length<3){err.textContent='⚠ Mínimo 3 caracteres no usuário.';err.style.color='#ff4c4c';return;}
-  const users=await getUsers();
-  if(users[uname]){err.textContent='⚠ Usuário já existe.';err.style.color='#ff4c4c';return;}
-  users[uname]={passwordHash:await hashPwd(pwd),role,displayName:display||uname};
+async function addUser(){
+  const login   = (document.getElementById('nuLogin').value||'').trim().toLowerCase();
+  const nome    = (document.getElementById('nuNome').value||'').trim();
+  const senha   = document.getElementById('nuSenha').value;
+  const perfil  = document.getElementById('nuPerfil').value;
+  const msg     = document.getElementById('nuMsg');
+
+  if(!login||!senha){ _nuMsg('⚠ Preencha login e senha.','#ff4c4c'); return; }
+  if(login.length<3){ _nuMsg('⚠ Login mínimo 3 caracteres.','#ff4c4c'); return; }
+
+  const users = await getUsers();
+  if(users[login]){ _nuMsg('⚠ Login já existe.','#ff4c4c'); return; }
+
+  users[login] = { passwordHash: await hashPwd(senha), role: perfil, displayName: nome||login };
   await saveUsers(users);
-  document.getElementById('newUserName').value='';
-  document.getElementById('newUserDisplay').value='';
-  document.getElementById('newUserPwd').value='';
-  err.textContent='✅ Usuário criado com sucesso!';err.style.color='#00e676';
-  renderUsersPanel();
+
+  document.getElementById('nuLogin').value='';
+  document.getElementById('nuNome').value='';
+  document.getElementById('nuSenha').value='';
+  _nuMsg('✅ Usuário criado!','#00e676');
+  renderUsersList();
 }
 
-async function deleteUser(uname){
-  if(!confirm(`Excluir o usuário "${uname}"? Esta ação não pode ser desfeita.`))return;
-  const users=await getUsers();
+function _nuMsg(txt, color){
+  const el = document.getElementById('nuMsg');
+  el.textContent=txt; el.style.color=color;
+  setTimeout(()=>{ el.textContent=''; }, 4000);
+}
+
+async function removeUser(uname){
+  if(!confirm(`Excluir o usuário "${uname}"?`)) return;
+  const users = await getUsers();
   delete users[uname];
   await saveUsers(users);
-  renderUsersPanel();
+  renderUsersList();
 }
 
-async function promptEditUser(uname){
-  const users=await getUsers();
-  const u=users[uname];if(!u)return;
-  const newRole=prompt(`Novo perfil para "${uname}":\nadmin / supervisor / operador`,u.role);
-  if(!newRole)return;
-  const r=newRole.trim().toLowerCase();
-  if(!['admin','supervisor','operador'].includes(r)){alert('Perfil inválido. Use: admin, supervisor ou operador');return;}
-  users[uname].role=r;
-  if(confirm('Deseja alterar a senha também?')){
-    const np=prompt('Nova senha (mínimo 4 caracteres):');
-    if(!np||np.length<4){alert('Senha muito curta. Perfil salvo sem alterar a senha.');
-    }else{users[uname].passwordHash=await hashPwd(np);}
+async function editUser(uname){
+  const users = await getUsers(); const u = users[uname]; if(!u) return;
+  const novoPerfil = prompt(
+    `Perfil de "${uname}" — atual: ${u.role}\nDigite: admin / supervisor / operador`, u.role);
+  if(!novoPerfil) return;
+  const r = novoPerfil.trim().toLowerCase();
+  if(!['admin','supervisor','operador'].includes(r)){ alert('Perfil inválido.'); return; }
+  users[uname].role = r;
+  if(confirm('Alterar a senha também?')){
+    const ns = prompt('Nova senha (mín. 4 caracteres):');
+    if(!ns||ns.length<4){ alert('Senha muito curta — perfil salvo, senha mantida.'); }
+    else { users[uname].passwordHash = await hashPwd(ns); }
   }
   await saveUsers(users);
-  renderUsersPanel();
+  renderUsersList();
 }
 
+// ══════════════════════════════════════════════════════════
+// INIT
+// ══════════════════════════════════════════════════════════
 function init(){
   load();
-  const latest=latestDay();
-  curDate=latest?latest.date:today();
+  const latest = latestDay();
+  curDate = latest ? latest.date : today();
   buildDayNav();
-  if(latest){renderKPIs(latest);renderFlowBar(latest);renderDashCharts(latest);renderDashTables(latest);}
-  else{document.getElementById('hdrDate').textContent='Nenhum dado — clique em ✏️ para começar';}
+  if(latest){ renderKPIs(latest); renderFlowBar(latest); renderDashCharts(latest); renderDashTables(latest); }
+  else{ document.getElementById('hdrDate').textContent='Nenhum dado — faça login para começar'; }
 
-  // Verifica sessão — se já logado, pula login
+  // sessão ativa → pula login
   if(checkSession()){
     document.getElementById('loginOv').style.display='none';
-    applyRoleUI();
-    updateUserBadge();
-    if(currentUser.role==='admin'){
-      document.getElementById('usersPanelWrap').style.display='';
-      // Carrega painel de usuários após Firebase conectar
-      setTimeout(renderUsersPanel,1500);
-    }
+    afterLogin();
   }
 
-  setTimeout(initFirebase,100);
-  setTimeout(startSbPolling,300);
+  // Firebase + Supabase em paralelo
+  setTimeout(initFirebase, 100);
+  setTimeout(startSbPolling, 300);
 }
 init();
 </script>
