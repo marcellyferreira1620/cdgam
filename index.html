@@ -706,6 +706,48 @@ let fbConnected=false;
 let isSaving=false;
 let lastSaveTs=0;
 
+function load(){
+  try{
+    const raw=localStorage.getItem(SK);
+    const parsed=raw?JSON.parse(raw):null;
+    db=(parsed&&Array.isArray(parsed.days))?parsed:{days:[]};
+  }catch(e){
+    console.error('Load error:',e);
+    db={days:[]};
+  }
+  db.days.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+}
+
+function getLocalUsersCache(){
+  try{
+    const raw=localStorage.getItem(USERS_LS);
+    const parsed=raw?JSON.parse(raw):null;
+    return parsed&&typeof parsed==='object'&&!Array.isArray(parsed)?parsed:{};
+  }catch(e){return {};}
+}
+
+function setLocalUsersCache(users){
+  localStorage.setItem(USERS_LS,JSON.stringify(users||{}));
+}
+
+function mergeUsers(localUsers,remoteUsers){
+  return {...(localUsers||{}),...(remoteUsers||{})};
+}
+
+function mergeDays(remoteDays,localDays){
+  const byDate={};
+  (Array.isArray(remoteDays)?remoteDays:[]).forEach(d=>{if(d&&d.date)byDate[d.date]=d;});
+  (Array.isArray(localDays)?localDays:[]).forEach(d=>{if(d&&d.date)byDate[d.date]=d;});
+  return Object.values(byDate).sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+function ensureFirebase(){
+  if(typeof firebase==='undefined')return false;
+  if(!firebase.apps.length)firebase.initializeApp(FB_CONFIG);
+  fbDb=firebase.database();
+  return true;
+}
+
 function showSyncStatus(msg,isErr){
   const el=document.getElementById('syncStatus');if(!el)return;
   el.textContent=msg;
@@ -723,8 +765,12 @@ function showSyncStatus(msg,isErr){
 }
 
 function applyRemoteData(remote){
-  if(!remote||!remote.days||!Array.isArray(remote.days))return;
-  db.days=JSON.parse(JSON.stringify(remote.days));
+  if(!remote)return;
+  if(remote.users&&typeof remote.users==='object'&&!Array.isArray(remote.users)){
+    setLocalUsersCache(mergeUsers(getLocalUsersCache(),remote.users));
+  }
+  if(!remote.days||!Array.isArray(remote.days))return;
+  db.days=mergeDays(db.days,JSON.parse(JSON.stringify(remote.days)));
   db.days.sort((a,b)=>a.date.localeCompare(b.date));
   localStorage.setItem(SK,JSON.stringify(db));
   buildDayNav();
@@ -764,8 +810,7 @@ let fbRetryTimer=null;
 
 function initFirebase(){
   try{
-    if(!firebase.apps.length)firebase.initializeApp(FB_CONFIG);
-    fbDb=firebase.database();
+    if(!ensureFirebase())return;
     showSyncStatus('☁ Conectando...',null);
 
     // Monitor conexão
@@ -895,6 +940,7 @@ function liveUpdate(){
       renderFlowBar(day);
       renderDashCharts(day);
       renderDashTables(day);
+      autoSave();
     }
   },300);
 }
@@ -1818,7 +1864,7 @@ function autoSave(){
     if(idx>=0)db.days[idx]=day;else db.days.push(day);
     db.days.sort((a,b)=>a.date.localeCompare(b.date));
     save();
-  },1500);
+  },500);
 }
 function saveDay(){
   const day=readFormAsDay();if(!day){alert('⚠️ Informe a data!');return;}
@@ -2055,61 +2101,130 @@ const SB_KEY_DEFAULT='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 let sbUrl=localStorage.getItem('gam_sb_url')||SB_URL_DEFAULT;
 let sbKey=localStorage.getItem('gam_sb_key')||SB_KEY_DEFAULT;
 let sbConnected=false,sbSyncing=false,sbPollTimer=null,sbLastTs=0;
+let sbSaveRunning=false,sbSaveQueued=false;
 const SB_TABLE='cdgam_data';
 const SB_ROW_ID='main';
 
 function sbHeaders(){return{'apikey':sbKey,'Authorization':'Bearer '+sbKey,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'};}
 
+async function sbReadPayload(){
+  if(!sbUrl||!sbKey)return null;
+  const r=await fetch(`${sbUrl}/rest/v1/${SB_TABLE}?id=eq.${SB_ROW_ID}&select=payload,updated_at`,
+    {headers:sbHeaders()});
+  if(!r.ok)return null;
+  const rows=await r.json();
+  if(!rows||!rows.length||!rows[0].payload)return null;
+  return typeof rows[0].payload==='string'?JSON.parse(rows[0].payload):rows[0].payload;
+}
+
+async function sbWritePayload(payload,ts){
+  const r=await fetch(`${sbUrl}/rest/v1/${SB_TABLE}`,{
+    method:'POST',
+    headers:{...sbHeaders(),'Prefer':'resolution=merge-duplicates'},
+    body:JSON.stringify({id:SB_ROW_ID,payload:JSON.stringify(payload),updated_at:new Date(ts).toISOString()})
+  });
+  return r;
+}
+
 async function sbSave(){
   if(!sbUrl||!sbKey)return;
+  if(sbSaveRunning){sbSaveQueued=true;return;}
+  sbSaveRunning=true;
   sbSyncing=true;
-  const ts=Date.now();
-  sbLastTs=ts;
   try{
-    const payload=JSON.stringify({days:db.days,savedAt:ts});
-    const r=await fetch(`${sbUrl}/rest/v1/${SB_TABLE}`,{
-      method:'POST',
-      headers:{...sbHeaders(),'Prefer':'resolution=merge-duplicates'},
-      body:JSON.stringify({id:SB_ROW_ID,payload,updated_at:new Date(ts).toISOString()})
-    });
-    if(r.ok){
-      sbConnected=true;
-      showSyncStatus('☁ Salvo na nuvem ✓',false);
-      setTimeout(()=>{if(sbConnected)showSyncStatus('☁ Nuvem ativa ✓',false);},2000);
-    } else {
-      const err=await r.json().catch(()=>({}));
-      showSyncStatus('⚠ Erro ao salvar: '+(err.message||r.status),true);
+    do{
+      sbSaveQueued=false;
+      const ts=Date.now();
+      sbLastTs=ts;
+      try{
+        const remote=await sbReadPayload()||{};
+        const payload={
+          ...remote,
+          days:mergeDays(remote.days,db.days),
+          users:mergeUsers(remote.users,getLocalUsersCache()),
+          savedAt:ts
+        };
+        const r=await sbWritePayload(payload,ts);
+        if(r.ok){
+          sbConnected=true;
+          showSyncStatus('☁ Salvo na nuvem ✓',false);
+          setTimeout(()=>{if(sbConnected)showSyncStatus('☁ Nuvem ativa ✓',false);},2000);
+        } else {
+          const err=await r.json().catch(()=>({}));
+          showSyncStatus('⚠ Erro ao salvar: '+(err.message||r.status),true);
+        }
+      }catch(e){
+        showSyncStatus('⚠ Sem internet — salvo local',true);
+      }
     }
-  }catch(e){
-    showSyncStatus('⚠ Sem internet — salvo local',true);
+    while(sbSaveQueued);
+  }finally{
+    sbSyncing=false;
+    sbSaveRunning=false;
   }
-  sbSyncing=false;
 }
 
 async function sbLoad(){
   if(!sbUrl||!sbKey)return false;
   try{
-    const r=await fetch(`${sbUrl}/rest/v1/${SB_TABLE}?id=eq.${SB_ROW_ID}&select=payload,updated_at`,
-      {headers:sbHeaders()});
-    if(!r.ok)return false;
-    const rows=await r.json();
-    if(!rows||!rows.length||!rows[0].payload)return false;
-    const remote=JSON.parse(rows[0].payload);
-    if(!remote||!remote.days)return false;
+    const remote=await sbReadPayload();
+    if(!remote)return false;
     const remoteTs=remote.savedAt||0;
     // Sempre aplicar se remoto tem dados e é diferente do que temos
     const localTs=sbLastTs||0;
-    if(remoteTs>localTs||remote.days.length>db.days.length){
-      sbLastTs=remoteTs;
-      // Merge: nunca perder dias locais que não estão na nuvem
-      const remoteMap={};remote.days.forEach(d=>remoteMap[d.date]=d);
-      db.days.forEach(d=>{if(!remoteMap[d.date])remote.days.push(d);});
-      db.days=remote.days.sort((a,b)=>a.date.localeCompare(b.date));
+    let changed=false;
+    if(remote.users&&typeof remote.users==='object'&&!Array.isArray(remote.users)){
+      const localUsers=getLocalUsersCache();
+      const mergedUsers=mergeUsers(localUsers,remote.users);
+      if(JSON.stringify(mergedUsers)!==JSON.stringify(localUsers)){
+        setLocalUsersCache(mergedUsers);
+        changed=true;
+        if(currentUser&&currentUser.role==='admin')setTimeout(renderUsersList,0);
+      }
+    }
+    if(remote.days&&Array.isArray(remote.days)&&(remoteTs>localTs||remote.days.length>db.days.length)){
+      db.days=mergeDays(db.days,remote.days);
       localStorage.setItem(SK,JSON.stringify(db));
+      changed=true;
+    }
+    if(remoteTs>sbLastTs)sbLastTs=remoteTs;
+    return changed;
+  }catch(e){return false;}
+}
+
+async function sbLoadUsers(){
+  if(!sbUrl||!sbKey)return null;
+  try{
+    const remote=await sbReadPayload();
+    if(remote&&remote.users&&typeof remote.users==='object'&&!Array.isArray(remote.users)){
+      const mergedUsers=mergeUsers(getLocalUsersCache(),remote.users);
+      setLocalUsersCache(mergedUsers);
+      return mergedUsers;
+    }
+  }catch(e){}
+  return null;
+}
+
+async function sbSaveUsers(users){
+  if(!sbUrl||!sbKey)return false;
+  const ts=Date.now();
+  try{
+    const remote=await sbReadPayload()||{};
+    const payload={
+      ...remote,
+      days:mergeDays(remote.days,db.days),
+      users:mergeUsers(remote.users,users),
+      savedAt:ts
+    };
+    const r=await sbWritePayload(payload,ts);
+    if(r.ok){
+      sbConnected=true;
+      sbLastTs=ts;
+      setLocalUsersCache(payload.users);
       return true;
     }
-    return false;
-  }catch(e){return false;}
+  }catch(e){}
+  return false;
 }
 
 async function sbConnect(){
@@ -2463,21 +2578,23 @@ function setSession(u){currentUser=u;sessionStorage.setItem(SESS_KEY,JSON.string
 function clearSession(){currentUser=null;sessionStorage.removeItem(SESS_KEY);}
 
 async function getUsers(){
-  // Tenta Firebase, depois localStorage cache
-  if(typeof firebase!=='undefined'&&firebase.apps&&firebase.apps.length){
+  // Tenta Supabase, depois Firebase e por fim o cache local.
+  const sbUsers=await sbLoadUsers();
+  if(sbUsers&&Object.keys(sbUsers).length)return sbUsers;
+  if(ensureFirebase()){
     try{
-      const snap=await firebase.database().ref(USERS_FB).once('value');
+      const snap=await fbDb.ref(USERS_FB).once('value');
       const d=snap.val();
-      if(d){localStorage.setItem(USERS_LS,JSON.stringify(d));return d;}
+      if(d){setLocalUsersCache(d);await sbSaveUsers(d);return d;}
     }catch(e){}
   }
-  try{const c=localStorage.getItem(USERS_LS);if(c)return JSON.parse(c);}catch(e){}
-  return {};
+  return getLocalUsersCache();
 }
 async function saveUsers(users){
-  localStorage.setItem(USERS_LS,JSON.stringify(users));
-  if(typeof firebase!=='undefined'&&firebase.apps&&firebase.apps.length){
-    try{await firebase.database().ref(USERS_FB).set(users);}catch(e){}
+  setLocalUsersCache(users);
+  await sbSaveUsers(users);
+  if(ensureFirebase()){
+    try{await fbDb.ref(USERS_FB).set(users);}catch(e){}
   }
 }
 
@@ -2487,9 +2604,6 @@ async function doLogin(){
   const err=document.getElementById('loginErr');
   if(!u||!p){err.textContent='Preencha usuário e senha.';err.style.color='#ff4c4c';return;}
   err.textContent='⏳ Verificando...';err.style.color='#ffd700';
-  // aguarda Firebase até 2s para ter usuários atualizados
-  if(!(typeof firebase!=='undefined'&&firebase.apps&&firebase.apps.length))
-    await new Promise(r=>setTimeout(r,2000));
   let users=await getUsers();
   // Primeiro acesso: cria admin padrão
   if(!Object.keys(users).length){
