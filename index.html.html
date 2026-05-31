@@ -171,14 +171,21 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
       <input id="sbKeyIn" type="text" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." style="background:#0d1c2e;border:1px solid #1e4a72;color:#fff;padding:7px;border-radius:4px;width:100%;font-size:12px;margin-bottom:12px"/>
     </div>
     <div style="background:#071525;border-radius:4px;padding:8px;margin-bottom:12px;font-size:10px;color:#6a9fc0;text-align:left;line-height:1.7">
+      <b style="color:#ffd700">⚡ SQL para criar a tabela (copie e cole no Supabase → SQL Editor):</b>
+      <div style="background:#0a1825;border-radius:4px;padding:7px 10px;margin:6px 0;font-family:monospace;font-size:11px;color:#00e676;border:1px solid rgba(0,230,118,.3);cursor:pointer;line-height:1.6"
+           onclick="navigator.clipboard.writeText('create table if not exists cdgam_data (id text primary key, payload text, updated_at text);');this.style.borderColor='#00e676';this.innerHTML=this.innerHTML.replace('📋','✅');"
+           title="Clique para copiar">
+        create table if not exists cdgam_data (<br>
+        &nbsp;&nbsp;id text primary key,<br>
+        &nbsp;&nbsp;payload text,<br>
+        &nbsp;&nbsp;updated_at text<br>
+        ); <span style="float:right;color:#4a7a9b">📋 copiar</span>
+      </div>
       <b style="color:#ffd700">Passo a passo:</b><br>
-      1. Acesse <b>supabase.com</b> e crie uma conta gratuita<br>
-      2. Crie um novo projeto (nome: cdgam, qualquer senha)<br>
-      3. Vá em <b>Settings → API</b> e copie a <b>Project URL</b> e a <b>anon public key</b><br>
-      4. Vá em <b>Table Editor → New Table</b>, nome: <b>cdgam_data</b><br>
-      5. Adicione as colunas: <b>id</b> (text, primary key), <b>payload</b> (text), <b>updated_at</b> (text)<br>
-      6. Cole a URL e a chave aqui e clique Salvar<br>
-      7. Faça isso em todos os computadores com as mesmas credenciais
+      1. <a href="https://supabase.com" target="_blank" style="color:#00e5ff">supabase.com</a> → login → seu projeto<br>
+      2. Menu lateral → <b style="color:#fff">SQL Editor</b> → cole o SQL acima → <b style="color:#fff">Run</b><br>
+      3. Vá em <b style="color:#fff">Settings → API</b> → copie <b style="color:#fff">Project URL</b> e <b style="color:#fff">anon public key</b><br>
+      4. Cole os dois campos acima e clique <b style="color:#00e676">Salvar e Conectar</b>
     </div>
     <div style="display:flex;gap:8px">
       <button onclick="saveSyncConfig()" style="flex:1;background:#00b894;color:#fff;border:none;padding:9px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold">💾 Salvar e Conectar</button>
@@ -186,6 +193,77 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
       <button onclick="document.getElementById('syncOv').classList.remove('on')" style="background:#444;color:#fff;border:none;padding:9px 14px;border-radius:4px;cursor:pointer;font-size:12px">Fechar</button>
     </div>
     <div id="syncTestResult" style="font-size:11px;margin-top:10px;min-height:16px"></div>
+  </div>
+</div>
+
+<!-- GUIA DE CONFIGURAÇÃO FIREBASE -->
+<div class="lock-ov" id="setupGuideOv" style="z-index:9998">
+  <div class="lock-box" style="width:520px;max-height:90vh;overflow-y:auto">
+    <h3>🔥 Configurar Salvamento na Nuvem</h3>
+    <p style="color:#89b4d4;font-size:11px;margin-bottom:12px;line-height:1.7">
+      Seus dados já estão salvos <b style="color:#ffd700">localmente</b> neste computador.<br>
+      Para garantir que <b style="color:#00e676">nunca perca nada</b> mesmo desligando o PC, siga os passos abaixo para ativar o Firebase (gratuito, da Google).
+    </p>
+    <div style="counter-reset:step">
+      <!-- PASSO 1 -->
+      <div style="background:#071525;border-radius:6px;padding:10px 14px;margin-bottom:8px;border-left:3px solid #ffd700">
+        <div style="color:#ffd700;font-size:11px;font-weight:bold;margin-bottom:6px">PASSO 1 — Acessar o Console Firebase</div>
+        <div style="font-size:11px;color:#c0d8f0;line-height:1.8">
+          1. Acesse <a href="https://console.firebase.google.com" target="_blank" style="color:#00e5ff">console.firebase.google.com</a><br>
+          2. Faça login com sua conta Google<br>
+          3. Clique em <b style="color:#fff">GAM-SJP</b> (projeto já criado)
+        </div>
+      </div>
+      <!-- PASSO 2 -->
+      <div style="background:#071525;border-radius:6px;padding:10px 14px;margin-bottom:8px;border-left:3px solid #ff9500">
+        <div style="color:#ff9500;font-size:11px;font-weight:bold;margin-bottom:6px">PASSO 2 — Abrir Realtime Database</div>
+        <div style="font-size:11px;color:#c0d8f0;line-height:1.8">
+          1. No menu lateral esquerdo clique em <b style="color:#fff">Build</b><br>
+          2. Clique em <b style="color:#fff">Realtime Database</b><br>
+          3. Se não existir ainda, clique <b style="color:#fff">"Create Database"</b>, escolha <b style="color:#fff">São Paulo</b> e modo <b style="color:#fff">Test Mode</b>
+        </div>
+      </div>
+      <!-- PASSO 3 -->
+      <div style="background:#071525;border-radius:6px;padding:10px 14px;margin-bottom:8px;border-left:3px solid #e94560">
+        <div style="color:#e94560;font-size:11px;font-weight:bold;margin-bottom:6px">PASSO 3 — Liberar as Regras de Acesso</div>
+        <div style="font-size:11px;color:#c0d8f0;line-height:1.8">
+          1. Clique na aba <b style="color:#fff">Rules</b><br>
+          2. Apague o conteúdo e cole exatamente isso:
+        </div>
+        <div style="background:#0a1825;border-radius:4px;padding:8px 12px;margin-top:6px;font-family:monospace;font-size:12px;color:#00e676;border:1px solid rgba(0,230,118,.3);cursor:pointer" onclick="navigator.clipboard.writeText('{"rules":{".read":true,".write":true}}');this.style.borderColor='#00e676';this.title='Copiado!';" title="Clique para copiar">
+          {"rules":{".read":true,".write":true}}
+          <span style="float:right;font-size:10px;color:#4a7a9b">📋 clique para copiar</span>
+        </div>
+        <div style="font-size:11px;color:#c0d8f0;line-height:1.8;margin-top:6px">
+          3. Clique em <b style="color:#fff">Publish</b>
+        </div>
+      </div>
+      <!-- PASSO 4 -->
+      <div style="background:#071525;border-radius:6px;padding:10px 14px;margin-bottom:8px;border-left:3px solid #00e676">
+        <div style="color:#00e676;font-size:11px;font-weight:bold;margin-bottom:6px">PASSO 4 — Testar a Conexão</div>
+        <div style="font-size:11px;color:#c0d8f0;line-height:1.8">
+          1. Volte aqui no dashboard<br>
+          2. No canto superior direito deve aparecer <b style="color:#00e676">☁ Nuvem ativa ✓</b><br>
+          3. Salve qualquer dado — ele aparece no Firebase em tempo real!
+        </div>
+      </div>
+    </div>
+    <div style="background:#0a2340;border-radius:4px;padding:8px 12px;font-size:10px;color:#6a9fc0;margin-bottom:12px;border:1px solid rgba(0,229,255,.2)">
+      💡 <b style="color:#00e5ff">Segurança:</b> As regras acima são abertas (ideal para rede interna do CD). Se quiser restringir o acesso, fale com o TI para configurar autenticação.
+    </div>
+    <div style="display:flex;gap:8px">
+      <a href="https://console.firebase.google.com/project/gam-sjp/database" target="_blank"
+         style="flex:1;background:#ff9500;color:#000;border:none;padding:9px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold;text-align:center;text-decoration:none;display:block">
+        🔥 Abrir Firebase Console
+      </a>
+      <button onclick="document.getElementById('setupGuideOv').classList.remove('on')"
+              style="background:#444;color:#fff;border:none;padding:9px 20px;border-radius:4px;cursor:pointer;font-size:12px">
+        Fechar
+      </button>
+    </div>
+    <div style="margin-top:10px;font-size:10px;color:#445;text-align:center">
+      Dados locais: sempre seguros mesmo sem nuvem — o Firebase é um backup extra
+    </div>
   </div>
 </div>
 
@@ -204,7 +282,8 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
   <div class="hdr-logo">GAM</div>
   <div class="hdr-title">ACOMPANHAMENTO DE PRODUTIVIDADE — CD GAM (GENESIO A. MENDES)</div>
   <span class="live-badge" id="liveBadge" style="display:none">⬤ AO VIVO</span>
-  <span id="syncStatus" onclick="openSyncConfig()" style="font-size:10px;color:#89b4d4;padding:2px 8px;background:#122033;border-radius:3px;cursor:pointer;" title="Clique para configurar sincronização">☁ Conectando...</span>
+  <span id="syncStatus" onclick="openSyncConfig()" style="font-size:10px;color:#89b4d4;padding:2px 8px;background:#122033;border-radius:3px;cursor:pointer;border:1px solid #1e4a72;transition:border-color .3s" title="Status da nuvem — clique para configurar">☁ Conectando...</span>
+  <button onclick="document.getElementById('setupGuideOv').classList.add('on')" style="font-size:10px;background:#ff9500;color:#000;border:none;padding:2px 8px;border-radius:3px;cursor:pointer;font-weight:bold" title="Como configurar o salvamento na nuvem">🔥 Configurar Nuvem</button>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
 
@@ -268,6 +347,22 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
 <div class="day-nav">
   <div class="day-nav-lbl">📅 DIAS SALVOS:</div>
   <div id="dayBtns" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+  <button onclick="calcPrevisaoEncerramento()" style="margin-left:auto;background:#9b59b6;color:#fff;border:none;padding:4px 14px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:bold;white-space:nowrap">
+    🕐 Previsão de Encerramento
+  </button>
+</div>
+
+<!-- PAINEL PREVISÃO ENCERRAMENTO -->
+<div id="prevEncPanel" style="display:none;background:#0a1825;border:2px solid rgba(155,89,182,.5);margin:4px 8px;border-radius:6px;overflow:hidden">
+  <div style="background:rgba(155,89,182,.2);padding:6px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(155,89,182,.3)">
+    <div style="font-size:11px;font-weight:bold;color:#c39bd3">🕐 PREVISÃO DE ENCERRAMENTO — calculado às <span id="prevEncHora">—</span></div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="font-size:13px;font-weight:bold;color:#ffd700">Encerramento total previsto: <span id="prevEncTotal" style="color:#00e676;font-size:16px">—</span></div>
+      <button onclick="document.getElementById('prevEncPanel').style.display='none'" style="background:#333;color:#aaa;border:none;padding:2px 8px;border-radius:3px;cursor:pointer;font-size:11px">✕</button>
+    </div>
+  </div>
+  <div id="prevEncGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(155,89,182,.15)"></div>
+  <div id="prevEncObs" style="padding:6px 14px;font-size:10px;color:#6a9fc0;border-top:1px solid rgba(155,89,182,.2)"></div>
 </div>
 
 <!-- TABS -->
@@ -600,6 +695,7 @@ function showSyncStatus(msg,isErr){
   const el=document.getElementById('syncStatus');if(!el)return;
   el.textContent=msg;
   el.style.color=isErr?'#ff4c4c':isErr===false?'#00e676':'#ffd700';
+  el.style.borderColor=isErr?'rgba(233,69,96,.5)':isErr===false?'rgba(0,230,118,.5)':'rgba(255,215,0,.3)';
 }
 
 function applyRemoteData(remote){
@@ -636,43 +732,82 @@ function save(){
   }
 }
 
+let fbRetryCount=0;
+let fbRetryTimer=null;
+
 function initFirebase(){
   try{
     if(!firebase.apps.length)firebase.initializeApp(FB_CONFIG);
     fbDb=firebase.database();
-    showSyncStatus('☁ Conectando...');
+    showSyncStatus('☁ Conectando...',null);
+
+    // Monitor conexão
+    fbDb.ref('.info/connected').on('value',(snap)=>{
+      const online=snap.val()===true;
+      if(online){
+        fbRetryCount=0;
+        if(fbRetryTimer){clearTimeout(fbRetryTimer);fbRetryTimer=null;}
+      } else {
+        fbConnected=false;
+        if(!isSaving)showSyncStatus('☁ Sem conexão — dados locais OK',true);
+        // Reconectar automaticamente
+        fbRetryTimer=setTimeout(()=>reconnectFirebase(),30000);
+      }
+    });
+
     fbDb.ref(FB_PATH).on('value',
       (snapshot)=>{
         const remote=snapshot.val();
         fbConnected=true;
+        const liveBadge=document.getElementById('liveBadge');
+        if(liveBadge)liveBadge.style.display='inline';
         if(!remote||!remote.days){
-          showSyncStatus('☁ Nuvem ativa',false);
+          showSyncStatus('☁ Nuvem ativa ✓',false);
           if(db.days&&db.days.length>0)save();
           return;
         }
-        // Only apply if remote is newer than our last save
         const remoteTs=remote.savedAt||0;
         if(!isSaving&&remoteTs>lastSaveTs){
           lastSaveTs=remoteTs;
           applyRemoteData(remote);
-          showSyncStatus('☁ Atualizado',false);
-          setTimeout(()=>showSyncStatus('☁ Nuvem ativa',false),2000);
+          showSyncStatus('☁ Sincronizado ✓',false);
+          setTimeout(()=>showSyncStatus('☁ Nuvem ativa ✓',false),2500);
         } else if(isSaving){
           // skip — we just saved
         } else {
-          showSyncStatus('☁ Nuvem ativa',false);
+          showSyncStatus('☁ Nuvem ativa ✓',false);
         }
       },
       (err)=>{
         fbConnected=false;
-        showSyncStatus('⚠ Erro Firebase',true);
         console.error('Firebase error:',err);
+        const msg=err.code==='PERMISSION_DENIED'?'⚠ Permissão negada — ver instruções':'⚠ Erro Firebase: '+err.code;
+        showSyncStatus(msg,true);
+        // Mostrar alerta de configuração se permissão negada
+        if(err.code==='PERMISSION_DENIED'){
+          const el=document.getElementById('syncStatus');
+          if(el)el.title='Abra o Firebase Console → Realtime Database → Rules e cole: {"rules":{".read":true,".write":true}}';
+        }
+        fbRetryTimer=setTimeout(()=>reconnectFirebase(),60000);
       }
     );
   }catch(e){
     fbConnected=false;
     showSyncStatus('⚠ Firebase offline',true);
     console.error('Firebase init error:',e);
+    fbRetryTimer=setTimeout(()=>reconnectFirebase(),30000);
+  }
+}
+
+function reconnectFirebase(){
+  if(fbConnected)return;
+  fbRetryCount++;
+  showSyncStatus(`☁ Reconectando (${fbRetryCount})...`,null);
+  try{
+    if(fbDb)fbDb.goOnline();
+    else initFirebase();
+  }catch(e){
+    fbRetryTimer=setTimeout(()=>reconnectFirebase(),Math.min(60000*fbRetryCount,300000));
   }
 }
 
@@ -1899,52 +2034,460 @@ function renderRotasTab(){
   renderRotasTblFull(day);
 }
 
+// ── SUPABASE SYNC ─────────────────────────────────────────
+let sbUrl='',sbKey='',sbConnected=false,sbSyncing=false,sbPollTimer=null,sbLastTs=0;
+const SB_TABLE='cdgam_data';
+const SB_ROW_ID='main';
+
+function sbHeaders(){return{'apikey':sbKey,'Authorization':'Bearer '+sbKey,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'};}
+
+async function sbSave(){
+  if(!sbUrl||!sbKey)return;
+  sbSyncing=true;
+  const ts=Date.now();
+  sbLastTs=ts;
+  try{
+    const payload=JSON.stringify({days:db.days,savedAt:ts});
+    const r=await fetch(`${sbUrl}/rest/v1/${SB_TABLE}`,{
+      method:'POST',
+      headers:{...sbHeaders(),'Prefer':'resolution=merge-duplicates'},
+      body:JSON.stringify({id:SB_ROW_ID,payload,updated_at:new Date(ts).toISOString()})
+    });
+    if(r.ok){
+      sbConnected=true;
+      showSyncStatus('☁ Salvo na nuvem ✓',false);
+      setTimeout(()=>{if(sbConnected)showSyncStatus('☁ Nuvem ativa ✓',false);},2000);
+    } else {
+      const err=await r.json().catch(()=>({}));
+      showSyncStatus('⚠ Erro ao salvar: '+(err.message||r.status),true);
+    }
+  }catch(e){
+    showSyncStatus('⚠ Sem internet — salvo local',true);
+  }
+  sbSyncing=false;
+}
+
+async function sbLoad(){
+  if(!sbUrl||!sbKey)return false;
+  try{
+    const r=await fetch(`${sbUrl}/rest/v1/${SB_TABLE}?id=eq.${SB_ROW_ID}&select=payload,updated_at`,
+      {headers:sbHeaders()});
+    if(!r.ok)return false;
+    const rows=await r.json();
+    if(!rows||!rows.length||!rows[0].payload)return false;
+    const remote=JSON.parse(rows[0].payload);
+    if(!remote||!remote.days)return false;
+    const remoteTs=remote.savedAt||0;
+    // Sempre aplicar se remoto tem dados e é diferente do que temos
+    const localTs=sbLastTs||0;
+    if(remoteTs>localTs||remote.days.length>db.days.length){
+      sbLastTs=remoteTs;
+      // Merge: nunca perder dias locais que não estão na nuvem
+      const remoteMap={};remote.days.forEach(d=>remoteMap[d.date]=d);
+      db.days.forEach(d=>{if(!remoteMap[d.date])remote.days.push(d);});
+      db.days=remote.days.sort((a,b)=>a.date.localeCompare(b.date));
+      localStorage.setItem(SK,JSON.stringify(db));
+      return true;
+    }
+    return false;
+  }catch(e){return false;}
+}
+
+async function sbConnect(){
+  sbUrl=localStorage.getItem('gam_sb_url')||'';
+  sbKey=localStorage.getItem('gam_sb_key')||'';
+  if(!sbUrl||!sbKey){showSyncStatus('☁ Sem nuvem — só local',null);return;}
+  showSyncStatus('☁ Conectando ao Supabase...',null);
+  try{
+    // Test + load
+    const r=await fetch(`${sbUrl}/rest/v1/${SB_TABLE}?id=eq.${SB_ROW_ID}&select=id`,
+      {headers:sbHeaders()});
+    if(!r.ok){
+      const err=await r.json().catch(()=>({}));
+      if(r.status===404||r.status===400){
+        showSyncStatus('⚠ Tabela não encontrada — ver guia',true);
+        return;
+      }
+      showSyncStatus('⚠ Erro '+r.status,true);
+      return;
+    }
+    sbConnected=true;
+    // Carregar dados remotos na inicialização
+    const updated=await sbLoad();
+    if(updated){
+      // Re-render com dados da nuvem
+      const latest=latestDay();
+      if(latest){
+        curDate=latest.date;
+        buildDayNav();
+        renderKPIs(latest);renderFlowBar(latest);renderDashCharts(latest);renderDashTables(latest);
+      }
+      showSyncStatus('☁ Dados carregados da nuvem ✓',false);
+    } else {
+      showSyncStatus('☁ Nuvem ativa ✓',false);
+      // Se temos dados locais e nuvem vazia, salvar para a nuvem
+      if(db.days&&db.days.length>0)await sbSave();
+    }
+    // Polling a cada 30s para sincronização em tempo real entre computadores
+    if(sbPollTimer)clearInterval(sbPollTimer);
+    sbPollTimer=setInterval(async()=>{
+      if(!sbSyncing){
+        const upd=await sbLoad();
+        if(upd){
+          const latest=latestDay();const cur=getDay(curDate);
+          buildDayNav();
+          if(cur){renderKPIs(cur);renderFlowBar(cur);renderDashCharts(cur);renderDashTables(cur);}
+          else if(latest){renderKPIs(latest);renderFlowBar(latest);renderDashCharts(latest);renderDashTables(latest);}
+          showSyncStatus('☁ Sincronizado ✓',false);
+          setTimeout(()=>showSyncStatus('☁ Nuvem ativa ✓',false),2000);
+        }
+      }
+    },30000);
+    // Badge ao vivo
+    const lb=document.getElementById('liveBadge');if(lb)lb.style.display='inline';
+  }catch(e){
+    sbConnected=false;
+    showSyncStatus('⚠ Sem conexão — dados locais OK',true);
+    // Tentar reconectar em 1 minuto
+    setTimeout(sbConnect,60000);
+  }
+}
+
 function openSyncConfig(){
   document.getElementById('sbUrlIn').value=localStorage.getItem('gam_sb_url')||'';
   document.getElementById('sbKeyIn').value=localStorage.getItem('gam_sb_key')||'';
   document.getElementById('syncOv').classList.add('on');
 }
+
 async function saveSyncConfig(){
   const url=document.getElementById('sbUrlIn').value.trim();
   const key=document.getElementById('sbKeyIn').value.trim();
   if(!url||!key){alert('Preencha URL e chave!');return;}
   localStorage.setItem('gam_sb_url',url);
   localStorage.setItem('gam_sb_key',key);
+  sbUrl=url;sbKey=key;
   document.getElementById('syncTestResult').textContent='⏳ Testando conexão...';
   document.getElementById('syncTestResult').style.color='#ffd700';
-  // Test connection
   try{
-    const r=await fetch(`${url}/rest/v1/cdgam_data?id=eq.main&select=id`,
+    const r=await fetch(`${url}/rest/v1/${SB_TABLE}?id=eq.${SB_ROW_ID}&select=id`,
       {headers:{'apikey':key,'Authorization':'Bearer '+key}});
     if(r.ok){
-      document.getElementById('syncTestResult').textContent='✅ Conexão OK! Recarregando...';
+      document.getElementById('syncTestResult').textContent='✅ Conectado! Salvando dados...';
       document.getElementById('syncTestResult').style.color='#00e676';
-      setTimeout(()=>location.reload(),1500);
+      sbConnected=true;
+      // Fechar e iniciar sync
+      setTimeout(async()=>{
+        document.getElementById('syncOv').classList.remove('on');
+        await sbSave();
+        showSyncStatus('☁ Nuvem ativa ✓',false);
+        const lb=document.getElementById('liveBadge');if(lb)lb.style.display='inline';
+        // Iniciar polling
+        if(sbPollTimer)clearInterval(sbPollTimer);
+        sbPollTimer=setInterval(async()=>{if(!sbSyncing){await sbLoad();}},30000);
+      },1200);
     }else{
-      const err=await r.json();
-      document.getElementById('syncTestResult').textContent='❌ Erro: '+(err.message||r.status)+' — Verifique a tabela cdgam_data e as credenciais.';
+      const err=await r.json().catch(()=>({}));
+      let msg='❌ Erro '+r.status;
+      if(r.status===401)msg='❌ Chave inválida — verifique a anon key';
+      else if(r.status===404||r.status===400)msg='❌ Tabela "cdgam_data" não existe — ver guia de setup';
+      else if(err.message)msg='❌ '+err.message;
+      document.getElementById('syncTestResult').textContent=msg;
       document.getElementById('syncTestResult').style.color='#ff4c4c';
     }
   }catch(e){
-    document.getElementById('syncTestResult').textContent='❌ Erro de conexão: '+e.message;
+    document.getElementById('syncTestResult').textContent='❌ Sem conexão: '+e.message;
     document.getElementById('syncTestResult').style.color='#ff4c4c';
   }
 }
+
 function clearSyncConfig(){
   if(!confirm('Remover configuração de nuvem? Dados locais ficam intactos.'))return;
   localStorage.removeItem('gam_sb_url');localStorage.removeItem('gam_sb_key');
-  location.reload();
+  sbUrl='';sbKey='';sbConnected=false;
+  if(sbPollTimer){clearInterval(sbPollTimer);sbPollTimer=null;}
+  showSyncStatus('☁ Sem nuvem — só local',null);
+  document.getElementById('syncOv').classList.remove('on');
 }
 
-function init(){
-  load(); // carrega localStorage primeiro
+// ── OVERRIDE save() para incluir Supabase ─────────────────
+const _origSave=save;
+// Patch: após save local, salvar na nuvem também
+function save(){
+  localStorage.setItem(SK,JSON.stringify(db));
+  if(sbConnected&&sbUrl&&sbKey){
+    sbSave(); // async, não bloqueia
+  } else if(fbConnected&&fbDb){
+    isSaving=true;
+    const ts=Date.now();lastSaveTs=ts;
+    fbDb.ref(FB_PATH).set({days:db.days,savedAt:ts})
+      .then(()=>{showSyncStatus('☁ Nuvem ativa',false);setTimeout(()=>{isSaving=false;},1000);})
+      .catch(e=>{isSaving=false;showSyncStatus('⚠ Erro: '+e.message,true);});
+  }
+}
+
+// ── PREVISÃO DE ENCERRAMENTO ─────────────────────────────
+function calcPrevisaoEncerramento(){
+  const day=getDay(curDate);
+  if(!day){alert('Nenhum dia selecionado!');return;}
+  const hd=day.hd||{};
+  const now=new Date();
+  const horaAtual=now.getHours()+now.getMinutes()/60;
+  const horaStr=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+
+  // Helper: soma deltas já realizados de uma métrica
+  const realizado=m=>sumHoraField(m,hd);
+
+  // Helper: adicionar horas a uma hora decimal e retornar string HH:MM
+  function addHoras(baseDecimal, horasExtra){
+    let total=baseDecimal+horasExtra;
+    // normalizar: turno vai de 17:30 até ~06:00 do dia seguinte
+    // base é decimal onde horas após meia-noite = 24+h (ex: 01:00 = 25)
+    // para exibir, pegar módulo 24
+    const totalMod=total%24;
+    const h=Math.floor(totalMod);
+    const m=Math.round((totalMod-h)*60);
+    const mFix=m>=60?59:m;
+    return h.toString().padStart(2,'0')+':'+mFix.toString().padStart(2,'0');
+  }
+
+  // Helper: hora decimal de string HH:MM
+  function horaDecimal(str){
+    if(!str||str==='—:—')return null;
+    const [h,m]=(str||'').split(':').map(Number);
+    if(isNaN(h))return null;
+    // Ajuste para turno noturno: horas após meia-noite (00-08) = 24+h
+    return h<12?24+h+m/60:h+m/60;
+  }
+
+  // Hora atual decimal (ajustada para turno noturno)
+  const hAtual=horaAtual<12?24+horaAtual:horaAtual;
+
+  // ── SETORES ──────────────────────────────────────────────
+  const setores=[];
+
+  // 1. CORREIA MEDICAMENTOS
+  const capLM=day.capLM||3500;
+  const prevLM=day.pnCorreia||0;
+  const realLM=realizado('Linhas Med.');
+  const faltaLM=Math.max(prevLM-realLM,0);
+  const tempoLM=faltaLM>0?faltaLM/capLM:0;
+  setores.push({
+    nome:'Correia Med.',cor:'#ff9500',icone:'🔴',
+    prev:prevLM,real:realLM,falta:faltaLM,cap:capLM,
+    termino:faltaLM>0?addHoras(hAtual,tempoLM):'✅ Concluído',
+    terminoDec:faltaLM>0?hAtual+tempoLM:hAtual,
+    unidade:'linhas'
+  });
+
+  // 2. CORREIA PERFUMARIA
+  const capLP=day.capLP||3000;
+  const prevLP=day.pnCorreia||0;
+  const realLP=realizado('Linhas Perf.');
+  const faltaLP=Math.max(prevLP-realLP,0);
+  const tempoLP=faltaLP>0?faltaLP/capLP:0;
+  setores.push({
+    nome:'Correia Perf.',cor:'#ff9500',icone:'🔴',
+    prev:prevLP,real:realLP,falta:faltaLP,cap:capLP,
+    termino:faltaLP>0?addHoras(hAtual,tempoLP):'✅ Concluído',
+    terminoDec:faltaLP>0?hAtual+tempoLP:hAtual,
+    unidade:'linhas'
+  });
+
+  // 3. CHECKOUT (Vol.)
+  const capVC=day.capVC||1280;
+  // Checkout processa o que veio da correia: pnCorreia + pnJuncao
+  const prevCK=(day.pnCorreia||0)+(day.pnJuncao||0);
+  const realCK=realizado('Vol. Checkout');
+  const faltaCK=Math.max(prevCK-realCK,0);
+  const tempoCK=faltaCK>0?faltaCK/capVC:0;
+  setores.push({
+    nome:'Checkout',cor:'#00e5ff',icone:'🔵',
+    prev:prevCK,real:realCK,falta:faltaCK,cap:capVC,
+    termino:faltaCK>0?addHoras(hAtual,tempoCK):'✅ Concluído',
+    terminoDec:faltaCK>0?hAtual+tempoCK:hAtual,
+    unidade:'vol'
+  });
+
+  // 4. ESPECIAL
+  const capEsp=day.capEsp||340;
+  const prevEsp=day.pnEspecial||0;
+  const realEsp=realizado('Vol. Especial');
+  const faltaEsp=Math.max(prevEsp-realEsp,0);
+  const tempoEsp=faltaEsp>0?faltaEsp/capEsp:0;
+  if(prevEsp>0)setores.push({
+    nome:'Especial',cor:'#9b59b6',icone:'🟣',
+    prev:prevEsp,real:realEsp,falta:faltaEsp,cap:capEsp,
+    termino:faltaEsp>0?addHoras(hAtual,tempoEsp):'✅ Concluído',
+    terminoDec:faltaEsp>0?hAtual+tempoEsp:hAtual,
+    unidade:'vol'
+  });
+
+  // 5. ESP. FRACIONADO
+  const capEspFrac=day.capEspFrac||0;
+  const prevEspFrac=day.pnEspFrac||0;
+  const realEspFrac=realizado('Vol. Esp. Frac.');
+  const faltaEspFrac=Math.max(prevEspFrac-realEspFrac,0);
+  if(prevEspFrac>0&&capEspFrac>0)setores.push({
+    nome:'Esp. Frac.',cor:'#9b59b6',icone:'🟣',
+    prev:prevEspFrac,real:realEspFrac,falta:faltaEspFrac,cap:capEspFrac,
+    termino:faltaEspFrac>0?addHoras(hAtual,faltaEspFrac/capEspFrac):'✅ Concluído',
+    terminoDec:faltaEspFrac>0?hAtual+faltaEspFrac/capEspFrac:hAtual,
+    unidade:'vol'
+  });
+
+  // 6. FRALDAS CX FECHADA
+  const capFrF=day.capFrF||114;
+  const prevFrF=day.pnFraldaF||0;
+  const realFrF=realizado('Vol. Fraldas Cx Fech.');
+  const faltaFrF=Math.max(prevFrF-realFrF,0);
+  if(prevFrF>0)setores.push({
+    nome:'Fraldas Cx Fech.',cor:'#4a90d9',icone:'🔷',
+    prev:prevFrF,real:realFrF,falta:faltaFrF,cap:capFrF,
+    termino:faltaFrF>0?addHoras(hAtual,faltaFrF/capFrF):'✅ Concluído',
+    terminoDec:faltaFrF>0?hAtual+faltaFrF/capFrF:hAtual,
+    unidade:'vol'
+  });
+
+  // 7. FRALDAS FRACIONADO
+  const capFrFc=day.capFrFc||89;
+  const prevFrFc=day.pnFralda||0;
+  const realFrFc=realizado('Vol. Fraldas Frac.');
+  const faltaFrFc=Math.max(prevFrFc-realFrFc,0);
+  if(prevFrFc>0)setores.push({
+    nome:'Fraldas Frac.',cor:'#4a90d9',icone:'🔷',
+    prev:prevFrFc,real:realFrFc,falta:faltaFrFc,cap:capFrFc,
+    termino:faltaFrFc>0?addHoras(hAtual,faltaFrFc/capFrFc):'✅ Concluído',
+    terminoDec:faltaFrFc>0?hAtual+faltaFrFc/capFrFc:hAtual,
+    unidade:'vol'
+  });
+
+  // 8. DOCA — soma de TODOS os volumes que precisam ser expedidos
+  const capVE=day.capVE||1303;
+  // Previsto doca = todos os volumes
+  const prevDoca=(day.pnCorreia||0)+(day.pnEspecial||0)+(day.pnEspFrac||0)+
+    (day.pnEspMed||0)+(day.pnEspPerf||0)+(day.pnFraldaF||0)+(day.pnFralda||0)+
+    (day.pnJuncao||0)+(day.pnDoca||0);
+  // Real doca = o que já foi expedido (Vol. Doca)
+  const realDoca=realizado('Vol. Doca');
+  // Falta doca = tudo que ainda vai chegar da correia/especial + o que já chegou mas não expediu
+  // = (previsto total - já expedido)
+  const faltaDoca=Math.max((prevDoca||day.pnVol||0)-realDoca,0);
+  const tempoDoca=faltaDoca>0?faltaDoca/capVE:0;
+  setores.push({
+    nome:'DOCA (Expedição)',cor:'#00e676',icone:'🟢',
+    prev:prevDoca||day.pnVol||0,real:realDoca,falta:faltaDoca,cap:capVE,
+    termino:faltaDoca>0?addHoras(hAtual,tempoDoca):'✅ Concluído',
+    terminoDec:faltaDoca>0?hAtual+tempoDoca:hAtual,
+    unidade:'vol'
+  });
+
+  // ── CALCULAR ENCERRAMENTO TOTAL ───────────────────────────
+  // = o setor que termina mais tarde
+  const terminoMax=setores.reduce((mx,s)=>s.terminoDec>mx?s.terminoDec:mx,hAtual);
+  let totalStr;
+  if(terminoMax<=hAtual+0.1){
+    totalStr='✅ Já encerrou!';
+  } else {
+    const h=Math.floor(terminoMax%24);
+    const m=Math.round((terminoMax%24-h)*60);
+    totalStr=h.toString().padStart(2,'0')+':'+(m===60?'00':m.toString().padStart(2,'0'));
+  }
+
+  // ── RENDERIZAR PAINEL ─────────────────────────────────────
+  document.getElementById('prevEncHora').textContent=horaStr;
+  document.getElementById('prevEncTotal').textContent=totalStr;
+
+  const grid=document.getElementById('prevEncGrid');
+  grid.innerHTML=setores.map(s=>{
+    const pct=s.prev>0?Math.round(s.real/s.prev*100):0;
+    const concluido=s.falta===0;
+    const urgente=!concluido&&s.terminoDec>hAtual+3;
+    const critico=!concluido&&s.terminoDec>hAtual+4;
+    const bgCard=concluido?'rgba(0,180,80,.15)':critico?'rgba(180,20,20,.2)':urgente?'rgba(180,130,0,.15)':'rgba(0,100,180,.12)';
+    const corTermino=concluido?'#00e676':critico?'#ff4c4c':urgente?'#ffd700':'#00e5ff';
+    return`<div style="background:${bgCard};padding:8px 12px;border-right:1px solid rgba(155,89,182,.1);border-bottom:1px solid rgba(155,89,182,.1)">
+      <div style="font-size:10px;font-weight:bold;color:#c39bd3;margin-bottom:4px">${s.icone} ${s.nome}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;font-size:10px;margin-bottom:5px">
+        <div><span style="color:#6a9fc0">Previsto:</span> <span style="color:#fff">${s.prev.toLocaleString('pt-BR')}</span></div>
+        <div><span style="color:#6a9fc0">Realizado:</span> <span style="color:#00e676">${s.real.toLocaleString('pt-BR')}</span></div>
+        <div><span style="color:#6a9fc0">Falta:</span> <span style="color:${s.falta>0?'#ff9500':'#00e676'};font-weight:bold">${s.falta.toLocaleString('pt-BR')}</span></div>
+        <div><span style="color:#6a9fc0">Cap/h:</span> <span style="color:#89b4d4">${s.cap.toLocaleString('pt-BR')}</span></div>
+      </div>
+      <div style="background:#1e3a55;border-radius:2px;height:4px;margin-bottom:5px"><div style="background:${s.cor};width:${Math.min(pct,100)}%;height:100%;border-radius:2px"></div></div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:9px;color:#6a9fc0">${pct}% concluído</span>
+        <span style="font-size:13px;font-weight:bold;color:${corTermino}">${s.termino}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Observações automáticas
+  const obs=[];
+  const setoresCriticos=setores.filter(s=>s.falta>0&&s.terminoDec>hAtual+4);
+  if(setoresCriticos.length>0)obs.push(`⚠ Setores críticos (>4h restantes): ${setoresCriticos.map(s=>s.nome).join(', ')}`);
+  const docaSetor=setores.find(s=>s.nome==='DOCA (Expedição)');
+  if(docaSetor&&docaSetor.falta>0){
+    const hFalta=docaSetor.falta/docaSetor.cap;
+    if(hFalta>3)obs.push(`🚨 Expedição com ${hFalta.toFixed(1)}h de trabalho restante — rotas em risco`);
+  }
+  if(obs.length===0)obs.push('✅ Operação dentro do esperado');
+  document.getElementById('prevEncObs').textContent=obs.join(' | ');
+
+  // Mostrar painel
+  document.getElementById('prevEncPanel').style.display='block';
+  document.getElementById('prevEncPanel').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+async function init(){
+  // Mostrar loading enquanto busca na nuvem
+  document.getElementById('hdrDate').textContent='⏳ Carregando dados...';
+
+  // 1. Carregar local primeiro (instantâneo)
+  load();
+
+  // 2. Tentar buscar da nuvem ANTES de renderizar
+  sbUrl=localStorage.getItem('gam_sb_url')||'';
+  sbKey=localStorage.getItem('gam_sb_key')||'';
+
+  if(sbUrl&&sbKey){
+    showSyncStatus('☁ Carregando da nuvem...',null);
+    try{
+      // Buscar direto sem passar pelo sbConnect completo — mais rápido
+      const r=await fetch(`${sbUrl}/rest/v1/${SB_TABLE}?id=eq.${SB_ROW_ID}&select=payload,updated_at`,
+        {headers:{'apikey':sbKey,'Authorization':'Bearer '+sbKey}});
+      if(r.ok){
+        const rows=await r.json();
+        if(rows&&rows.length&&rows[0].payload){
+          const remote=JSON.parse(rows[0].payload);
+          if(remote&&remote.days&&remote.days.length>0){
+            // Merge: nuvem + dias locais que não existem na nuvem
+            const remoteMap={};remote.days.forEach(d=>remoteMap[d.date]=d);
+            (db.days||[]).forEach(d=>{if(!remoteMap[d.date])remote.days.push(d);});
+            db.days=remote.days.sort((a,b)=>a.date.localeCompare(b.date));
+            sbLastTs=remote.savedAt||0;
+            localStorage.setItem(SK,JSON.stringify(db));
+            showSyncStatus('☁ Dados carregados ✓',false);
+          }
+        }
+        sbConnected=true;
+      }
+    }catch(e){
+      showSyncStatus('⚠ Sem internet — usando dados locais',true);
+    }
+  }
+
+  // 3. Renderizar com os dados finais (local ou nuvem)
   const latest=latestDay();
   curDate=latest?latest.date:today();
   buildDayNav();
   if(latest){renderKPIs(latest);renderFlowBar(latest);renderDashCharts(latest);renderDashTables(latest);}
   else{document.getElementById('hdrDate').textContent='Nenhum dado — clique em ✏️ para começar';}
-  // Inicia Firebase após render local (não bloqueia a tela)
-  setTimeout(initFirebase,100);
+
+  // 4. Iniciar sync completo em background
+  setTimeout(async()=>{
+    await sbConnect();
+    if(!sbConnected)setTimeout(initFirebase,500);
+  },500);
 }
 init();
 </script>
