@@ -2669,50 +2669,18 @@ async function editUser(uname){
 }
 
 // ══════════════════════════════════════════════════════════
-async function init(){
-  // Mostrar loading enquanto busca na nuvem
-  document.getElementById('hdrDate').textContent='⏳ Carregando dados...';
-
-  // 1. Carregar local primeiro (instantâneo)
+function init(){
+  // 1. Carregar local — instantâneo, não bloqueia
   load();
 
-  // 2. Tentar buscar da nuvem ANTES de renderizar
+  // 2. Renderizar imediatamente com dados locais
   sbUrl=localStorage.getItem('gam_sb_url')||SB_URL_DEFAULT;
   sbKey=localStorage.getItem('gam_sb_key')||SB_KEY_DEFAULT;
-
-  if(sbUrl&&sbKey){
-    showSyncStatus('☁ Carregando da nuvem...',null);
-    try{
-      // Buscar direto sem passar pelo sbConnect completo — mais rápido
-      const r=await fetch(`${sbUrl}/rest/v1/${SB_TABLE}?id=eq.${SB_ROW_ID}&select=payload,updated_at`,
-        {headers:{'apikey':sbKey,'Authorization':'Bearer '+sbKey}});
-      if(r.ok){
-        const rows=await r.json();
-        if(rows&&rows.length&&rows[0].payload){
-          const remote=JSON.parse(rows[0].payload);
-          if(remote&&remote.days&&remote.days.length>0){
-            // Merge: nuvem + dias locais que não existem na nuvem
-            const remoteMap={};remote.days.forEach(d=>remoteMap[d.date]=d);
-            (db.days||[]).forEach(d=>{if(!remoteMap[d.date])remote.days.push(d);});
-            db.days=remote.days.sort((a,b)=>a.date.localeCompare(b.date));
-            sbLastTs=remote.savedAt||0;
-            localStorage.setItem(SK,JSON.stringify(db));
-            showSyncStatus('☁ Dados carregados ✓',false);
-          }
-        }
-        sbConnected=true;
-      }
-    }catch(e){
-      showSyncStatus('⚠ Sem internet — usando dados locais',true);
-    }
-  }
-
-  // 3. Renderizar com os dados finais (local ou nuvem)
   const latest=latestDay();
   curDate=latest?latest.date:today();
   buildDayNav();
   if(latest){renderKPIs(latest);renderFlowBar(latest);renderDashCharts(latest);renderDashTables(latest);}
-  else{document.getElementById('hdrDate').textContent='Nenhum dado — faça login para começar';}
+  else{document.getElementById('hdrDate').textContent='Nenhum dado — crie um dia para começar';}
 
   // 5. Verificar sessão ativa
   if(checkSession()){
