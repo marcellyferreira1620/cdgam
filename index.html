@@ -1,4 +1,5 @@
- <!DOCTYPE html>
+
+<!DOCTYPE html>
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
@@ -157,7 +158,7 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
 <body>
 
 <!-- Firebase sync — sem necessidade de configuração manual -->
-<div class="lock-ov" id="syncOv" style="display:none!important">
+<div class="lock-ov" id="syncOv">
   <div class="lock-box" style="width:420px">
     <h3>☁️ Configurar Sincronização em Tempo Real</h3>
     <p style="color:#89b4d4;font-size:11px;margin-bottom:14px;line-height:1.6">
@@ -171,14 +172,21 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
       <input id="sbKeyIn" type="text" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..." style="background:#0d1c2e;border:1px solid #1e4a72;color:#fff;padding:7px;border-radius:4px;width:100%;font-size:12px;margin-bottom:12px"/>
     </div>
     <div style="background:#071525;border-radius:4px;padding:8px;margin-bottom:12px;font-size:10px;color:#6a9fc0;text-align:left;line-height:1.7">
+      <b style="color:#ffd700">⚡ SQL para criar a tabela (copie e cole no Supabase → SQL Editor):</b>
+      <div style="background:#0a1825;border-radius:4px;padding:7px 10px;margin:6px 0;font-family:monospace;font-size:11px;color:#00e676;border:1px solid rgba(0,230,118,.3);cursor:pointer;line-height:1.6"
+           onclick="navigator.clipboard.writeText('create table if not exists cdgam_data (id text primary key, payload text, updated_at text);');this.style.borderColor='#00e676';this.innerHTML=this.innerHTML.replace('📋','✅');"
+           title="Clique para copiar">
+        create table if not exists cdgam_data (<br>
+        &nbsp;&nbsp;id text primary key,<br>
+        &nbsp;&nbsp;payload text,<br>
+        &nbsp;&nbsp;updated_at text<br>
+        ); <span style="float:right;color:#4a7a9b">📋 copiar</span>
+      </div>
       <b style="color:#ffd700">Passo a passo:</b><br>
-      1. Acesse <b>supabase.com</b> e crie uma conta gratuita<br>
-      2. Crie um novo projeto (nome: cdgam, qualquer senha)<br>
-      3. Vá em <b>Settings → API</b> e copie a <b>Project URL</b> e a <b>anon public key</b><br>
-      4. Vá em <b>Table Editor → New Table</b>, nome: <b>cdgam_data</b><br>
-      5. Adicione as colunas: <b>id</b> (text, primary key), <b>payload</b> (text), <b>updated_at</b> (text)<br>
-      6. Cole a URL e a chave aqui e clique Salvar<br>
-      7. Faça isso em todos os computadores com as mesmas credenciais
+      1. <a href="https://supabase.com" target="_blank" style="color:#00e5ff">supabase.com</a> → login → seu projeto<br>
+      2. Menu lateral → <b style="color:#fff">SQL Editor</b> → cole o SQL acima → <b style="color:#fff">Run</b><br>
+      3. Vá em <b style="color:#fff">Settings → API</b> → copie <b style="color:#fff">Project URL</b> e <b style="color:#fff">anon public key</b><br>
+      4. Cole os dois campos acima e clique <b style="color:#00e676">Salvar e Conectar</b>
     </div>
     <div style="display:flex;gap:8px">
       <button onclick="saveSyncConfig()" style="flex:1;background:#00b894;color:#fff;border:none;padding:9px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold">💾 Salvar e Conectar</button>
@@ -186,6 +194,77 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
       <button onclick="document.getElementById('syncOv').classList.remove('on')" style="background:#444;color:#fff;border:none;padding:9px 14px;border-radius:4px;cursor:pointer;font-size:12px">Fechar</button>
     </div>
     <div id="syncTestResult" style="font-size:11px;margin-top:10px;min-height:16px"></div>
+  </div>
+</div>
+
+<!-- GUIA DE CONFIGURAÇÃO FIREBASE -->
+<div class="lock-ov" id="setupGuideOv" style="z-index:9998">
+  <div class="lock-box" style="width:520px;max-height:90vh;overflow-y:auto">
+    <h3>🔥 Configurar Salvamento na Nuvem</h3>
+    <p style="color:#89b4d4;font-size:11px;margin-bottom:12px;line-height:1.7">
+      Seus dados já estão salvos <b style="color:#ffd700">localmente</b> neste computador.<br>
+      Para garantir que <b style="color:#00e676">nunca perca nada</b> mesmo desligando o PC, siga os passos abaixo para ativar o Firebase (gratuito, da Google).
+    </p>
+    <div style="counter-reset:step">
+      <!-- PASSO 1 -->
+      <div style="background:#071525;border-radius:6px;padding:10px 14px;margin-bottom:8px;border-left:3px solid #ffd700">
+        <div style="color:#ffd700;font-size:11px;font-weight:bold;margin-bottom:6px">PASSO 1 — Acessar o Console Firebase</div>
+        <div style="font-size:11px;color:#c0d8f0;line-height:1.8">
+          1. Acesse <a href="https://console.firebase.google.com" target="_blank" style="color:#00e5ff">console.firebase.google.com</a><br>
+          2. Faça login com sua conta Google<br>
+          3. Clique em <b style="color:#fff">GAM-SJP</b> (projeto já criado)
+        </div>
+      </div>
+      <!-- PASSO 2 -->
+      <div style="background:#071525;border-radius:6px;padding:10px 14px;margin-bottom:8px;border-left:3px solid #ff9500">
+        <div style="color:#ff9500;font-size:11px;font-weight:bold;margin-bottom:6px">PASSO 2 — Abrir Realtime Database</div>
+        <div style="font-size:11px;color:#c0d8f0;line-height:1.8">
+          1. No menu lateral esquerdo clique em <b style="color:#fff">Build</b><br>
+          2. Clique em <b style="color:#fff">Realtime Database</b><br>
+          3. Se não existir ainda, clique <b style="color:#fff">"Create Database"</b>, escolha <b style="color:#fff">São Paulo</b> e modo <b style="color:#fff">Test Mode</b>
+        </div>
+      </div>
+      <!-- PASSO 3 -->
+      <div style="background:#071525;border-radius:6px;padding:10px 14px;margin-bottom:8px;border-left:3px solid #e94560">
+        <div style="color:#e94560;font-size:11px;font-weight:bold;margin-bottom:6px">PASSO 3 — Liberar as Regras de Acesso</div>
+        <div style="font-size:11px;color:#c0d8f0;line-height:1.8">
+          1. Clique na aba <b style="color:#fff">Rules</b><br>
+          2. Apague o conteúdo e cole exatamente isso:
+        </div>
+        <div style="background:#0a1825;border-radius:4px;padding:8px 12px;margin-top:6px;font-family:monospace;font-size:12px;color:#00e676;border:1px solid rgba(0,230,118,.3);cursor:pointer" onclick="navigator.clipboard.writeText('{"rules":{".read":true,".write":true}}');this.style.borderColor='#00e676';this.title='Copiado!';" title="Clique para copiar">
+          {"rules":{".read":true,".write":true}}
+          <span style="float:right;font-size:10px;color:#4a7a9b">📋 clique para copiar</span>
+        </div>
+        <div style="font-size:11px;color:#c0d8f0;line-height:1.8;margin-top:6px">
+          3. Clique em <b style="color:#fff">Publish</b>
+        </div>
+      </div>
+      <!-- PASSO 4 -->
+      <div style="background:#071525;border-radius:6px;padding:10px 14px;margin-bottom:8px;border-left:3px solid #00e676">
+        <div style="color:#00e676;font-size:11px;font-weight:bold;margin-bottom:6px">PASSO 4 — Testar a Conexão</div>
+        <div style="font-size:11px;color:#c0d8f0;line-height:1.8">
+          1. Volte aqui no dashboard<br>
+          2. No canto superior direito deve aparecer <b style="color:#00e676">☁ Nuvem ativa ✓</b><br>
+          3. Salve qualquer dado — ele aparece no Firebase em tempo real!
+        </div>
+      </div>
+    </div>
+    <div style="background:#0a2340;border-radius:4px;padding:8px 12px;font-size:10px;color:#6a9fc0;margin-bottom:12px;border:1px solid rgba(0,229,255,.2)">
+      💡 <b style="color:#00e5ff">Segurança:</b> As regras acima são abertas (ideal para rede interna do CD). Se quiser restringir o acesso, fale com o TI para configurar autenticação.
+    </div>
+    <div style="display:flex;gap:8px">
+      <a href="https://console.firebase.google.com/project/gam-sjp/database" target="_blank"
+         style="flex:1;background:#ff9500;color:#000;border:none;padding:9px;border-radius:4px;cursor:pointer;font-size:12px;font-weight:bold;text-align:center;text-decoration:none;display:block">
+        🔥 Abrir Firebase Console
+      </a>
+      <button onclick="document.getElementById('setupGuideOv').classList.remove('on')"
+              style="background:#444;color:#fff;border:none;padding:9px 20px;border-radius:4px;cursor:pointer;font-size:12px">
+        Fechar
+      </button>
+    </div>
+    <div style="margin-top:10px;font-size:10px;color:#445;text-align:center">
+      Dados locais: sempre seguros mesmo sem nuvem — o Firebase é um backup extra
+    </div>
   </div>
 </div>
 
@@ -204,7 +283,8 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
   <div class="hdr-logo">GAM</div>
   <div class="hdr-title">ACOMPANHAMENTO DE PRODUTIVIDADE — CD GAM (GENESIO A. MENDES)</div>
   <span class="live-badge" id="liveBadge" style="display:none">⬤ AO VIVO</span>
-  <span id="syncStatus" style="font-size:10px;color:#89b4d4;padding:2px 8px;background:#122033;border-radius:3px;" title="Status da sincronização">☁ Conectando...</span>
+  <span id="syncStatus" onclick="openSyncConfig()" style="font-size:10px;color:#89b4d4;padding:2px 8px;background:#122033;border-radius:3px;cursor:pointer;border:1px solid #1e4a72;transition:border-color .3s" title="Status da nuvem — clique para configurar">☁ Conectando...</span>
+  <button onclick="document.getElementById('setupGuideOv').classList.add('on')" style="font-size:10px;background:#ff9500;color:#000;border:none;padding:2px 8px;border-radius:3px;cursor:pointer;font-weight:bold" title="Como configurar o salvamento na nuvem">🔥 Configurar Nuvem</button>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
 
@@ -268,6 +348,22 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
 <div class="day-nav">
   <div class="day-nav-lbl">📅 DIAS SALVOS:</div>
   <div id="dayBtns" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+  <button onclick="calcPrevisaoEncerramento()" style="margin-left:auto;background:#9b59b6;color:#fff;border:none;padding:4px 14px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:bold;white-space:nowrap">
+    🕐 Previsão de Encerramento
+  </button>
+</div>
+
+<!-- PAINEL PREVISÃO ENCERRAMENTO -->
+<div id="prevEncPanel" style="display:none;background:#0a1825;border:2px solid rgba(155,89,182,.5);margin:4px 8px;border-radius:6px;overflow:hidden">
+  <div style="background:rgba(155,89,182,.2);padding:6px 14px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid rgba(155,89,182,.3)">
+    <div style="font-size:11px;font-weight:bold;color:#c39bd3">🕐 PREVISÃO DE ENCERRAMENTO — calculado às <span id="prevEncHora">—</span></div>
+    <div style="display:flex;align-items:center;gap:10px">
+      <div style="font-size:13px;font-weight:bold;color:#ffd700">Encerramento total previsto: <span id="prevEncTotal" style="color:#00e676;font-size:16px">—</span></div>
+      <button onclick="document.getElementById('prevEncPanel').style.display='none'" style="background:#333;color:#aaa;border:none;padding:2px 8px;border-radius:3px;cursor:pointer;font-size:11px">✕</button>
+    </div>
+  </div>
+  <div id="prevEncGrid" style="display:grid;grid-template-columns:repeat(4,1fr);gap:1px;background:rgba(155,89,182,.15)"></div>
+  <div id="prevEncObs" style="padding:6px 14px;font-size:10px;color:#6a9fc0;border-top:1px solid rgba(155,89,182,.2)"></div>
 </div>
 
 <!-- TABS -->
@@ -306,6 +402,21 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
     <div class="chart-box">
       <div class="chart-ttl">Meta Acumulada vs Produção Acumulada (Linhas Med.)</div>
       <div style="position:relative;height:200px"><canvas id="cAcum" role="img" aria-label="Meta vs producao acumulada"></canvas></div>
+    </div>
+  </div>
+  <!-- DOCA BALANCE ROW -->
+  <div class="chart-grid" style="grid-template-columns:2fr 1fr">
+    <div class="chart-box" style="border-color:rgba(0,230,118,.4)">
+      <div class="chart-ttl">
+        <span>⚖️ Equilíbrio da Doca — Entrada vs Saída por Hora</span>
+        <span style="font-size:9px;font-weight:normal;color:#6a9fc0">Entrada = CK + Especiais + Fraldas &nbsp;|&nbsp; Saída = Vol. Doca expedido</span>
+      </div>
+      <div style="position:relative;height:200px"><canvas id="cDocaBalance" role="img" aria-label="Equilibrio doca"></canvas></div>
+      <div id="docaBalanceAlert" style="margin-top:5px;font-size:10px;padding:5px 10px;border-radius:3px;display:none;font-weight:bold"></div>
+    </div>
+    <div class="chart-box" style="border-color:rgba(0,230,118,.4)">
+      <div class="chart-ttl">📦 Resumo Doca — Turno</div>
+      <div id="docaKpiPanel" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px"></div>
     </div>
   </div>
   <div class="chart-grid">
@@ -567,7 +678,7 @@ let liveTimer=null;
 let syncTimer=null;
 let lastSyncHash='';
 
-// ── FIREBASE CONFIG ────────────────────────────────────────
+// ── FIREBASE SYNC ──────────────────────────────────────────
 const FB_CONFIG={
   apiKey:"AIzaSyCkqDak4jXeRyzgJ3qaY6WPv4IC1N8q5vo",
   authDomain:"gam-sjp.firebaseapp.com",
@@ -579,16 +690,18 @@ const FB_PATH='cdgam/data';
 let fbDb=null;
 let fbConnected=false;
 let isSaving=false;
+let lastSaveTs=0;
 
 function showSyncStatus(msg,isErr){
   const el=document.getElementById('syncStatus');if(!el)return;
-  el.textContent=msg;el.style.color=isErr?'#ff4c4c':'#00e676';
-  setTimeout(()=>{if(el){el.textContent=fbConnected?'☁ Nuvem ativa':'💾 Local';el.style.color=fbConnected?'#00e676':'#89b4d4';}},3000);
+  el.textContent=msg;
+  el.style.color=isErr?'#ff4c4c':isErr===false?'#00e676':'#ffd700';
+  el.style.borderColor=isErr?'rgba(233,69,96,.5)':isErr===false?'rgba(0,230,118,.5)':'rgba(255,215,0,.3)';
 }
 
 function applyRemoteData(remote){
   if(!remote||!remote.days||!Array.isArray(remote.days))return;
-  db.days=JSON.parse(JSON.stringify(remote.days)); // deep copy
+  db.days=JSON.parse(JSON.stringify(remote.days));
   db.days.sort((a,b)=>a.date.localeCompare(b.date));
   localStorage.setItem(SK,JSON.stringify(db));
   buildDayNav();
@@ -601,61 +714,101 @@ function applyRemoteData(remote){
   }
 }
 
-// ── STORAGE ────────────────────────────────────────────────
-function load(){
-  try{const r=localStorage.getItem(SK);if(r)db=JSON.parse(r);if(!db.days)db.days=[];}catch(e){db={days:[]};}
-}
-
 function save(){
   localStorage.setItem(SK,JSON.stringify(db));
   if(fbConnected&&fbDb){
     isSaving=true;
-    const dataToSave={days:db.days,savedAt:Date.now()};
-    fbDb.ref(FB_PATH).set(dataToSave)
+    const ts=Date.now();
+    lastSaveTs=ts;
+    fbDb.ref(FB_PATH).set({days:db.days,savedAt:ts})
       .then(()=>{
-        showSyncStatus('☁ Salvo na nuvem');
-        setTimeout(()=>{isSaving=false;},1500);
+        showSyncStatus('☁ Nuvem ativa',false);
+        setTimeout(()=>{isSaving=false;},1000);
       })
-      .catch((e)=>{
+      .catch(e=>{
         isSaving=false;
         showSyncStatus('⚠ Erro: '+e.message,true);
-        console.error('Save error:',e);
+        console.error('Firebase save error:',e);
       });
   }
 }
 
-// ── FIREBASE INIT ───────────────────────────────────────────
+let fbRetryCount=0;
+let fbRetryTimer=null;
+
 function initFirebase(){
   try{
-    if(typeof firebase==='undefined'){showSyncStatus('⚠ Firebase SDK não carregou',true);return;}
-    if(!firebase.apps||!firebase.apps.length)firebase.initializeApp(FB_CONFIG);
+    if(!firebase.apps.length)firebase.initializeApp(FB_CONFIG);
     fbDb=firebase.database();
-    fbConnected=true;
-    showSyncStatus('☁ Conectando...');
-    // Listener em tempo real — dispara agora e a cada mudança de qualquer computador
+    showSyncStatus('☁ Conectando...',null);
+
+    // Monitor conexão
+    fbDb.ref('.info/connected').on('value',(snap)=>{
+      const online=snap.val()===true;
+      if(online){
+        fbRetryCount=0;
+        if(fbRetryTimer){clearTimeout(fbRetryTimer);fbRetryTimer=null;}
+      } else {
+        fbConnected=false;
+        if(!isSaving)showSyncStatus('☁ Sem conexão — dados locais OK',true);
+        // Reconectar automaticamente
+        fbRetryTimer=setTimeout(()=>reconnectFirebase(),30000);
+      }
+    });
+
     fbDb.ref(FB_PATH).on('value',
       (snapshot)=>{
-        if(isSaving)return; // evita loop: ignora o eco do próprio save
         const remote=snapshot.val();
+        fbConnected=true;
+        const liveBadge=document.getElementById('liveBadge');
+        if(liveBadge)liveBadge.style.display='inline';
         if(!remote||!remote.days){
-          // Nuvem vazia — sobe dados locais
-          if(db.days&&db.days.length>0){save();}
-          else{showSyncStatus('☁ Nuvem ativa');}
+          showSyncStatus('☁ Nuvem ativa ✓',false);
+          if(db.days&&db.days.length>0)save();
           return;
         }
-        applyRemoteData(remote);
-        showSyncStatus('☁ Sincronizado');
+        const remoteTs=remote.savedAt||0;
+        if(!isSaving&&remoteTs>lastSaveTs){
+          lastSaveTs=remoteTs;
+          applyRemoteData(remote);
+          showSyncStatus('☁ Sincronizado ✓',false);
+          setTimeout(()=>showSyncStatus('☁ Nuvem ativa ✓',false),2500);
+        } else if(isSaving){
+          // skip — we just saved
+        } else {
+          showSyncStatus('☁ Nuvem ativa ✓',false);
+        }
       },
       (err)=>{
         fbConnected=false;
-        showSyncStatus('⚠ Erro Firebase',true);
         console.error('Firebase error:',err);
+        const msg=err.code==='PERMISSION_DENIED'?'⚠ Permissão negada — ver instruções':'⚠ Erro Firebase: '+err.code;
+        showSyncStatus(msg,true);
+        // Mostrar alerta de configuração se permissão negada
+        if(err.code==='PERMISSION_DENIED'){
+          const el=document.getElementById('syncStatus');
+          if(el)el.title='Abra o Firebase Console → Realtime Database → Rules e cole: {"rules":{".read":true,".write":true}}';
+        }
+        fbRetryTimer=setTimeout(()=>reconnectFirebase(),60000);
       }
     );
   }catch(e){
     fbConnected=false;
     showSyncStatus('⚠ Firebase offline',true);
     console.error('Firebase init error:',e);
+    fbRetryTimer=setTimeout(()=>reconnectFirebase(),30000);
+  }
+}
+
+function reconnectFirebase(){
+  if(fbConnected)return;
+  fbRetryCount++;
+  showSyncStatus(`☁ Reconectando (${fbRetryCount})...`,null);
+  try{
+    if(fbDb)fbDb.goOnline();
+    else initFirebase();
+  }catch(e){
+    fbRetryTimer=setTimeout(()=>reconnectFirebase(),Math.min(60000*fbRetryCount,300000));
   }
 }
 
@@ -689,8 +842,15 @@ function sumHoraField(metric,hd){
   return hd[metric].reduce((s,v)=>s+(v!==''&&v!==null&&v!==undefined?+v:0),0);
 }
 function sumHoraInput(metric){
-  let s=0;
-  document.querySelectorAll(`#hTblBody input[data-m="${metric}"]`).forEach(inp=>{if(inp.value!=='')s+=+inp.value;});
+  const inputs=[...document.querySelectorAll(`#hTblBody input[data-m="${metric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
+  if(!inputs.length)return 0;
+  if(isDeltaMetric(metric)){
+    // inputs contêm acumulados → o último valor preenchido = total acumulado
+    let last=0;
+    inputs.forEach(inp=>{if(inp.value!=='')last=+inp.value;});
+    return last;
+  }
+  let s=0;inputs.forEach(inp=>{if(inp.value!=='')s+=+inp.value;});
   return s;
 }
 
@@ -1052,6 +1212,152 @@ function renderDashCharts(day){
       scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},
               y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'},position:'left'},
               y2:{ticks:{color:'#ffd700',font:{size:9}},grid:{display:false},position:'right'}}}});
+
+  renderDocaBalance(day);
+}
+
+// ── DOCA BALANCE CHART ────────────────────────────────────
+function renderDocaBalance(day){
+  const hd=day.hd||{};
+  const capDoca=day.capVE||1303;
+  const espMetrics=['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.','Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.'];
+
+  const entradas=HOURS.map((_,i)=>{
+    let e=(hd['Vol. Checkout']&&hd['Vol. Checkout'][i]!==''&&hd['Vol. Checkout'][i]!==null?+hd['Vol. Checkout'][i]:0);
+    espMetrics.forEach(m=>{const a=hd[m]||[];e+=(a[i]!==''&&a[i]!==null?+a[i]:0);});
+    return e>0?e:null;
+  });
+  const saidas=HOURS.map((_,i)=>{
+    const v=hd['Vol. Doca']&&hd['Vol. Doca'][i]!==''&&hd['Vol. Doca'][i]!==null?+hd['Vol. Doca'][i]:null;
+    return v;
+  });
+
+  let running=0;
+  const estoque=HOURS.map((_,i)=>{
+    const e=entradas[i]||0,s=saidas[i]||0;
+    if(e===0&&s===0)return null;
+    running+=e-s;
+    return running;
+  });
+
+  const saidaColors=saidas.map(v=>{
+    if(v===null)return'transparent';
+    const p=v/capDoca;
+    return p>=1.05?'#00e676':p>=0.9?'#7ddc9f':p>=0.7?'#ffd700':'#ff4c4c';
+  });
+  const entradaColors=entradas.map((v,i)=>{
+    if(v===null)return'transparent';
+    const s=saidas[i]||0;
+    return v>(s||capDoca)*1.1?'rgba(255,149,0,.9)':'rgba(0,229,255,.5)';
+  });
+
+  if(CH.docaBal)CH.docaBal.destroy();
+  CH.docaBal=new Chart(document.getElementById('cDocaBalance'),{
+    type:'bar',
+    data:{
+      labels:HOURS,
+      datasets:[
+        {label:'Entrada (CK+Esp+Fralda)',data:entradas,backgroundColor:entradaColors,borderRadius:3,order:2},
+        {label:'Saída (expedido)',data:saidas,backgroundColor:saidaColors,borderRadius:3,order:2},
+        {label:'Capacidade/h',data:HOURS.map(()=>capDoca),type:'line',borderColor:'#ffd700',borderDash:[5,3],borderWidth:1.5,pointRadius:0,fill:false,order:1},
+        {label:'Estoque Doca',data:estoque,type:'line',borderColor:'#ff4c4c',borderWidth:2,pointRadius:3,
+         pointBackgroundColor:estoque.map(v=>v===null?'transparent':v<=0?'#00e676':v<=capDoca?'#ffd700':'#ff4c4c'),
+         fill:false,order:0,yAxisID:'y2'}
+      ]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      plugins:{
+        legend:{labels:{color:'#89b4d4',font:{size:9}}},
+        tooltip:{callbacks:{
+          afterBody:(items)=>{
+            const i=items[0].dataIndex;
+            const e=entradas[i]||0,s=saidas[i]||0,diff=e-s;
+            const est=estoque[i];
+            const lines=[`Δ Hora: ${diff>0?'+':''}${diff.toLocaleString('pt-BR')}`];
+            if(est!==null)lines.push(`Estoque acum: ${est.toLocaleString('pt-BR')}`);
+            if(diff>0)lines.push('⚠ Entrada > Saída — risco acúmulo');
+            return lines;
+          }
+        }}
+      },
+      scales:{
+        x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{ticks:{color:'#89b4d4',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'},title:{display:true,text:'Vol/h',color:'#6a9fc0',font:{size:9}}},
+        y2:{ticks:{color:'#ff7070',font:{size:9}},grid:{display:false},position:'right',title:{display:true,text:'Estoque',color:'#ff7070',font:{size:9}}}
+      }
+    }
+  });
+
+  const totalEntrada=entradas.reduce((s,v)=>s+(v||0),0);
+  const totalSaida=saidas.reduce((s,v)=>s+(v||0),0);
+  const saldoFinal=totalEntrada-totalSaida;
+  const estoqueAtual=estoque.reduce((last,v)=>v!==null?v:last,0);
+  const horasComProblema=HOURS.filter((_,i)=>{const e=entradas[i]||0,s=saidas[i]||0;return e>0&&s>0&&e>s*1.1;}).length;
+  // eficDoca mantido para compatibilidade (não exibido diretamente)
+  const eficDoca=totalEntrada>0?Math.round(totalSaida/totalEntrada*100):0;
+
+  const panel=document.getElementById('docaKpiPanel');
+  if(panel){
+    // % Atraso: quanto do volume total passou pela doca fora do ritmo ideal
+    // Horas em que entrada > saída = horas com atraso → vol acumulado nessas horas / total entrada
+    let volAtrasado=0;
+    HOURS.forEach((_,i)=>{
+      const e=entradas[i]||0,s=saidas[i]||0;
+      if(e>s)volAtrasado+=(e-s);
+    });
+    const pctAtraso=totalEntrada>0?Math.round(volAtrasado/totalEntrada*100):0;
+    const pctAtrasoColor=pctAtraso===0?'#00e676':pctAtraso<=10?'#7ddc9f':pctAtraso<=25?'#ffd700':pctAtraso<=50?'#ff9500':'#ff4c4c';
+
+    const kpis=[
+      {l:'Total Entrou',v:totalEntrada.toLocaleString('pt-BR'),c:'#ff9500'},
+      {l:'Total Expedido',v:totalSaida.toLocaleString('pt-BR'),c:'#00e676'},
+      {l:'Vol. Não Conferido',v:(saldoFinal>0?'+':'')+saldoFinal.toLocaleString('pt-BR'),
+       c:saldoFinal<=0?'#00e676':saldoFinal<=capDoca?'#ffd700':'#ff4c4c',
+       sub:saldoFinal<=0?'✔ Zerado — turno equilibrado':'Deve zerar ao final do turno'},
+      {l:'Vol. Sem Conferir',v:estoqueAtual<=0?'0':estoqueAtual.toLocaleString('pt-BR'),
+       c:estoqueAtual<=0?'#00e676':estoqueAtual<=capDoca?'#ffd700':'#ff4c4c',
+       sub:estoqueAtual<=0?'✔ Doca vazia':'Acumulado atual na doca'},
+      {l:'Horas Críticas',v:horasComProblema+'h',c:horasComProblema===0?'#00e676':horasComProblema<=2?'#ffd700':'#ff4c4c',
+       sub:horasComProblema===0?'Sem atrasos':'Entrada > Saída'},
+      {l:'% Atraso no Turno',v:pctAtraso+'%',c:pctAtrasoColor,
+       sub:pctAtraso===0?'✔ Sem atraso':pctAtraso<=10?'Mínimo':pctAtraso<=25?'Moderado':pctAtraso<=50?'Alto':'Crítico'},
+    ];
+    panel.innerHTML=kpis.map(k=>`<div class="kpi" style="border-color:rgba(0,230,118,.3);padding:6px 8px">
+      <div class="kpi-lbl">${k.l}</div>
+      <div class="kpi-val" style="color:${k.c};font-size:14px">${k.v}</div>
+      ${k.sub?`<div style="font-size:8px;color:#4a7a9b;margin-top:2px;line-height:1.2">${k.sub}</div>`:''}
+    </div>`).join('');
+  }
+
+  const alertEl=document.getElementById('docaBalanceAlert');
+  if(alertEl){
+    if(estoqueAtual>capDoca*2){
+      alertEl.style.display='block';alertEl.style.background='rgba(180,20,20,.4)';alertEl.style.color='#ff4c4c';
+      alertEl.textContent=`🚨 Estoque crítico na doca: ${estoqueAtual.toLocaleString('pt-BR')} vol — rotas em risco!`;
+    } else if(estoqueAtual>capDoca){
+      alertEl.style.display='block';alertEl.style.background='rgba(180,130,0,.3)';alertEl.style.color='#ffd700';
+      alertEl.textContent=`⚠ Acúmulo na doca: ${estoqueAtual.toLocaleString('pt-BR')} vol — monitorar expedição`;
+    } else if(horasComProblema>2){
+      alertEl.style.display='block';alertEl.style.background='rgba(180,130,0,.25)';alertEl.style.color='#ff9500';
+      alertEl.textContent=`⚠ ${horasComProblema} horas com entrada > saída — risco de acúmulo futuro`;
+    } else {
+      alertEl.style.display='none';
+    }
+  }
+
+  const fsAlert=document.getElementById('fsExpAlert');
+  if(fsAlert){
+    if(estoqueAtual>capDoca){
+      fsAlert.style.display='block';fsAlert.style.background='rgba(180,20,20,.35)';fsAlert.style.color='#ff4c4c';
+      fsAlert.textContent=`📦 Estoque doca: ${estoqueAtual.toLocaleString('pt-BR')} vol acum.`;
+    } else if(saldoFinal>0){
+      fsAlert.style.display='block';fsAlert.style.background='rgba(180,130,0,.25)';fsAlert.style.color='#ffd700';
+      fsAlert.textContent=`📦 Saldo doca: +${saldoFinal.toLocaleString('pt-BR')} vol`;
+    } else {
+      fsAlert.style.display='none';
+    }
+  }
 }
 
 // ── DASHBOARD TABLES ──────────────────────────────────────
@@ -1102,11 +1408,38 @@ function renderDashTables(day){
           if(isInv){bg=n>cap?'background:rgba(200,20,20,.5)':n>cap*.8?'background:rgba(180,130,0,.25)':'background:rgba(0,120,60,.25)';style=n>cap?'color:#ff4c4c;font-weight:bold':n>cap*.8?'color:#ffd700':'color:#00e676';}
           else{const p=n/cap;bg=p>=1.05?'background:rgba(0,180,80,.3)':p>=.9?'background:rgba(0,120,60,.2)':p>=.7?'background:rgba(180,130,0,.2)':'background:rgba(180,30,30,.3)';style=p>=1.05?'color:#00e676;font-weight:bold':p>=.9?'color:#7ddc9f':p>=.7?'color:#ffd700':'color:#ff7070';}
         }
+        const isExtra=isCK&&i>=H_CK;
         h2+=`<td style="text-align:center;${bg}" title="${isExtra?'⚡ Hora extra':''}"><span style="${style}">${v!==''?v:isExtra?'·':'-'}</span></td>`;
       });
       h2+='</tr>';
     });
   });
+  // ── Linha especial: Estoque Doca (acúmulo hora a hora) ──
+  const docaEntradaArr=hd['Vol. Checkout']||new Array(HOURS.length).fill('');
+  const docaSaidaArr=hd['Vol. Doca']||new Array(HOURS.length).fill('');
+  // somar entradas: CK + Esp + Fraldas (todos já são deltas armazenados)
+  const espMetrics=['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.','Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.'];
+  let estoqueRunning=0;
+  const estoqueArr=HOURS.map((_,i)=>{
+    let entrada=(docaEntradaArr[i]!==''&&docaEntradaArr[i]!==null?+docaEntradaArr[i]:0);
+    espMetrics.forEach(em=>{const ea=hd[em]||[];entrada+=(ea[i]!==''&&ea[i]!==null?+ea[i]:0);});
+    const saida=docaSaidaArr[i]!==''&&docaSaidaArr[i]!==null?+docaSaidaArr[i]:0;
+    const anyData=entrada>0||saida>0;
+    if(anyData){estoqueRunning+=entrada-saida;}
+    return anyData?estoqueRunning:null;
+  });
+  h2+=`<tr><td colspan="${HOURS.length+1}" style="background:rgba(0,230,118,.06);color:#00e676;font-size:9px;font-weight:bold;padding:3px 8px;border-top:2px solid rgba(0,230,118,.3)">📦 EQUILÍBRIO DOCA — Estoque acumulado por hora (Entrada - Saída) — meta: 0 | capacidade entrega: 1.303/h</td></tr>`;
+  h2+=`<tr><td class="row-lbl">Estoque Doca<span style="font-size:9px;color:#6a9fc0;font-weight:normal;display:block">CK+Esp+Fralda−Doca</span></td>`;
+  estoqueArr.forEach((v,i)=>{
+    if(v===null){h2+=`<td style="text-align:center;color:#2a3a4a">-</td>`;return;}
+    const capH=1303; // capacidade doca/h
+    let bg,col;
+    if(v<=0){bg='background:rgba(0,180,80,.3)';col='color:#00e676;font-weight:bold';}
+    else if(v<=capH){bg='background:rgba(180,130,0,.3)';col='color:#ffd700;font-weight:bold';}
+    else{bg='background:rgba(180,20,20,.5)';col='color:#ff4c4c;font-weight:bold';}
+    h2+=`<td style="text-align:center;${bg}" title="Estoque acumulado na doca: ${v.toLocaleString('pt-BR')} vol"><span style="${col}">${v.toLocaleString('pt-BR')}</span></td>`;
+  });
+  h2+='</tr>';
   h2+='</tbody></table>';
   document.getElementById('horaTbl').innerHTML=h2;
   // render rotas summary in dashboard tab
@@ -1223,12 +1556,51 @@ function getCapacities(){
   Object.entries(CAP_MAP).forEach(([m,id])=>{const el=document.getElementById(id);caps[m]=el&&el.value!==''?+el.value:null;});
   return caps;
 }
+// ── ACUMULADO → DELTA ────────────────────────────────────
+// Métricas que NÃO usam modo acumulado (valores já são por hora discreta)
+const DELTA_SKIP=['Vales','Conf. Planejado','Conf. Ativo'];
+function isDeltaMetric(m){return!DELTA_SKIP.includes(m);}
+
+// Dado array de acumulados (alguns podem ser ''), retorna array de deltas por hora
+function acumToDeltas(acums){
+  const deltas=new Array(acums.length).fill('');
+  let prevFilled=-1,prevVal=0;
+  for(let i=0;i<acums.length;i++){
+    if(acums[i]!==''&&acums[i]!==null&&acums[i]!==undefined){
+      const cur=+acums[i];
+      if(prevFilled===-1){
+        // primeira hora preenchida: delta = o próprio valor
+        deltas[i]=cur;
+      } else {
+        // delta = acumulado atual - acumulado anterior
+        deltas[i]=Math.max(cur-prevVal,0);
+      }
+      prevFilled=i;prevVal=cur;
+    }
+  }
+  return deltas;
+}
+
+// Dado array de deltas (armazenados), reconstrói acumulados para exibir nos inputs
+function deltasToAcums(deltas){
+  const acums=new Array(deltas.length).fill('');
+  let running=0,anyFilled=false;
+  for(let i=0;i<deltas.length;i++){
+    if(deltas[i]!==''&&deltas[i]!==null&&deltas[i]!==undefined){
+      running+=+deltas[i];acums[i]=running;anyFilled=true;
+    } else if(anyFilled){
+      // após primeira entrada, deixa vazio (operador ainda não preencheu)
+      acums[i]='';
+    }
+  }
+  return acums;
+}
+
 function buildHoraTable(hd){
   const hdr=document.getElementById('hTblHdr'),body=document.getElementById('hTblBody');
   hdr.innerHTML='<th style="text-align:left;padding:3px 8px;min-width:140px">Indicador</th>'+HOURS.map(h=>`<th style="min-width:62px;white-space:nowrap">${h}</th>`).join('');
   body.innerHTML='';
   const caps=getCapacities();
-  // Group separators
   const MHORA_GROUPS=[
     {title:'🔴 CORREIA — Separação', color:'rgba(255,149,0,.15)',
      metrics:['Linhas Med.','Linhas Perf.','Erros Sep. Med.']},
@@ -1241,32 +1613,77 @@ function buildHoraTable(hd){
      metrics:['Vales','Conf. Planejado','Conf. Ativo']},
   ];
   MHORA_GROUPS.forEach(group=>{
-    // separator header row
     const sepTr=document.createElement('tr');
     sepTr.innerHTML=`<td colspan="${HOURS.length+1}" style="background:${group.color};color:#89b4d4;font-size:9px;font-weight:bold;padding:3px 8px;text-transform:uppercase;letter-spacing:.5px;border-top:2px solid rgba(255,255,255,.08)">${group.title}</td>`;
     body.appendChild(sepTr);
     group.metrics.forEach(m=>{
-    const cap=caps[m]||null;const isInv=MHORA_INV.includes(m);
-    const tr=document.createElement('tr');
-    let html=`<td class="hlbl">${m}${cap?`<span style="font-size:9px;color:#6a9fc0;font-weight:normal;display:block">${isInv?'máx':'meta'}: ${cap.toLocaleString('pt-BR')}/h</span>`:''}</td>`;
-    HOURS.forEach((_,i)=>{
-      const v=(hd&&hd[m]&&hd[m][i]!==''&&hd[m][i]!==null&&hd[m][i]!==undefined)?hd[m][i]:'';
-      let bg='';
-      if(cap&&v!==''){
-        const n=+v;
-        if(isInv){bg=n>cap?'background:rgba(200,20,20,.55)':n>cap*.8?'background:rgba(180,130,0,.4)':'background:rgba(0,100,50,.45)';}
-        else{const p=n/cap;bg=p>=1.05?'background:rgba(0,180,80,.45)':p>=.9?'background:rgba(0,120,60,.35)':p>=.7?'background:rgba(180,130,0,.4)':'background:rgba(180,20,20,.5)';}
-      }
-      // Correia/checkout: colunas 23→00h em diante são hora extra (fundo diferente, mas editáveis)
-      const isCKMetric=['Linhas Med.','Linhas Perf.','Erros Sep. Med.','Vol. Checkout','Linhas Checkout','Unid. Checkout'].includes(m);
-      const isExtra=isCKMetric&&i>=H_CK;
-      const extraStyle=isExtra&&!bg?'background:rgba(255,149,0,.06);border-left:2px solid rgba(255,149,0,.2)':'';
-      html+=`<td style="${bg};${extraStyle}" title="${isExtra?'⚡ Hora extra':''}"><input type="number" data-m="${m}" data-i="${i}" value="${v}" placeholder="-" oninput="colorCell(this);liveUpdate()" style="${isExtra?'opacity:0.75':''}"/></td>`;
+      const cap=caps[m]||null;const isInv=MHORA_INV.includes(m);const useDelta=isDeltaMetric(m);
+      const tr=document.createElement('tr');
+      const modeHint=useDelta?`<span style="font-size:8px;color:#4a7a9b;display:block">▲ acumulado</span>`:'';
+      let html=`<td class="hlbl">${m}${cap?`<span style="font-size:9px;color:#6a9fc0;font-weight:normal;display:block">${isInv?'máx':'meta'}: ${cap.toLocaleString('pt-BR')}/h</span>`:''} ${modeHint}</td>`;
+      // Para modo delta: converter deltas armazenados → acumulados para exibir
+      const rawVals=hd&&hd[m]?hd[m]:new Array(HOURS.length).fill('');
+      const displayVals=useDelta?deltasToAcums(rawVals):rawVals;
+      // Deltas calculados para colorir célula (baseado no ritmo/hora)
+      const deltaVals=useDelta?rawVals:rawVals;
+
+      HOURS.forEach((_,i)=>{
+        const vDisplay=displayVals[i]!==''&&displayVals[i]!==null?displayVals[i]:'';
+        const vDelta=deltaVals[i]!==''&&deltaVals[i]!==null?+deltaVals[i]:null;
+        let bg='';
+        if(cap&&vDelta!==null){
+          const n=vDelta;
+          if(isInv){bg=n>cap?'background:rgba(200,20,20,.55)':n>cap*.8?'background:rgba(180,130,0,.4)':'background:rgba(0,100,50,.45)';}
+          else{const p=n/cap;bg=p>=1.05?'background:rgba(0,180,80,.45)':p>=.9?'background:rgba(0,120,60,.35)':p>=.7?'background:rgba(180,130,0,.4)':'background:rgba(180,20,20,.5)';}
+        }
+        const isCKMetric=['Linhas Med.','Linhas Perf.','Erros Sep. Med.','Vol. Checkout','Linhas Checkout','Unid. Checkout'].includes(m);
+        const isExtra=isCKMetric&&i>=H_CK;
+        const extraStyle=isExtra&&!bg?'background:rgba(255,149,0,.06);border-left:2px solid rgba(255,149,0,.2)':'';
+        // Mostrar delta calculado como tooltip/subtítulo dentro da célula
+        const deltaHint=useDelta&&vDelta!==null?`<div style="font-size:8px;color:#4a7a9b;line-height:1;margin-top:1px">Δ${vDelta.toLocaleString('pt-BR')}</div>`:'';
+        html+=`<td style="${bg};${extraStyle};padding:1px 2px" title="${isExtra?'⚡ Hora extra — ':''}${useDelta?'Digite o acumulado total até esta hora':''}">
+          <input type="number" data-m="${m}" data-i="${i}" data-use-delta="${useDelta?1:0}" value="${vDisplay}" placeholder="-"
+            oninput="onHoraInput(this);liveUpdate()"
+            style="${isExtra?'opacity:0.75':''}"/>
+          ${deltaHint}
+        </td>`;
+      });
+      tr.innerHTML=html;body.appendChild(tr);
     });
-    tr.innerHTML=html;body.appendChild(tr);
-    }); // end group.metrics
-  }); // end MHORA_GROUPS
+  });
 }
+
+function onHoraInput(inp){
+  const m=inp.dataset.m;const useDelta=inp.dataset.useDelta==='1';
+  if(useDelta){
+    // Recalcular e atualizar os hints Δ da linha inteira
+    const row=inp.closest('tr');
+    const inputs=[...row.querySelectorAll(`input[data-m="${m}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
+    const acums=inputs.map(el=>el.value!==''?+el.value:'');
+    const deltas=acumToDeltas(acums);
+    inputs.forEach((el,idx)=>{
+      // Atualiza hint Δ na célula
+      const td=el.parentNode;
+      let hint=td.querySelector('.delta-hint');
+      if(!hint){hint=document.createElement('div');hint.className='delta-hint';hint.style.cssText='font-size:8px;color:#4a7a9b;line-height:1;margin-top:1px';td.appendChild(hint);}
+      hint.textContent=deltas[idx]!==''?'Δ'+Number(deltas[idx]).toLocaleString('pt-BR'):'';
+      // Recolorir célula baseado no delta desta hora
+      colorCellByDelta(el,m,deltas[idx]);
+    });
+  } else {
+    colorCell(inp);
+  }
+}
+
+function colorCellByDelta(inp,m,delta){
+  const isInv=MHORA_INV.includes(m);
+  const capEl=document.getElementById(CAP_MAP[m]);const cap=capEl&&capEl.value!==''?+capEl.value:null;
+  if(!cap||delta===''||delta===null){inp.parentNode.style.background='';return;}
+  const n=+delta;
+  if(isInv){inp.parentNode.style.background=n>cap?'rgba(200,20,20,.55)':n>cap*.8?'rgba(180,130,0,.4)':'rgba(0,100,50,.45)';}
+  else{const p=n/cap;inp.parentNode.style.background=p>=1.05?'rgba(0,180,80,.45)':p>=.9?'rgba(0,120,60,.35)':p>=.7?'rgba(180,130,0,.4)':'rgba(180,20,20,.5)';}
+}
+
 function colorCell(inp){
   const m=inp.dataset.m;const isInv=MHORA_INV.includes(m);
   const capEl=document.getElementById(CAP_MAP[m]);const cap=capEl&&capEl.value!==''?+capEl.value:null;
@@ -1275,11 +1692,26 @@ function colorCell(inp){
   if(isInv){inp.parentNode.style.background=v>cap?'rgba(200,20,20,.55)':v>cap*.8?'rgba(180,130,0,.4)':'rgba(0,100,50,.45)';}
   else{const p=v/cap;inp.parentNode.style.background=p>=1.05?'rgba(0,180,80,.45)':p>=.9?'rgba(0,120,60,.35)':p>=.7?'rgba(180,130,0,.4)':'rgba(180,20,20,.5)';}
 }
+
 function readHoraData(){
   const hd={};MHORA.forEach(m=>{hd[m]=new Array(HOURS.length).fill('');});
-  document.querySelectorAll('#hTblBody input').forEach(inp=>{
-    const m=inp.dataset.m,i=+inp.dataset.i;hd[m][i]=inp.value!==''?+inp.value:'';
-  });return hd;
+  // Agrupar inputs por métrica
+  const byMetric={};
+  document.querySelectorAll('#hTblBody input[data-m]').forEach(inp=>{
+    const m=inp.dataset.m,i=+inp.dataset.i;
+    if(!byMetric[m])byMetric[m]=new Array(HOURS.length).fill('');
+    byMetric[m][i]=inp.value!==''?+inp.value:'';
+  });
+  // Para métricas de delta: converter acumulados digitados → deltas para armazenar
+  MHORA.forEach(m=>{
+    const vals=byMetric[m]||new Array(HOURS.length).fill('');
+    if(isDeltaMetric(m)){
+      hd[m]=acumToDeltas(vals);
+    } else {
+      hd[m]=vals;
+    }
+  });
+  return hd;
 }
 function readFormAsDay(){
   const dt=document.getElementById('iData').value;if(!dt)return null;
@@ -1362,6 +1794,19 @@ function loadFormFrom(day){
   setTimeout(updateRealAuto,100);
 }
 function prepNewDay(){loadFormFrom(emptyDay(today()));}
+// Auto-save debounce timer
+let autoSaveTimer=null;
+function autoSave(){
+  clearTimeout(autoSaveTimer);
+  autoSaveTimer=setTimeout(()=>{
+    const day=readFormAsDay();
+    if(!day)return;
+    const idx=db.days.findIndex(d=>d.date===day.date);
+    if(idx>=0)db.days[idx]=day;else db.days.push(day);
+    db.days.sort((a,b)=>a.date.localeCompare(b.date));
+    save();
+  },1500);
+}
 function saveDay(){
   const day=readFormAsDay();if(!day){alert('⚠️ Informe a data!');return;}
   const idx=db.days.findIndex(d=>d.date===day.date);
@@ -1372,7 +1817,7 @@ function saveDay(){
   document.getElementById('liveBadge').style.display='none';
   document.getElementById('btnDel').style.display='';
   document.getElementById('admDayLbl').textContent=`(editando: ${fmtDate(day.date)})`;
-  alert('✅ Dia salvo! '+fmtDate(day.date));
+  showSyncStatus('☁ Salvo!',false);
 }
 function delCurrentDay(){
   const dt=document.getElementById('iData').value;if(!dt)return;
@@ -1590,52 +2035,460 @@ function renderRotasTab(){
   renderRotasTblFull(day);
 }
 
+// ── SUPABASE SYNC ─────────────────────────────────────────
+let sbUrl='',sbKey='',sbConnected=false,sbSyncing=false,sbPollTimer=null,sbLastTs=0;
+const SB_TABLE='cdgam_data';
+const SB_ROW_ID='main';
+
+function sbHeaders(){return{'apikey':sbKey,'Authorization':'Bearer '+sbKey,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'};}
+
+async function sbSave(){
+  if(!sbUrl||!sbKey)return;
+  sbSyncing=true;
+  const ts=Date.now();
+  sbLastTs=ts;
+  try{
+    const payload=JSON.stringify({days:db.days,savedAt:ts});
+    const r=await fetch(`${sbUrl}/rest/v1/${SB_TABLE}`,{
+      method:'POST',
+      headers:{...sbHeaders(),'Prefer':'resolution=merge-duplicates'},
+      body:JSON.stringify({id:SB_ROW_ID,payload,updated_at:new Date(ts).toISOString()})
+    });
+    if(r.ok){
+      sbConnected=true;
+      showSyncStatus('☁ Salvo na nuvem ✓',false);
+      setTimeout(()=>{if(sbConnected)showSyncStatus('☁ Nuvem ativa ✓',false);},2000);
+    } else {
+      const err=await r.json().catch(()=>({}));
+      showSyncStatus('⚠ Erro ao salvar: '+(err.message||r.status),true);
+    }
+  }catch(e){
+    showSyncStatus('⚠ Sem internet — salvo local',true);
+  }
+  sbSyncing=false;
+}
+
+async function sbLoad(){
+  if(!sbUrl||!sbKey)return false;
+  try{
+    const r=await fetch(`${sbUrl}/rest/v1/${SB_TABLE}?id=eq.${SB_ROW_ID}&select=payload,updated_at`,
+      {headers:sbHeaders()});
+    if(!r.ok)return false;
+    const rows=await r.json();
+    if(!rows||!rows.length||!rows[0].payload)return false;
+    const remote=JSON.parse(rows[0].payload);
+    if(!remote||!remote.days)return false;
+    const remoteTs=remote.savedAt||0;
+    // Sempre aplicar se remoto tem dados e é diferente do que temos
+    const localTs=sbLastTs||0;
+    if(remoteTs>localTs||remote.days.length>db.days.length){
+      sbLastTs=remoteTs;
+      // Merge: nunca perder dias locais que não estão na nuvem
+      const remoteMap={};remote.days.forEach(d=>remoteMap[d.date]=d);
+      db.days.forEach(d=>{if(!remoteMap[d.date])remote.days.push(d);});
+      db.days=remote.days.sort((a,b)=>a.date.localeCompare(b.date));
+      localStorage.setItem(SK,JSON.stringify(db));
+      return true;
+    }
+    return false;
+  }catch(e){return false;}
+}
+
+async function sbConnect(){
+  sbUrl=localStorage.getItem('gam_sb_url')||'';
+  sbKey=localStorage.getItem('gam_sb_key')||'';
+  if(!sbUrl||!sbKey){showSyncStatus('☁ Sem nuvem — só local',null);return;}
+  showSyncStatus('☁ Conectando ao Supabase...',null);
+  try{
+    // Test + load
+    const r=await fetch(`${sbUrl}/rest/v1/${SB_TABLE}?id=eq.${SB_ROW_ID}&select=id`,
+      {headers:sbHeaders()});
+    if(!r.ok){
+      const err=await r.json().catch(()=>({}));
+      if(r.status===404||r.status===400){
+        showSyncStatus('⚠ Tabela não encontrada — ver guia',true);
+        return;
+      }
+      showSyncStatus('⚠ Erro '+r.status,true);
+      return;
+    }
+    sbConnected=true;
+    // Carregar dados remotos na inicialização
+    const updated=await sbLoad();
+    if(updated){
+      // Re-render com dados da nuvem
+      const latest=latestDay();
+      if(latest){
+        curDate=latest.date;
+        buildDayNav();
+        renderKPIs(latest);renderFlowBar(latest);renderDashCharts(latest);renderDashTables(latest);
+      }
+      showSyncStatus('☁ Dados carregados da nuvem ✓',false);
+    } else {
+      showSyncStatus('☁ Nuvem ativa ✓',false);
+      // Se temos dados locais e nuvem vazia, salvar para a nuvem
+      if(db.days&&db.days.length>0)await sbSave();
+    }
+    // Polling a cada 30s para sincronização em tempo real entre computadores
+    if(sbPollTimer)clearInterval(sbPollTimer);
+    sbPollTimer=setInterval(async()=>{
+      if(!sbSyncing){
+        const upd=await sbLoad();
+        if(upd){
+          const latest=latestDay();const cur=getDay(curDate);
+          buildDayNav();
+          if(cur){renderKPIs(cur);renderFlowBar(cur);renderDashCharts(cur);renderDashTables(cur);}
+          else if(latest){renderKPIs(latest);renderFlowBar(latest);renderDashCharts(latest);renderDashTables(latest);}
+          showSyncStatus('☁ Sincronizado ✓',false);
+          setTimeout(()=>showSyncStatus('☁ Nuvem ativa ✓',false),2000);
+        }
+      }
+    },30000);
+    // Badge ao vivo
+    const lb=document.getElementById('liveBadge');if(lb)lb.style.display='inline';
+  }catch(e){
+    sbConnected=false;
+    showSyncStatus('⚠ Sem conexão — dados locais OK',true);
+    // Tentar reconectar em 1 minuto
+    setTimeout(sbConnect,60000);
+  }
+}
+
 function openSyncConfig(){
   document.getElementById('sbUrlIn').value=localStorage.getItem('gam_sb_url')||'';
   document.getElementById('sbKeyIn').value=localStorage.getItem('gam_sb_key')||'';
   document.getElementById('syncOv').classList.add('on');
 }
+
 async function saveSyncConfig(){
   const url=document.getElementById('sbUrlIn').value.trim();
   const key=document.getElementById('sbKeyIn').value.trim();
   if(!url||!key){alert('Preencha URL e chave!');return;}
   localStorage.setItem('gam_sb_url',url);
   localStorage.setItem('gam_sb_key',key);
+  sbUrl=url;sbKey=key;
   document.getElementById('syncTestResult').textContent='⏳ Testando conexão...';
   document.getElementById('syncTestResult').style.color='#ffd700';
-  // Test connection
   try{
-    const r=await fetch(`${url}/rest/v1/cdgam_data?id=eq.main&select=id`,
+    const r=await fetch(`${url}/rest/v1/${SB_TABLE}?id=eq.${SB_ROW_ID}&select=id`,
       {headers:{'apikey':key,'Authorization':'Bearer '+key}});
     if(r.ok){
-      document.getElementById('syncTestResult').textContent='✅ Conexão OK! Recarregando...';
+      document.getElementById('syncTestResult').textContent='✅ Conectado! Salvando dados...';
       document.getElementById('syncTestResult').style.color='#00e676';
-      setTimeout(()=>location.reload(),1500);
+      sbConnected=true;
+      // Fechar e iniciar sync
+      setTimeout(async()=>{
+        document.getElementById('syncOv').classList.remove('on');
+        await sbSave();
+        showSyncStatus('☁ Nuvem ativa ✓',false);
+        const lb=document.getElementById('liveBadge');if(lb)lb.style.display='inline';
+        // Iniciar polling
+        if(sbPollTimer)clearInterval(sbPollTimer);
+        sbPollTimer=setInterval(async()=>{if(!sbSyncing){await sbLoad();}},30000);
+      },1200);
     }else{
-      const err=await r.json();
-      document.getElementById('syncTestResult').textContent='❌ Erro: '+(err.message||r.status)+' — Verifique a tabela cdgam_data e as credenciais.';
+      const err=await r.json().catch(()=>({}));
+      let msg='❌ Erro '+r.status;
+      if(r.status===401)msg='❌ Chave inválida — verifique a anon key';
+      else if(r.status===404||r.status===400)msg='❌ Tabela "cdgam_data" não existe — ver guia de setup';
+      else if(err.message)msg='❌ '+err.message;
+      document.getElementById('syncTestResult').textContent=msg;
       document.getElementById('syncTestResult').style.color='#ff4c4c';
     }
   }catch(e){
-    document.getElementById('syncTestResult').textContent='❌ Erro de conexão: '+e.message;
+    document.getElementById('syncTestResult').textContent='❌ Sem conexão: '+e.message;
     document.getElementById('syncTestResult').style.color='#ff4c4c';
   }
 }
+
 function clearSyncConfig(){
   if(!confirm('Remover configuração de nuvem? Dados locais ficam intactos.'))return;
   localStorage.removeItem('gam_sb_url');localStorage.removeItem('gam_sb_key');
-  location.reload();
+  sbUrl='';sbKey='';sbConnected=false;
+  if(sbPollTimer){clearInterval(sbPollTimer);sbPollTimer=null;}
+  showSyncStatus('☁ Sem nuvem — só local',null);
+  document.getElementById('syncOv').classList.remove('on');
 }
 
-function init(){
-  load(); // carrega localStorage primeiro
+// ── OVERRIDE save() para incluir Supabase ─────────────────
+const _origSave=save;
+// Patch: após save local, salvar na nuvem também
+function save(){
+  localStorage.setItem(SK,JSON.stringify(db));
+  if(sbConnected&&sbUrl&&sbKey){
+    sbSave(); // async, não bloqueia
+  } else if(fbConnected&&fbDb){
+    isSaving=true;
+    const ts=Date.now();lastSaveTs=ts;
+    fbDb.ref(FB_PATH).set({days:db.days,savedAt:ts})
+      .then(()=>{showSyncStatus('☁ Nuvem ativa',false);setTimeout(()=>{isSaving=false;},1000);})
+      .catch(e=>{isSaving=false;showSyncStatus('⚠ Erro: '+e.message,true);});
+  }
+}
+
+// ── PREVISÃO DE ENCERRAMENTO ─────────────────────────────
+function calcPrevisaoEncerramento(){
+  const day=getDay(curDate);
+  if(!day){alert('Nenhum dia selecionado!');return;}
+  const hd=day.hd||{};
+  const now=new Date();
+  const horaAtual=now.getHours()+now.getMinutes()/60;
+  const horaStr=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+
+  // Helper: soma deltas já realizados de uma métrica
+  const realizado=m=>sumHoraField(m,hd);
+
+  // Helper: adicionar horas a uma hora decimal e retornar string HH:MM
+  function addHoras(baseDecimal, horasExtra){
+    let total=baseDecimal+horasExtra;
+    // normalizar: turno vai de 17:30 até ~06:00 do dia seguinte
+    // base é decimal onde horas após meia-noite = 24+h (ex: 01:00 = 25)
+    // para exibir, pegar módulo 24
+    const totalMod=total%24;
+    const h=Math.floor(totalMod);
+    const m=Math.round((totalMod-h)*60);
+    const mFix=m>=60?59:m;
+    return h.toString().padStart(2,'0')+':'+mFix.toString().padStart(2,'0');
+  }
+
+  // Helper: hora decimal de string HH:MM
+  function horaDecimal(str){
+    if(!str||str==='—:—')return null;
+    const [h,m]=(str||'').split(':').map(Number);
+    if(isNaN(h))return null;
+    // Ajuste para turno noturno: horas após meia-noite (00-08) = 24+h
+    return h<12?24+h+m/60:h+m/60;
+  }
+
+  // Hora atual decimal (ajustada para turno noturno)
+  const hAtual=horaAtual<12?24+horaAtual:horaAtual;
+
+  // ── SETORES ──────────────────────────────────────────────
+  const setores=[];
+
+  // 1. CORREIA MEDICAMENTOS
+  const capLM=day.capLM||3500;
+  const prevLM=day.pnCorreia||0;
+  const realLM=realizado('Linhas Med.');
+  const faltaLM=Math.max(prevLM-realLM,0);
+  const tempoLM=faltaLM>0?faltaLM/capLM:0;
+  setores.push({
+    nome:'Correia Med.',cor:'#ff9500',icone:'🔴',
+    prev:prevLM,real:realLM,falta:faltaLM,cap:capLM,
+    termino:faltaLM>0?addHoras(hAtual,tempoLM):'✅ Concluído',
+    terminoDec:faltaLM>0?hAtual+tempoLM:hAtual,
+    unidade:'linhas'
+  });
+
+  // 2. CORREIA PERFUMARIA
+  const capLP=day.capLP||3000;
+  const prevLP=day.pnCorreia||0;
+  const realLP=realizado('Linhas Perf.');
+  const faltaLP=Math.max(prevLP-realLP,0);
+  const tempoLP=faltaLP>0?faltaLP/capLP:0;
+  setores.push({
+    nome:'Correia Perf.',cor:'#ff9500',icone:'🔴',
+    prev:prevLP,real:realLP,falta:faltaLP,cap:capLP,
+    termino:faltaLP>0?addHoras(hAtual,tempoLP):'✅ Concluído',
+    terminoDec:faltaLP>0?hAtual+tempoLP:hAtual,
+    unidade:'linhas'
+  });
+
+  // 3. CHECKOUT (Vol.)
+  const capVC=day.capVC||1280;
+  // Checkout processa o que veio da correia: pnCorreia + pnJuncao
+  const prevCK=(day.pnCorreia||0)+(day.pnJuncao||0);
+  const realCK=realizado('Vol. Checkout');
+  const faltaCK=Math.max(prevCK-realCK,0);
+  const tempoCK=faltaCK>0?faltaCK/capVC:0;
+  setores.push({
+    nome:'Checkout',cor:'#00e5ff',icone:'🔵',
+    prev:prevCK,real:realCK,falta:faltaCK,cap:capVC,
+    termino:faltaCK>0?addHoras(hAtual,tempoCK):'✅ Concluído',
+    terminoDec:faltaCK>0?hAtual+tempoCK:hAtual,
+    unidade:'vol'
+  });
+
+  // 4. ESPECIAL
+  const capEsp=day.capEsp||340;
+  const prevEsp=day.pnEspecial||0;
+  const realEsp=realizado('Vol. Especial');
+  const faltaEsp=Math.max(prevEsp-realEsp,0);
+  const tempoEsp=faltaEsp>0?faltaEsp/capEsp:0;
+  if(prevEsp>0)setores.push({
+    nome:'Especial',cor:'#9b59b6',icone:'🟣',
+    prev:prevEsp,real:realEsp,falta:faltaEsp,cap:capEsp,
+    termino:faltaEsp>0?addHoras(hAtual,tempoEsp):'✅ Concluído',
+    terminoDec:faltaEsp>0?hAtual+tempoEsp:hAtual,
+    unidade:'vol'
+  });
+
+  // 5. ESP. FRACIONADO
+  const capEspFrac=day.capEspFrac||0;
+  const prevEspFrac=day.pnEspFrac||0;
+  const realEspFrac=realizado('Vol. Esp. Frac.');
+  const faltaEspFrac=Math.max(prevEspFrac-realEspFrac,0);
+  if(prevEspFrac>0&&capEspFrac>0)setores.push({
+    nome:'Esp. Frac.',cor:'#9b59b6',icone:'🟣',
+    prev:prevEspFrac,real:realEspFrac,falta:faltaEspFrac,cap:capEspFrac,
+    termino:faltaEspFrac>0?addHoras(hAtual,faltaEspFrac/capEspFrac):'✅ Concluído',
+    terminoDec:faltaEspFrac>0?hAtual+faltaEspFrac/capEspFrac:hAtual,
+    unidade:'vol'
+  });
+
+  // 6. FRALDAS CX FECHADA
+  const capFrF=day.capFrF||114;
+  const prevFrF=day.pnFraldaF||0;
+  const realFrF=realizado('Vol. Fraldas Cx Fech.');
+  const faltaFrF=Math.max(prevFrF-realFrF,0);
+  if(prevFrF>0)setores.push({
+    nome:'Fraldas Cx Fech.',cor:'#4a90d9',icone:'🔷',
+    prev:prevFrF,real:realFrF,falta:faltaFrF,cap:capFrF,
+    termino:faltaFrF>0?addHoras(hAtual,faltaFrF/capFrF):'✅ Concluído',
+    terminoDec:faltaFrF>0?hAtual+faltaFrF/capFrF:hAtual,
+    unidade:'vol'
+  });
+
+  // 7. FRALDAS FRACIONADO
+  const capFrFc=day.capFrFc||89;
+  const prevFrFc=day.pnFralda||0;
+  const realFrFc=realizado('Vol. Fraldas Frac.');
+  const faltaFrFc=Math.max(prevFrFc-realFrFc,0);
+  if(prevFrFc>0)setores.push({
+    nome:'Fraldas Frac.',cor:'#4a90d9',icone:'🔷',
+    prev:prevFrFc,real:realFrFc,falta:faltaFrFc,cap:capFrFc,
+    termino:faltaFrFc>0?addHoras(hAtual,faltaFrFc/capFrFc):'✅ Concluído',
+    terminoDec:faltaFrFc>0?hAtual+faltaFrFc/capFrFc:hAtual,
+    unidade:'vol'
+  });
+
+  // 8. DOCA — soma de TODOS os volumes que precisam ser expedidos
+  const capVE=day.capVE||1303;
+  // Previsto doca = todos os volumes
+  const prevDoca=(day.pnCorreia||0)+(day.pnEspecial||0)+(day.pnEspFrac||0)+
+    (day.pnEspMed||0)+(day.pnEspPerf||0)+(day.pnFraldaF||0)+(day.pnFralda||0)+
+    (day.pnJuncao||0)+(day.pnDoca||0);
+  // Real doca = o que já foi expedido (Vol. Doca)
+  const realDoca=realizado('Vol. Doca');
+  // Falta doca = tudo que ainda vai chegar da correia/especial + o que já chegou mas não expediu
+  // = (previsto total - já expedido)
+  const faltaDoca=Math.max((prevDoca||day.pnVol||0)-realDoca,0);
+  const tempoDoca=faltaDoca>0?faltaDoca/capVE:0;
+  setores.push({
+    nome:'DOCA (Expedição)',cor:'#00e676',icone:'🟢',
+    prev:prevDoca||day.pnVol||0,real:realDoca,falta:faltaDoca,cap:capVE,
+    termino:faltaDoca>0?addHoras(hAtual,tempoDoca):'✅ Concluído',
+    terminoDec:faltaDoca>0?hAtual+tempoDoca:hAtual,
+    unidade:'vol'
+  });
+
+  // ── CALCULAR ENCERRAMENTO TOTAL ───────────────────────────
+  // = o setor que termina mais tarde
+  const terminoMax=setores.reduce((mx,s)=>s.terminoDec>mx?s.terminoDec:mx,hAtual);
+  let totalStr;
+  if(terminoMax<=hAtual+0.1){
+    totalStr='✅ Já encerrou!';
+  } else {
+    const h=Math.floor(terminoMax%24);
+    const m=Math.round((terminoMax%24-h)*60);
+    totalStr=h.toString().padStart(2,'0')+':'+(m===60?'00':m.toString().padStart(2,'0'));
+  }
+
+  // ── RENDERIZAR PAINEL ─────────────────────────────────────
+  document.getElementById('prevEncHora').textContent=horaStr;
+  document.getElementById('prevEncTotal').textContent=totalStr;
+
+  const grid=document.getElementById('prevEncGrid');
+  grid.innerHTML=setores.map(s=>{
+    const pct=s.prev>0?Math.round(s.real/s.prev*100):0;
+    const concluido=s.falta===0;
+    const urgente=!concluido&&s.terminoDec>hAtual+3;
+    const critico=!concluido&&s.terminoDec>hAtual+4;
+    const bgCard=concluido?'rgba(0,180,80,.15)':critico?'rgba(180,20,20,.2)':urgente?'rgba(180,130,0,.15)':'rgba(0,100,180,.12)';
+    const corTermino=concluido?'#00e676':critico?'#ff4c4c':urgente?'#ffd700':'#00e5ff';
+    return`<div style="background:${bgCard};padding:8px 12px;border-right:1px solid rgba(155,89,182,.1);border-bottom:1px solid rgba(155,89,182,.1)">
+      <div style="font-size:10px;font-weight:bold;color:#c39bd3;margin-bottom:4px">${s.icone} ${s.nome}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;font-size:10px;margin-bottom:5px">
+        <div><span style="color:#6a9fc0">Previsto:</span> <span style="color:#fff">${s.prev.toLocaleString('pt-BR')}</span></div>
+        <div><span style="color:#6a9fc0">Realizado:</span> <span style="color:#00e676">${s.real.toLocaleString('pt-BR')}</span></div>
+        <div><span style="color:#6a9fc0">Falta:</span> <span style="color:${s.falta>0?'#ff9500':'#00e676'};font-weight:bold">${s.falta.toLocaleString('pt-BR')}</span></div>
+        <div><span style="color:#6a9fc0">Cap/h:</span> <span style="color:#89b4d4">${s.cap.toLocaleString('pt-BR')}</span></div>
+      </div>
+      <div style="background:#1e3a55;border-radius:2px;height:4px;margin-bottom:5px"><div style="background:${s.cor};width:${Math.min(pct,100)}%;height:100%;border-radius:2px"></div></div>
+      <div style="display:flex;justify-content:space-between;align-items:center">
+        <span style="font-size:9px;color:#6a9fc0">${pct}% concluído</span>
+        <span style="font-size:13px;font-weight:bold;color:${corTermino}">${s.termino}</span>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Observações automáticas
+  const obs=[];
+  const setoresCriticos=setores.filter(s=>s.falta>0&&s.terminoDec>hAtual+4);
+  if(setoresCriticos.length>0)obs.push(`⚠ Setores críticos (>4h restantes): ${setoresCriticos.map(s=>s.nome).join(', ')}`);
+  const docaSetor=setores.find(s=>s.nome==='DOCA (Expedição)');
+  if(docaSetor&&docaSetor.falta>0){
+    const hFalta=docaSetor.falta/docaSetor.cap;
+    if(hFalta>3)obs.push(`🚨 Expedição com ${hFalta.toFixed(1)}h de trabalho restante — rotas em risco`);
+  }
+  if(obs.length===0)obs.push('✅ Operação dentro do esperado');
+  document.getElementById('prevEncObs').textContent=obs.join(' | ');
+
+  // Mostrar painel
+  document.getElementById('prevEncPanel').style.display='block';
+  document.getElementById('prevEncPanel').scrollIntoView({behavior:'smooth',block:'nearest'});
+}
+
+async function init(){
+  // Mostrar loading enquanto busca na nuvem
+  document.getElementById('hdrDate').textContent='⏳ Carregando dados...';
+
+  // 1. Carregar local primeiro (instantâneo)
+  load();
+
+  // 2. Tentar buscar da nuvem ANTES de renderizar
+  sbUrl=localStorage.getItem('gam_sb_url')||'';
+  sbKey=localStorage.getItem('gam_sb_key')||'';
+
+  if(sbUrl&&sbKey){
+    showSyncStatus('☁ Carregando da nuvem...',null);
+    try{
+      // Buscar direto sem passar pelo sbConnect completo — mais rápido
+      const r=await fetch(`${sbUrl}/rest/v1/${SB_TABLE}?id=eq.${SB_ROW_ID}&select=payload,updated_at`,
+        {headers:{'apikey':sbKey,'Authorization':'Bearer '+sbKey}});
+      if(r.ok){
+        const rows=await r.json();
+        if(rows&&rows.length&&rows[0].payload){
+          const remote=JSON.parse(rows[0].payload);
+          if(remote&&remote.days&&remote.days.length>0){
+            // Merge: nuvem + dias locais que não existem na nuvem
+            const remoteMap={};remote.days.forEach(d=>remoteMap[d.date]=d);
+            (db.days||[]).forEach(d=>{if(!remoteMap[d.date])remote.days.push(d);});
+            db.days=remote.days.sort((a,b)=>a.date.localeCompare(b.date));
+            sbLastTs=remote.savedAt||0;
+            localStorage.setItem(SK,JSON.stringify(db));
+            showSyncStatus('☁ Dados carregados ✓',false);
+          }
+        }
+        sbConnected=true;
+      }
+    }catch(e){
+      showSyncStatus('⚠ Sem internet — usando dados locais',true);
+    }
+  }
+
+  // 3. Renderizar com os dados finais (local ou nuvem)
   const latest=latestDay();
   curDate=latest?latest.date:today();
   buildDayNav();
   if(latest){renderKPIs(latest);renderFlowBar(latest);renderDashCharts(latest);renderDashTables(latest);}
   else{document.getElementById('hdrDate').textContent='Nenhum dado — clique em ✏️ para começar';}
-  // Inicia Firebase após render local (não bloqueia a tela)
-  setTimeout(initFirebase,100);
+
+  // 4. Iniciar sync completo em background
+  setTimeout(async()=>{
+    await sbConnect();
+    if(!sbConnected)setTimeout(initFirebase,500);
+  },500);
 }
 init();
 </script>
