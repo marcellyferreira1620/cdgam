@@ -711,6 +711,15 @@ function showSyncStatus(msg,isErr){
   el.textContent=msg;
   el.style.color=isErr?'#ff4c4c':isErr===false?'#00e676':'#ffd700';
   el.style.borderColor=isErr?'rgba(233,69,96,.5)':isErr===false?'rgba(0,230,118,.5)':'rgba(255,215,0,.3)';
+  // após 3s mostra status consolidado
+  clearTimeout(el._statusTimer);
+  el._statusTimer=setTimeout(()=>{
+    if(sbConnected&&fbConnected){el.textContent='☁ Firebase + Supabase';el.style.color='#00e676';}
+    else if(sbConnected){el.textContent='☁ Supabase ativo';el.style.color='#00e676';}
+    else if(fbConnected){el.textContent='☁ Firebase ativo';el.style.color='#00e676';}
+    else{el.textContent='💾 Local';el.style.color='#89b4d4';}
+    el.style.borderColor='';
+  },3000);
 }
 
 function applyRemoteData(remote){
@@ -2104,9 +2113,9 @@ async function sbLoad(){
 }
 
 async function sbConnect(){
-  sbUrl=localStorage.getItem('gam_sb_url')||'';
-  sbKey=localStorage.getItem('gam_sb_key')||'';
-  if(!sbUrl||!sbKey){showSyncStatus('☁ Sem nuvem — só local',null);return;}
+  sbUrl=localStorage.getItem('gam_sb_url')||SB_URL_DEFAULT;
+  sbKey=localStorage.getItem('gam_sb_key')||SB_KEY_DEFAULT;
+  if(!sbUrl||!sbKey){showSyncStatus('💾 Local',null);return;}
   showSyncStatus('☁ Conectando ao Supabase...',null);
   try{
     // Test + load
@@ -2668,8 +2677,8 @@ async function init(){
   load();
 
   // 2. Tentar buscar da nuvem ANTES de renderizar
-  sbUrl=localStorage.getItem('gam_sb_url')||'';
-  sbKey=localStorage.getItem('gam_sb_key')||'';
+  sbUrl=localStorage.getItem('gam_sb_url')||SB_URL_DEFAULT;
+  sbKey=localStorage.getItem('gam_sb_key')||SB_KEY_DEFAULT;
 
   if(sbUrl&&sbKey){
     showSyncStatus('☁ Carregando da nuvem...',null);
