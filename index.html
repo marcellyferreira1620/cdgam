@@ -98,12 +98,18 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
 .prev-item input:focus{outline:none;border-color:#ffd700}
 .hora-tbl-wrap{margin-top:10px;background:#122033;border-radius:4px;padding:8px;border:1px solid #1a3550;overflow-x:auto}
 .hora-tbl-wrap h4{color:#ffd700;font-size:11px;margin-bottom:6px;text-transform:uppercase}
-.hora-tbl-wrap table{border-collapse:collapse;font-size:10px;min-width:1100px}
+.hora-tbl-wrap table{border-collapse:collapse;font-size:10px;min-width:1280px}
 .hora-tbl-wrap th{background:#0a2340;color:#6a9fc0;padding:3px 6px;text-align:center;border:1px solid #1a3550;white-space:nowrap}
 .hora-tbl-wrap td{border:1px solid #1a3550;padding:1px 2px}
 .hora-tbl-wrap .hlbl{color:#89b4d4;background:#0a1825;padding:3px 6px;white-space:nowrap;font-weight:bold}
 .hora-tbl-wrap input{width:58px;background:#0d1c2e;border:none;color:#fff;padding:2px 4px;font-size:10px;text-align:center}
 .hora-tbl-wrap input:focus{outline:1px solid #ffd700;background:#162a3d}
+.hora-tbl-wrap .hora-cell{min-width:86px;padding:4px 5px;vertical-align:top}
+.hora-tbl-wrap .hora-acum-input{width:74px;background:#071525;border:1px solid rgba(106,159,192,.18);border-radius:2px;color:#dcecff;font-size:10px;font-weight:600;height:20px;padding:2px 5px}
+.hora-tbl-wrap .delta-hint{margin-top:3px;background:rgba(0,0,0,.24);border-left:3px solid #00e5ff;border-radius:3px;padding:3px 5px;min-height:25px;line-height:1.05}
+.hora-tbl-wrap .delta-label{display:block;color:#77b9dc;font-size:7px;text-transform:uppercase;letter-spacing:.4px;font-weight:800}
+.hora-tbl-wrap .delta-val{display:block;color:#fff;font-size:14px;font-weight:900}
+.hora-tbl-wrap .delta-empty{display:none}
 .btn-row{display:flex;gap:8px;margin-top:10px;justify-content:flex-end;flex-wrap:wrap}
 .btn{padding:6px 16px;border-radius:4px;border:none;cursor:pointer;font-size:12px;font-weight:bold;transition:opacity .15s}
 .btn:hover{opacity:.85}
@@ -458,7 +464,7 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
   <div style="padding:8px">
     <div style="background:#0a2340;border-radius:6px;padding:8px 14px;margin-bottom:8px;border:1px solid rgba(0,230,118,.3);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span style="font-size:11px;font-weight:bold;color:#00e676">⏱️ PRODUÇÃO HORA A HORA</span>
-      <span style="font-size:10px;color:#6a9fc0">Preencha o acumulado de cada período. Salvo automaticamente em 2s.</span>
+      <span style="font-size:10px;color:#6a9fc0">Preencha o acumulado de cada período. O resultado por hora aparece abaixo e salva automaticamente.</span>
       <span id="preenchStatus" style="font-size:10px;color:#ffd700;margin-left:auto"></span>
     </div>
     <div style="background:#122033;border-radius:6px;border:1px solid #1a3550;overflow-x:auto">
@@ -1655,9 +1661,14 @@ function deltasToAcums(deltas){
   return acums;
 }
 
+function deltaHintHtml(delta){
+  if(delta===''||delta===null||delta===undefined)return '';
+  return `<span class="delta-label">resultado/hora</span><span class="delta-val">${Number(delta).toLocaleString('pt-BR')}</span>`;
+}
+
 function buildHoraTable(hd){
   const hdr=document.getElementById('hTblHdr'),body=document.getElementById('hTblBody');
-  hdr.innerHTML='<th style="text-align:left;padding:3px 8px;min-width:140px">Indicador</th>'+HOURS.map(h=>`<th style="min-width:62px;white-space:nowrap">${h}</th>`).join('');
+  hdr.innerHTML='<th style="text-align:left;padding:3px 8px;min-width:140px">Indicador</th>'+HOURS.map(h=>`<th style="min-width:86px;white-space:nowrap">${h}</th>`).join('');
   body.innerHTML='';
   const caps=getCapacities();
   const MHORA_GROUPS=[
@@ -1687,8 +1698,10 @@ function buildHoraTable(hd){
       const deltaVals=useDelta?rawVals:rawVals;
 
       HOURS.forEach((_,i)=>{
-        const vDisplay=displayVals[i]!==''&&displayVals[i]!==null?displayVals[i]:'';
-        const vDelta=deltaVals[i]!==''&&deltaVals[i]!==null?+deltaVals[i]:null;
+        const hasDisplay=displayVals[i]!==''&&displayVals[i]!==null&&displayVals[i]!==undefined;
+        const hasDelta=deltaVals[i]!==''&&deltaVals[i]!==null&&deltaVals[i]!==undefined;
+        const vDisplay=hasDisplay?displayVals[i]:'';
+        const vDelta=hasDelta?+deltaVals[i]:null;
         let bg='';
         if(cap&&vDelta!==null){
           const n=vDelta;
@@ -1698,10 +1711,9 @@ function buildHoraTable(hd){
         const isCKMetric=['Linhas Med.','Linhas Perf.','Erros Sep. Med.','Vol. Checkout','Linhas Checkout','Unid. Checkout'].includes(m);
         const isExtra=isCKMetric&&i>=H_CK;
         const extraStyle=isExtra&&!bg?'background:rgba(255,149,0,.06);border-left:2px solid rgba(255,149,0,.2)':'';
-        // Mostrar delta calculado como tooltip/subtítulo dentro da célula
-        const deltaHint=useDelta&&vDelta!==null?`<div style="font-size:8px;color:#4a7a9b;line-height:1;margin-top:1px">Δ${vDelta.toLocaleString('pt-BR')}</div>`:'';
-        html+=`<td style="${bg};${extraStyle};padding:1px 2px" title="${isExtra?'⚡ Hora extra — ':''}${useDelta?'Digite o acumulado total até esta hora':''}">
-          <input type="number" data-m="${m}" data-i="${i}" data-use-delta="${useDelta?1:0}" value="${vDisplay}" placeholder="-"
+        const deltaHint=useDelta?`<div class="delta-hint ${vDelta===null?'delta-empty':''}">${deltaHintHtml(vDelta)}</div>`:'';
+        html+=`<td class="hora-cell" style="${bg};${extraStyle}" title="${isExtra?'⚡ Hora extra — ':''}${useDelta?'Resultado da hora = acumulado atual - acumulado anterior':''}">
+          <input class="${useDelta?'hora-acum-input':''}" type="number" data-m="${m}" data-i="${i}" data-use-delta="${useDelta?1:0}" value="${vDisplay}" placeholder="-"
             oninput="onHoraInput(this);liveUpdate()"
             style="${isExtra?'opacity:0.75':''}"/>
           ${deltaHint}
@@ -1724,8 +1736,9 @@ function onHoraInput(inp){
       // Atualiza hint Δ na célula
       const td=el.parentNode;
       let hint=td.querySelector('.delta-hint');
-      if(!hint){hint=document.createElement('div');hint.className='delta-hint';hint.style.cssText='font-size:8px;color:#4a7a9b;line-height:1;margin-top:1px';td.appendChild(hint);}
-      hint.textContent=deltas[idx]!==''?'Δ'+Number(deltas[idx]).toLocaleString('pt-BR'):'';
+      if(!hint){hint=document.createElement('div');hint.className='delta-hint';td.appendChild(hint);}
+      hint.classList.toggle('delta-empty',deltas[idx]==='');
+      hint.innerHTML=deltaHintHtml(deltas[idx]);
       // Recolorir célula baseado no delta desta hora
       colorCellByDelta(el,m,deltas[idx]);
     });
