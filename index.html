@@ -736,10 +736,6 @@ function setLocalUsersCache(users){
   localStorage.setItem(USERS_LS,JSON.stringify(users||{}));
 }
 
-function mergeUsers(localUsers,remoteUsers){
-  return {...(localUsers||{}),...(remoteUsers||{})};
-}
-
 function mergeDays(remoteDays,localDays){
   const byDate={};
   (Array.isArray(remoteDays)?remoteDays:[]).forEach(d=>{if(d&&d.date)byDate[d.date]=d;});
@@ -773,7 +769,7 @@ function showSyncStatus(msg,isErr){
 function applyRemoteData(remote){
   if(!remote)return;
   if(remote.users&&typeof remote.users==='object'&&!Array.isArray(remote.users)){
-    setLocalUsersCache(mergeUsers(getLocalUsersCache(),remote.users));
+    setLocalUsersCache(remote.users);
   }
   if(!remote.days||!Array.isArray(remote.days))return;
   db.days=mergeDays(db.days,JSON.parse(JSON.stringify(remote.days)));
@@ -2154,7 +2150,7 @@ async function sbSave(){
         const payload={
           ...remote,
           days:mergeDays(remote.days,db.days),
-          users:mergeUsers(remote.users,getLocalUsersCache()),
+          users:remote.users||getLocalUsersCache(),
           savedAt:ts
         };
         const r=await sbWritePayload(payload,ts);
@@ -2188,9 +2184,8 @@ async function sbLoad(){
     let changed=false;
     if(remote.users&&typeof remote.users==='object'&&!Array.isArray(remote.users)){
       const localUsers=getLocalUsersCache();
-      const mergedUsers=mergeUsers(localUsers,remote.users);
-      if(JSON.stringify(mergedUsers)!==JSON.stringify(localUsers)){
-        setLocalUsersCache(mergedUsers);
+      if(JSON.stringify(remote.users)!==JSON.stringify(localUsers)){
+        setLocalUsersCache(remote.users);
         changed=true;
         if(currentUser&&currentUser.role==='admin')setTimeout(renderUsersList,0);
       }
@@ -2210,9 +2205,8 @@ async function sbLoadUsers(){
   try{
     const remote=await sbReadPayload();
     if(remote&&remote.users&&typeof remote.users==='object'&&!Array.isArray(remote.users)){
-      const mergedUsers=mergeUsers(getLocalUsersCache(),remote.users);
-      setLocalUsersCache(mergedUsers);
-      return mergedUsers;
+      setLocalUsersCache(remote.users);
+      return remote.users;
     }
   }catch(e){}
   return null;
@@ -2226,7 +2220,7 @@ async function sbSaveUsers(users){
     const payload={
       ...remote,
       days:mergeDays(remote.days,db.days),
-      users:mergeUsers(remote.users,users),
+      users:{...(users||{})},
       savedAt:ts
     };
     const r=await sbWritePayload(payload,ts);
