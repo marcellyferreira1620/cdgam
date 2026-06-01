@@ -643,6 +643,8 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
 // 11 períodos: 17:30-18:00, 18:00-19:00, 19:00-20:00, 20:00-21:00, 21:00-22:00, 22:00-23:00, 23:00-00:00, 00:00-01:00, 01:00-02:00, 02:00-03:00, 03:00-04:00
 const HOURS=['17:30→18h','18→19h','19→20h','20→21h','21→22h','22→23h','23→00h','00→01h','01→02h','02→03h','03→04h'];
 const HOURS_LABEL=['17:30','18:00','19:00','20:00','21:00','22:00','23:00','00:00','01:00','02:00','03:00','04:00']; // início de cada slot
+const SHIFT_START_DEC=17.5;
+const SHIFT_END_DEC=28;
 const H_CK=7;  // correia/checkout: turno normal até 23:00 (slots 0-6); slots ≥7 = hora extra (laranja)
 const H_EX=HOURS.length; // expedição: todos os 11 slots
 
@@ -2401,34 +2403,32 @@ function calcPrevisaoEncerramento(){
   const now=new Date();
   const horaAtual=now.getHours()+now.getMinutes()/60;
   const horaStr=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
+  const turnoAgora=horaAtual<12?24+horaAtual:horaAtual;
+  const hAtual=Math.min(Math.max(turnoAgora,SHIFT_START_DEC),SHIFT_END_DEC);
+  const turnoEncerrado=turnoAgora>SHIFT_END_DEC&&turnoAgora<SHIFT_START_DEC+24;
 
   // Helper: soma deltas já realizados de uma métrica
   const realizado=m=>sumHoraField(m,hd);
 
-  // Helper: adicionar horas a uma hora decimal e retornar string HH:MM
-  function addHoras(baseDecimal, horasExtra){
-    let total=baseDecimal+horasExtra;
-    // normalizar: turno vai de 17:30 até ~06:00 do dia seguinte
-    // base é decimal onde horas após meia-noite = 24+h (ex: 01:00 = 25)
-    // para exibir, pegar módulo 24
-    const totalMod=total%24;
-    const h=Math.floor(totalMod);
-    const m=Math.round((totalMod-h)*60);
-    const mFix=m>=60?59:m;
-    return h.toString().padStart(2,'0')+':'+mFix.toString().padStart(2,'0');
+  function fmtTurnoHora(dec){
+    const totalMod=((dec%24)+24)%24;
+    let h=Math.floor(totalMod);
+    let m=Math.round((totalMod-h)*60);
+    if(m>=60){h=(h+1)%24;m=0;}
+    return h.toString().padStart(2,'0')+':'+m.toString().padStart(2,'0');
   }
 
-  // Helper: hora decimal de string HH:MM
-  function horaDecimal(str){
-    if(!str||str==='—:—')return null;
-    const [h,m]=(str||'').split(':').map(Number);
-    if(isNaN(h))return null;
-    // Ajuste para turno noturno: horas após meia-noite (00-08) = 24+h
-    return h<12?24+h+m/60:h+m/60;
+  function fmtTermino(dec,falta){
+    if(!falta)return'✅ Concluído';
+    if(dec>SHIFT_END_DEC){
+      const atrasoMin=Math.round((dec-SHIFT_END_DEC)*60);
+      const h=Math.floor(atrasoMin/60);
+      const m=atrasoMin%60;
+      const atraso=(h?h+'h ':'')+(m?m+'min':'');
+      return'⚠ Após 04:00'+(atraso?` (+${atraso})`:'');
+    }
+    return fmtTurnoHora(dec);
   }
-
-  // Hora atual decimal (ajustada para turno noturno)
-  const hAtual=horaAtual<12?24+horaAtual:horaAtual;
 
   // ── SETORES ──────────────────────────────────────────────
   const setores=[];
@@ -2442,7 +2442,7 @@ function calcPrevisaoEncerramento(){
   setores.push({
     nome:'Correia Med.',cor:'#ff9500',icone:'🔴',
     prev:prevLM,real:realLM,falta:faltaLM,cap:capLM,
-    termino:faltaLM>0?addHoras(hAtual,tempoLM):'✅ Concluído',
+    termino:fmtTermino(hAtual+tempoLM,faltaLM),
     terminoDec:faltaLM>0?hAtual+tempoLM:hAtual,
     unidade:'linhas'
   });
@@ -2456,7 +2456,7 @@ function calcPrevisaoEncerramento(){
   setores.push({
     nome:'Correia Perf.',cor:'#ff9500',icone:'🔴',
     prev:prevLP,real:realLP,falta:faltaLP,cap:capLP,
-    termino:faltaLP>0?addHoras(hAtual,tempoLP):'✅ Concluído',
+    termino:fmtTermino(hAtual+tempoLP,faltaLP),
     terminoDec:faltaLP>0?hAtual+tempoLP:hAtual,
     unidade:'linhas'
   });
@@ -2471,7 +2471,7 @@ function calcPrevisaoEncerramento(){
   setores.push({
     nome:'Checkout',cor:'#00e5ff',icone:'🔵',
     prev:prevCK,real:realCK,falta:faltaCK,cap:capVC,
-    termino:faltaCK>0?addHoras(hAtual,tempoCK):'✅ Concluído',
+    termino:fmtTermino(hAtual+tempoCK,faltaCK),
     terminoDec:faltaCK>0?hAtual+tempoCK:hAtual,
     unidade:'vol'
   });
@@ -2485,7 +2485,7 @@ function calcPrevisaoEncerramento(){
   if(prevEsp>0)setores.push({
     nome:'Especial',cor:'#9b59b6',icone:'🟣',
     prev:prevEsp,real:realEsp,falta:faltaEsp,cap:capEsp,
-    termino:faltaEsp>0?addHoras(hAtual,tempoEsp):'✅ Concluído',
+    termino:fmtTermino(hAtual+tempoEsp,faltaEsp),
     terminoDec:faltaEsp>0?hAtual+tempoEsp:hAtual,
     unidade:'vol'
   });
@@ -2498,7 +2498,7 @@ function calcPrevisaoEncerramento(){
   if(prevEspFrac>0&&capEspFrac>0)setores.push({
     nome:'Esp. Frac.',cor:'#9b59b6',icone:'🟣',
     prev:prevEspFrac,real:realEspFrac,falta:faltaEspFrac,cap:capEspFrac,
-    termino:faltaEspFrac>0?addHoras(hAtual,faltaEspFrac/capEspFrac):'✅ Concluído',
+    termino:fmtTermino(hAtual+faltaEspFrac/capEspFrac,faltaEspFrac),
     terminoDec:faltaEspFrac>0?hAtual+faltaEspFrac/capEspFrac:hAtual,
     unidade:'vol'
   });
@@ -2511,7 +2511,7 @@ function calcPrevisaoEncerramento(){
   if(prevFrF>0)setores.push({
     nome:'Fraldas Cx Fech.',cor:'#4a90d9',icone:'🔷',
     prev:prevFrF,real:realFrF,falta:faltaFrF,cap:capFrF,
-    termino:faltaFrF>0?addHoras(hAtual,faltaFrF/capFrF):'✅ Concluído',
+    termino:fmtTermino(hAtual+faltaFrF/capFrF,faltaFrF),
     terminoDec:faltaFrF>0?hAtual+faltaFrF/capFrF:hAtual,
     unidade:'vol'
   });
@@ -2524,7 +2524,7 @@ function calcPrevisaoEncerramento(){
   if(prevFrFc>0)setores.push({
     nome:'Fraldas Frac.',cor:'#4a90d9',icone:'🔷',
     prev:prevFrFc,real:realFrFc,falta:faltaFrFc,cap:capFrFc,
-    termino:faltaFrFc>0?addHoras(hAtual,faltaFrFc/capFrFc):'✅ Concluído',
+    termino:fmtTermino(hAtual+faltaFrFc/capFrFc,faltaFrFc),
     terminoDec:faltaFrFc>0?hAtual+faltaFrFc/capFrFc:hAtual,
     unidade:'vol'
   });
@@ -2544,7 +2544,7 @@ function calcPrevisaoEncerramento(){
   setores.push({
     nome:'DOCA (Expedição)',cor:'#00e676',icone:'🟢',
     prev:prevDoca||day.pnVol||0,real:realDoca,falta:faltaDoca,cap:capVE,
-    termino:faltaDoca>0?addHoras(hAtual,tempoDoca):'✅ Concluído',
+    termino:fmtTermino(hAtual+tempoDoca,faltaDoca),
     terminoDec:faltaDoca>0?hAtual+tempoDoca:hAtual,
     unidade:'vol'
   });
@@ -2555,22 +2555,24 @@ function calcPrevisaoEncerramento(){
   let totalStr;
   if(terminoMax<=hAtual+0.1){
     totalStr='✅ Já encerrou!';
+  } else if(terminoMax>SHIFT_END_DEC){
+    totalStr=fmtTermino(terminoMax,1);
   } else {
-    const h=Math.floor(terminoMax%24);
-    const m=Math.round((terminoMax%24-h)*60);
-    totalStr=h.toString().padStart(2,'0')+':'+(m===60?'00':m.toString().padStart(2,'0'));
+    totalStr=fmtTurnoHora(terminoMax);
   }
 
   // ── RENDERIZAR PAINEL ─────────────────────────────────────
-  document.getElementById('prevEncHora').textContent=horaStr;
+  const baseInfo=hAtual!==turnoAgora?`${horaStr} (base ${fmtTurnoHora(hAtual)})`:horaStr;
+  document.getElementById('prevEncHora').textContent=baseInfo;
   document.getElementById('prevEncTotal').textContent=totalStr;
 
   const grid=document.getElementById('prevEncGrid');
   grid.innerHTML=setores.map(s=>{
     const pct=s.prev>0?Math.round(s.real/s.prev*100):0;
     const concluido=s.falta===0;
+    const estouraTurno=!concluido&&s.terminoDec>SHIFT_END_DEC;
     const urgente=!concluido&&s.terminoDec>hAtual+3;
-    const critico=!concluido&&s.terminoDec>hAtual+4;
+    const critico=estouraTurno||(!concluido&&s.terminoDec>hAtual+4);
     const bgCard=concluido?'rgba(0,180,80,.15)':critico?'rgba(180,20,20,.2)':urgente?'rgba(180,130,0,.15)':'rgba(0,100,180,.12)';
     const corTermino=concluido?'#00e676':critico?'#ff4c4c':urgente?'#ffd700':'#00e5ff';
     return`<div style="background:${bgCard};padding:8px 12px;border-right:1px solid rgba(155,89,182,.1);border-bottom:1px solid rgba(155,89,182,.1)">
@@ -2591,6 +2593,10 @@ function calcPrevisaoEncerramento(){
 
   // Observações automáticas
   const obs=[];
+  if(turnoAgora<SHIFT_START_DEC)obs.push('ℹ Turno noturno começa às 17:30 — cálculo usando 17:30 como base');
+  if(turnoEncerrado)obs.push('ℹ Turno operacional encerra às 04:00 — cálculo usando 04:00 como base');
+  const setoresForaTurno=setores.filter(s=>s.falta>0&&s.terminoDec>SHIFT_END_DEC);
+  if(setoresForaTurno.length>0)obs.push(`⚠ Previsão fora do turno (após 04:00): ${setoresForaTurno.map(s=>s.nome).join(', ')}`);
   const setoresCriticos=setores.filter(s=>s.falta>0&&s.terminoDec>hAtual+4);
   if(setoresCriticos.length>0)obs.push(`⚠ Setores críticos (>4h restantes): ${setoresCriticos.map(s=>s.nome).join(', ')}`);
   const docaSetor=setores.find(s=>s.nome==='DOCA (Expedição)');
