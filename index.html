@@ -1813,6 +1813,8 @@ function readHoraData(){
 }
 function readFormAsDay(){
   const dt=document.getElementById('iData').value;if(!dt)return null;
+  const existing=getDay(dt);
+  const savedRotas=existing&&Array.isArray(existing.rotas)?JSON.parse(JSON.stringify(existing.rotas)):null;
   return{
     date:dt,
     pnVol:+document.getElementById('iPNVol').value||0,
@@ -1855,7 +1857,8 @@ function readFormAsDay(){
     capVE:+document.getElementById('iCapVE').value||1303,
     rOnco:+document.getElementById('iROnco').value||0,rOncoT:+document.getElementById('iROncoT').value||0,
     rJuncao:+document.getElementById('iRJuncao').value||0,rDoc:+document.getElementById('iRDoc').value||0,
-    hd:readHoraData()
+    hd:readHoraData(),
+    ...(savedRotas?{rotas:savedRotas}:{})
   };
 }
 function loadFormFrom(day){
@@ -2000,7 +2003,6 @@ function saveRotaField(cod,field,val){
   save();
   updateRotasKPIs(day);
   renderRotasTbl(day,'rotasTbl');
-  renderRotasTbl(day,'rotasTblFull');
 }
 
 function calcAtraso(hPrev,hReal){
@@ -2024,6 +2026,9 @@ function fmtAtraso(min){
 }
 
 // Inline input style helper
+function escAttr(v){
+  return String(v??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 const inpS='background:#0d1c2e;border:1px solid #1e4a72;color:#fff;padding:2px 4px;border-radius:3px;font-size:10px;width:100%;box-sizing:border-box';
 const inpSG=inpS.replace('#fff','#00e676'); // green for horário realizado
 
@@ -2059,30 +2064,30 @@ function renderRotasTbl(day,tblId){
       <td class="td-cidade">${r.cidade}</td>
       <td style="text-align:center">
         ${editable
-          ?`<input type="text" value="${r.placa}" onchange="saveRotaField('${r.cod}','placa',this.value.toUpperCase())" style="${inpS};text-transform:uppercase;text-align:center" placeholder="PLACA"/>`
+          ?`<input type="text" value="${escAttr(r.placa)}" oninput="this.value=this.value.toUpperCase();saveRotaField('${r.cod}','placa',this.value)" onchange="renderRotasTblFull(getDay(curDate))" style="${inpS};text-transform:uppercase;text-align:center" placeholder="PLACA"/>`
           :`<span style="font-family:monospace;color:#c0d8f0">${r.placa||'—'}</span>`}
       </td>
       <td style="text-align:center">
         ${editable
-          ?`<input type="number" value="${r.vol||''}" oninput="saveRotaField('${r.cod}','vol',+this.value)" style="${inpS};text-align:center" placeholder="0"/>`
+          ?`<input type="number" value="${r.vol||''}" oninput="saveRotaField('${r.cod}','vol',+this.value)" onchange="renderRotasTblFull(getDay(curDate))" style="${inpS};text-align:center" placeholder="0"/>`
           :`<span style="font-weight:bold">${r.vol?r.vol.toLocaleString('pt-BR'):'—'}</span>`}
       </td>
       <td style="text-align:center">
         ${editable
-          ?`<input type="number" value="${r.paletes||''}" oninput="saveRotaField('${r.cod}','paletes',+this.value)" style="${inpS};text-align:center" placeholder="0"/>`
+          ?`<input type="number" value="${r.paletes||''}" oninput="saveRotaField('${r.cod}','paletes',+this.value)" onchange="renderRotasTblFull(getDay(curDate))" style="${inpS};text-align:center" placeholder="0"/>`
           :`${r.paletes||'—'}`}
       </td>
       <td style="color:#ffd700;font-weight:bold;text-align:center">${r.hPrev}</td>
       <td style="text-align:center">
         ${editable
-          ?`<input type="time" value="${r.hReal}" oninput="saveRotaField('${r.cod}','hReal',this.value)" style="${inpSG};text-align:center"/>`
+          ?`<input type="time" value="${escAttr(r.hReal)}" oninput="saveRotaField('${r.cod}','hReal',this.value)" onchange="renderRotasTblFull(getDay(curDate))" style="${inpSG};text-align:center"/>`
           :`<span style="color:#00e676;font-weight:bold">${r.hReal||'—'}</span>`}
       </td>
       <td style="text-align:center;color:${atrColor};font-weight:bold">${fmtAtraso(atr)}</td>
       <td style="text-align:center"><span class="${stClass}">${stLabel}</span></td>
       <td style="text-align:left">
         ${editable
-          ?`<input type="text" value="${r.obs||''}" onchange="saveRotaField('${r.cod}','obs',this.value)" style="${inpS}" placeholder="Observação..."/>`
+          ?`<input type="text" value="${escAttr(r.obs||'')}" oninput="saveRotaField('${r.cod}','obs',this.value)" onchange="renderRotasTblFull(getDay(curDate))" style="${inpS}" placeholder="Observação..."/>`
           :`<span style="color:#89b4d4;font-size:10px">${r.obs||''}</span>`}
       </td>
     </tr>`;
