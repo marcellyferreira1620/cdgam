@@ -991,6 +991,34 @@ function selectDay(dt){
   if(adminOk)loadFormFrom(day||emptyDay(dt));
 }
 
+function activeTab(){
+  const el=document.querySelector('.tab-body.act');
+  return el&&el.id?el.id.replace('tb-',''):'dash';
+}
+
+function isEditingDataField(){
+  const el=document.activeElement;
+  return !!(el&&['INPUT','TEXTAREA','SELECT'].includes(el.tagName)&&el.closest('#tb-adm,#tb-preench,#tb-rotas'));
+}
+
+function refreshFromDb(){
+  const latest=latestDay();
+  let day=getDay(curDate);
+  if(!day&&latest){curDate=latest.date;day=latest;}
+  buildDayNav();
+  if(day){
+    renderKPIs(day);renderFlowBar(day);renderDashCharts(day);renderDashTables(day);
+    renderRotasTbl(day,'rotasTbl');renderRotasTbl(day,'rotasTblFull');updateRotasKPIs(day);
+  }
+  const tab=activeTab();
+  if(tab==='hist')renderHist();
+  if(tab==='comp')renderComp();
+  if(tab==='rotas')renderRotasTab();
+  if(tab==='preench'&&!isEditingDataField())renderPreench();
+  if(adminOk&&tab==='adm'&&!isEditingDataField())loadFormFrom(day||emptyDay(curDate||today()));
+  if(currentUser&&currentUser.role==='admin')renderUsersList();
+}
+
 // ── KPIs ──────────────────────────────────────────────────
 function renderKPIs(day){
   const perc=day.meta>0?Math.round(day.acum/day.meta*100):0;
@@ -2109,10 +2137,11 @@ const SB_URL_DEFAULT='https://pbvpgqbxlofqkovsjjdn.supabase.co';
 const SB_KEY_DEFAULT='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBidnBncWJ4bG9mcWtvdnNqamRuIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk4OTEzOTksImV4cCI6MjA5NTQ2NzM5OX0.Ob6_w_6mI804QKHmVyrJtUxj9EsG5Uq9aVHBQWwsW8E';
 let sbUrl=localStorage.getItem('gam_sb_url')||SB_URL_DEFAULT;
 let sbKey=localStorage.getItem('gam_sb_key')||SB_KEY_DEFAULT;
-let sbConnected=false,sbSyncing=false,sbPollTimer=null,sbLastTs=0;
+let sbConnected=false,sbSyncing=false,sbPollTimer=null,sbLastTs=0,sbLoadRunning=false,sbFastSyncReady=false;
 let sbSaveRunning=false,sbSaveQueued=false;
 const SB_TABLE='cdgam_data';
 const SB_ROW_ID='main';
+const SB_POLL_MS=2000;
 
 function sbHeaders(){return{'apikey':sbKey,'Authorization':'Bearer '+sbKey,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'};}
 
@@ -2234,6 +2263,38 @@ async function sbSaveUsers(users){
   return false;
 }
 
+async function syncFromCloud(showOk){
+  if(!sbConnected||sbSyncing||sbLoadRunning)return false;
+  sbLoadRunning=true;
+  try{
+    const updated=await sbLoad();
+    if(updated){
+      refreshFromDb();
+      if(showOk){
+        showSyncStatus('☁ Sincronizado ✓',false);
+        setTimeout(()=>showSyncStatus('☁ Nuvem ativa ✓',false),1200);
+      }
+    }
+    return updated;
+  }finally{
+    sbLoadRunning=false;
+  }
+}
+
+function startSbPolling(){
+  if(sbPollTimer)clearInterval(sbPollTimer);
+  sbPollTimer=setInterval(()=>syncFromCloud(true),SB_POLL_MS);
+}
+
+function installFastSyncTriggers(){
+  if(sbFastSyncReady)return;
+  sbFastSyncReady=true;
+  window.addEventListener('focus',()=>syncFromCloud(true));
+  document.addEventListener('visibilitychange',()=>{
+    if(!document.hidden)syncFromCloud(true);
+  });
+}
+
 async function sbConnect(){
   sbUrl=localStorage.getItem('gam_sb_url')||SB_URL_DEFAULT;
   sbKey=localStorage.getItem('gam_sb_key')||SB_KEY_DEFAULT;
@@ -2253,37 +2314,18 @@ async function sbConnect(){
       return;
     }
     sbConnected=true;
+    installFastSyncTriggers();
     // Carregar dados remotos na inicialização
     const updated=await sbLoad();
     if(updated){
-      // Re-render com dados da nuvem
-      const latest=latestDay();
-      if(latest){
-        curDate=latest.date;
-        buildDayNav();
-        renderKPIs(latest);renderFlowBar(latest);renderDashCharts(latest);renderDashTables(latest);
-      }
+      refreshFromDb();
       showSyncStatus('☁ Dados carregados da nuvem ✓',false);
     } else {
       showSyncStatus('☁ Nuvem ativa ✓',false);
       // Se temos dados locais e nuvem vazia, salvar para a nuvem
       if(db.days&&db.days.length>0)await sbSave();
     }
-    // Polling a cada 30s para sincronização em tempo real entre computadores
-    if(sbPollTimer)clearInterval(sbPollTimer);
-    sbPollTimer=setInterval(async()=>{
-      if(!sbSyncing){
-        const upd=await sbLoad();
-        if(upd){
-          const latest=latestDay();const cur=getDay(curDate);
-          buildDayNav();
-          if(cur){renderKPIs(cur);renderFlowBar(cur);renderDashCharts(cur);renderDashTables(cur);}
-          else if(latest){renderKPIs(latest);renderFlowBar(latest);renderDashCharts(latest);renderDashTables(latest);}
-          showSyncStatus('☁ Sincronizado ✓',false);
-          setTimeout(()=>showSyncStatus('☁ Nuvem ativa ✓',false),2000);
-        }
-      }
-    },30000);
+    startSbPolling();
     // Badge ao vivo
     const lb=document.getElementById('liveBadge');if(lb)lb.style.display='inline';
   }catch(e){
@@ -2322,9 +2364,8 @@ async function saveSyncConfig(){
         await sbSave();
         showSyncStatus('☁ Nuvem ativa ✓',false);
         const lb=document.getElementById('liveBadge');if(lb)lb.style.display='inline';
-        // Iniciar polling
-        if(sbPollTimer)clearInterval(sbPollTimer);
-        sbPollTimer=setInterval(async()=>{if(!sbSyncing){await sbLoad();}},30000);
+        installFastSyncTriggers();
+        startSbPolling();
       },1200);
     }else{
       const err=await r.json().catch(()=>({}));
