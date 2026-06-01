@@ -787,11 +787,11 @@ function applyRemoteData(remote){
   }
 }
 
-function save(){
+function save(replaceDays=false){
   localStorage.setItem(SK,JSON.stringify(db));
   // Supabase tem prioridade
   if(typeof sbUrl!=='undefined'&&sbUrl&&sbKey&&sbConnected){
-    sbSave();
+    sbSave(replaceDays);
   } else if(fbConnected&&fbDb){
     isSaving=true;
     const ts=Date.now();
@@ -1920,7 +1920,7 @@ function saveDay(){
 function delCurrentDay(){
   const dt=document.getElementById('iData').value;if(!dt)return;
   if(!confirm(`Excluir ${fmtDate(dt)}?`))return;
-  db.days=db.days.filter(d=>d.date!==dt);save();
+  db.days=db.days.filter(d=>d.date!==dt);save(true);
   const latest=latestDay();curDate=latest?latest.date:null;buildDayNav();
   if(latest){renderKPIs(latest);renderFlowBar(latest);renderDashCharts(latest);renderDashTables(latest);}
   prepNewDay();alert('🗑 Dia excluído.');
@@ -2140,7 +2140,7 @@ const SB_KEY_DEFAULT='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZ
 let sbUrl=localStorage.getItem('gam_sb_url')||SB_URL_DEFAULT;
 let sbKey=localStorage.getItem('gam_sb_key')||SB_KEY_DEFAULT;
 let sbConnected=false,sbSyncing=false,sbPollTimer=null,sbLastTs=0,sbLoadRunning=false,sbFastSyncReady=false;
-let sbSaveRunning=false,sbSaveQueued=false;
+let sbSaveRunning=false,sbSaveQueued=false,sbReplaceDaysQueued=false;
 const SB_TABLE='cdgam_data';
 const SB_ROW_ID='main';
 const SB_POLL_MS=2000;
@@ -2166,21 +2166,24 @@ async function sbWritePayload(payload,ts){
   return r;
 }
 
-async function sbSave(){
+async function sbSave(replaceDays=false){
   if(!sbUrl||!sbKey)return;
+  if(replaceDays)sbReplaceDaysQueued=true;
   if(sbSaveRunning){sbSaveQueued=true;return;}
   sbSaveRunning=true;
   sbSyncing=true;
   try{
     do{
       sbSaveQueued=false;
+      const replaceDaysNow=sbReplaceDaysQueued;
+      sbReplaceDaysQueued=false;
       const ts=Date.now();
       sbLastTs=ts;
       try{
         const remote=await sbReadPayload()||{};
         const payload={
           ...remote,
-          days:mergeDays(remote.days,db.days),
+          days:replaceDaysNow?[...db.days].sort((a,b)=>a.date.localeCompare(b.date)):mergeDays(remote.days,db.days),
           users:remote.users||getLocalUsersCache(),
           savedAt:ts
         };
@@ -2197,7 +2200,7 @@ async function sbSave(){
         showSyncStatus('⚠ Sem internet — salvo local',true);
       }
     }
-    while(sbSaveQueued);
+    while(sbSaveQueued||sbReplaceDaysQueued);
   }finally{
     sbSyncing=false;
     sbSaveRunning=false;
