@@ -2571,21 +2571,15 @@ function calcPrevisaoEncerramento(){
     unidade:'vol'
   });
 
-  // 8. DOCA — soma de TODOS os volumes que precisam ser expedidos
+  // 8. DOCA — usa o campo manual "Doca (vol.)" como previsto de expedição
   const capVE=day.capVE||1303;
-  // Previsto doca = todos os volumes
-  const prevDoca=(day.pnCorreia||0)+(day.pnEspecial||0)+(day.pnEspFrac||0)+
-    (day.pnEspMed||0)+(day.pnEspPerf||0)+(day.pnFraldaF||0)+(day.pnFralda||0)+
-    (day.pnJuncao||0)+(day.pnDoca||0);
-  // Real doca = o que já foi expedido (Vol. Doca)
+  const prevDoca=day.pnDoca||day.pnVol||0;
   const realDoca=realizado('Vol. Doca');
-  // Falta doca = tudo que ainda vai chegar da correia/especial + o que já chegou mas não expediu
-  // = (previsto total - já expedido)
-  const faltaDoca=Math.max((prevDoca||day.pnVol||0)-realDoca,0);
+  const faltaDoca=Math.max(prevDoca-realDoca,0);
   const tempoDoca=faltaDoca>0?faltaDoca/capVE:0;
   setores.push({
     nome:'DOCA (Expedição)',cor:'#00e676',icone:'🟢',
-    prev:prevDoca||day.pnVol||0,real:realDoca,falta:faltaDoca,cap:capVE,
+    prev:prevDoca,real:realDoca,falta:faltaDoca,cap:capVE,
     termino:fmtTermino(hAtual+tempoDoca,faltaDoca),
     terminoDec:faltaDoca>0?hAtual+tempoDoca:hAtual,
     unidade:'vol'
