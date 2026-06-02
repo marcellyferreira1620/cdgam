@@ -352,7 +352,7 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
     </div>
     <div class="chart-box">
       <div class="chart-ttl">
-        <span>Volumes por Tipo — Realizado vs Previsão Noturna</span>
+        <span>Volumes por Tipo — Realizado vs Previsão Noturna <small style="font-size:9px;color:#6a9fc0;font-weight:normal">(base 21:30)</small></span>
         <span style="font-size:9px;font-weight:normal"><span style="color:#ff9500">■</span>Correia <span style="color:#9b59b6">■</span>Especial <span style="color:#4a90d9">■</span>Fralda <span style="color:#00e5ff">■</span>Gelad. <span style="color:#00e676">■</span>CK <span style="color:#e94560">■</span>Doca &nbsp;|&nbsp; <span style="color:#ffd700">■</span>atenção <span style="color:#e94560">■</span>crítico <span style="color:rgba(255,255,255,.15)">■</span>pendente</span>
       </div>
       <div style="position:relative;height:310px"><canvas id="cVolTipo" role="img" aria-label="Volumes por tipo"></canvas></div>
@@ -564,6 +564,8 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
         <div class="real-auto-grid" id="realAutoGrid"></div>
         <div style="border-top:1px solid #1a3550;padding-top:6px;margin-top:4px">
           <h4 style="color:#89b4d4;font-size:10px;margin-bottom:6px">MANUAL — volumes sem linha hora a hora</h4>
+          <div class="adm-row"><label>Real. Cx Fech. Psico (vol.)</label><input type="number" id="iRPsico" placeholder="0" oninput="liveUpdate()"/></div>
+          <div class="adm-row"><label>Real. Geladeira (vol.)</label><input type="number" id="iRGel" placeholder="0" oninput="liveUpdate()"/></div>
           <div class="adm-row"><label>Real. Oncológico (vol.)</label><input type="number" id="iROnco" placeholder="0" oninput="liveUpdate()"/></div>
           <div class="adm-row"><label>Real. Onco Termolábil</label><input type="number" id="iROncoT" placeholder="0" oninput="liveUpdate()"/></div>
           <div class="adm-row"><label>Real. Junção (vol.)</label><input type="number" id="iRJuncao" placeholder="0" oninput="liveUpdate()"/></div>
@@ -925,7 +927,7 @@ function emptyDay(dt){
     capLM:3500,capLP:3000,capErros:2500,capVC:1280,capLC:6500,capUC:20800,
     capVales:1,
     capEsp:340,capEspFrac:0,capEspMed:0,capEspPerf:0,capFrF:114,capFrFc:89,capVE:1303,
-    rOnco:0,rOncoT:0,rJuncao:0,rDoc:0,
+    rPsico:0,rGel:0,rOnco:0,rOncoT:0,rJuncao:0,rDoc:0,
     hd
   };
 }
@@ -1151,39 +1153,28 @@ function renderDashCharts(day){
       scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},
               y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'}}}}});
 
-  // Volumes por Tipo — usa previsão noturna como 100%
+  // Volumes por Tipo — 100% = volumes previstos por tipo preenchidos ate 21:30
   const sumH=m=>sumHoraField(m,hd);
-
-  // AGRUPAMENTOS conforme fluxo real da operação:
-  // Correia = Linhas Med. + Linhas Perf. → vai para o Checkout
-  const rCorreia = sumH('Linhas Med.') + sumH('Linhas Perf.');
-  // Especial = Especial + Cx Fech. Psico + Espec. Frac. + Espec. Med. + Espec. Perf. + Fraldas Cx Fech.
-  const rEspecial = (day.pnEspecial||0)>0 ? sumH('Vol. Psico CK') : 0; // hora a hora do grupo especial via Psico CK
-  const prevEspecial = (day.pnEspecial||0)+(day.pnPsico||0)+(day.pnEspFrac||0)+(day.pnEspMed||0)+(day.pnEspPerf||0)+(day.pnFraldaF||0);
-  // Geladeira = Geladeira + Oncológico + Onco Termolábil
-  const rGeladeira = (day.rOnco||0) + (day.rOncoT||0);
-  const prevGeladeira = (day.pnGel||0)+(day.pnOnco||0)+(day.pnOncoT||0);
-  // Checkout = Correia + Junção (o que passa pelo checkout)
+  const realCheckout=sumH('Vol. Checkout');
+  const realCorreia=day.pnCorreia>0?Math.min(realCheckout,day.pnCorreia):realCheckout;
   const prevCheckout = (day.pnCorreia||0)+(day.pnJuncao||0);
-  // DOCA = tudo expedido (soma de todos os setores)
-  const rDoca = sumH('Vol. Expedição');
-  const prevDoca = day.pnDoca||0;
+  const realDoca=Math.max(sumH('Vol. Doca'),day.rDoc||0);
 
   const volDefs=[
-    {lbl:'01 - CORREIA',              real:rCorreia,              prev:day.pnCorreia||0,  cor:'correia'},
-    {lbl:'09 - CX FECH. PSICO',       real:day.rJuncao||0,        prev:day.pnPsico||0,    cor:'especial'},
-    {lbl:'02 - ESPECIAL',             real:0,                     prev:day.pnEspecial||0, cor:'especial'},
-    {lbl:'14 - ESPECIAL FRAC.',       real:0,                     prev:day.pnEspFrac||0,  cor:'especial'},
-    {lbl:'04 - ESPECIAL MED.',        real:0,                     prev:day.pnEspMed||0,   cor:'especial'},
-    {lbl:'03 - ESPECIAL PERF.',       real:0,                     prev:day.pnEspPerf||0,  cor:'especial'},
-    {lbl:'06 - FRALDAS',              real:0,                     prev:day.pnFralda||0,   cor:'fralda'},
-    {lbl:'10 - FRALDAS CX FECH.',     real:0,                     prev:day.pnFraldaF||0,  cor:'especial'},
-    {lbl:'05 - GELADEIRA',            real:rGeladeira,            prev:day.pnGel||0,      cor:'gelad'},
+    {lbl:'01 - CORREIA',              real:realCorreia,                 prev:day.pnCorreia||0,  cor:'correia'},
+    {lbl:'09 - CX FECH. PSICO',       real:day.rPsico||0,               prev:day.pnPsico||0,    cor:'especial'},
+    {lbl:'02 - ESPECIAL',             real:sumH('Vol. Especial'),       prev:day.pnEspecial||0, cor:'especial'},
+    {lbl:'14 - ESPECIAL FRAC.',       real:sumH('Vol. Esp. Frac.'),     prev:day.pnEspFrac||0,  cor:'especial'},
+    {lbl:'04 - ESPECIAL MED.',        real:sumH('Vol. Esp. Med.'),      prev:day.pnEspMed||0,   cor:'especial'},
+    {lbl:'03 - ESPECIAL PERF.',       real:sumH('Vol. Esp. Perf.'),     prev:day.pnEspPerf||0,  cor:'especial'},
+    {lbl:'06 - FRALDAS',              real:sumH('Vol. Fraldas Frac.'),  prev:day.pnFralda||0,   cor:'fralda'},
+    {lbl:'10 - FRALDAS CX FECH.',     real:sumH('Vol. Fraldas Cx Fech.'),prev:day.pnFraldaF||0, cor:'especial'},
+    {lbl:'05 - GELADEIRA',            real:day.rGel||0,                 prev:day.pnGel||0,      cor:'gelad'},
     {lbl:'15 - ONCOLÓGICO',           real:day.rOnco||0,          prev:day.pnOnco||0,     cor:'gelad'},
     {lbl:'16 - ONCO TERMOLÁBIL',      real:day.rOncoT||0,         prev:day.pnOncoT||0,    cor:'gelad'},
-    {lbl:'22 - CONTROLE QUALIDADE',   real:sumH('Vol. Checkout'), prev:prevCheckout,      cor:'checkout'},
+    {lbl:'22 - CONTROLE QUALIDADE',   real:realCheckout,          prev:prevCheckout,      cor:'checkout'},
     {lbl:'23 - JUNÇÃO',               real:day.rJuncao||0,        prev:day.pnJuncao||0,   cor:'checkout'},
-    {lbl:'24 - DOCA',                 real:rDoca,                 prev:prevDoca,          cor:'doca'},
+    {lbl:'24 - DOCA',                 real:realDoca,              prev:day.pnDoca||0,     cor:'doca'},
   ];
 
   // cores por grupo
@@ -1243,19 +1234,26 @@ function renderDashCharts(day){
     const ctx2=volChart.ctx;
     ctx2.save();
     volChart.data.datasets[0].data.forEach((val,i)=>{
-      if(val===0&&realVals[i]===0)return;
       const d=volDefs[i];
-      const meta=volChart.getDatasetMeta(0);
+      const showReal=d.real>0;
+      const showPrev=!showReal&&d.prev>0;
+      if(!showReal&&!showPrev)return;
+      const meta=volChart.getDatasetMeta(showReal?0:1);
       const bar=meta.data[i];
       if(!bar)return;
       const p=d.prev>0?Math.round(d.real/d.prev*100):null;
-      const txt=d.real.toLocaleString('pt-BR')+(p!==null?' ('+p+'%)':'');
-      ctx2.fillStyle='#fff';
+      const txt=showReal
+        ?d.real.toLocaleString('pt-BR')+(p!==null?' ('+p+'%)':'')
+        :'Prev. '+d.prev.toLocaleString('pt-BR');
+      ctx2.fillStyle=showReal?'#fff':'#89b4d4';
       ctx2.font='bold 10px Arial';
       ctx2.textAlign='left';
       ctx2.textBaseline='middle';
-      const x=bar.x-bar.width/2+6;
-      if(bar.width>40)ctx2.fillText(txt,x,bar.y);
+      const start=Number.isFinite(bar.base)?bar.base:bar.x-(bar.width||0);
+      const end=bar.x;
+      const w=Math.abs(end-start);
+      const x=Math.min(start,end)+6;
+      if(w>42)ctx2.fillText(txt,x,bar.y);
     });
     ctx2.restore();
   };
@@ -1886,6 +1884,7 @@ function readFormAsDay(){
     capFrF:+document.getElementById('iCapFrF').value||114,
     capFrFc:+document.getElementById('iCapFrFc').value||89,
     capVE:+document.getElementById('iCapVE').value||1303,
+    rPsico:+document.getElementById('iRPsico').value||0,rGel:+document.getElementById('iRGel').value||0,
     rOnco:+document.getElementById('iROnco').value||0,rOncoT:+document.getElementById('iROncoT').value||0,
     rJuncao:+document.getElementById('iRJuncao').value||0,rDoc:+document.getElementById('iRDoc').value||0,
     hd:readHoraData(),
@@ -1917,6 +1916,7 @@ function loadFormFrom(day){
   s('iCapEspMed',day.capEspMed||0);s('iCapEspPerf',day.capEspPerf||0);
   s('iCapFrF',day.capFrF||114);s('iCapFrFc',day.capFrFc||89);
   s('iCapVE',day.capVE||1303);
+  s('iRPsico',day.rPsico||'');s('iRGel',day.rGel||'');
   s('iROnco',day.rOnco||'');s('iROncoT',day.rOncoT||'');
   s('iRJuncao',day.rJuncao||'');s('iRDoc',day.rDoc||'');
   buildHoraTable(day.hd);
