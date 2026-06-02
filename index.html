@@ -694,6 +694,7 @@ const REAL_AUTO=[
 
 const SK='cdgam_v6';
 const PWD='gam2025';
+const NEW_RULES_FROM='2026-06-02';
 let db={days:[]};
 let curDate=null;
 let adminOk=false;
@@ -934,6 +935,14 @@ function emptyDay(dt){
 function today(){return new Date().toISOString().slice(0,10);}
 function fmtDate(d){return new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'});}
 function fmtDateShort(d){return new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});}
+function currentFormDate(){const el=document.getElementById('iData');return el&&el.value?el.value:(curDate||today());}
+function useNewRules(dt){return String(dt||currentFormDate())>=NEW_RULES_FROM;}
+function hourTargetFactor(i){return i===0?0.5:1;}
+function capForHour(metric,cap,i,dt){
+  if(!cap)return cap;
+  if(useNewRules(dt)&&['Linhas Med.','Linhas Perf.'].includes(metric))return cap*hourTargetFactor(i);
+  return cap;
+}
 function getDay(dt){return db.days.find(d=>d.date===dt)||null;}
 function sortedDays(){return [...db.days].sort((a,b)=>a.date.localeCompare(b.date));}
 function latestDay(){const s=sortedDays();return s.length?s[s.length-1]:null;}
@@ -1527,8 +1536,9 @@ function renderDashTables(day){
         if(dimmed){bg='background:#071525';style='color:#2a3a4a';}
         else if(cap&&v!==''){
           const n=+v;
-          if(isInv){bg=n>cap?'background:rgba(200,20,20,.5)':n>cap*.8?'background:rgba(180,130,0,.25)':'background:rgba(0,120,60,.25)';style=n>cap?'color:#ff4c4c;font-weight:bold':n>cap*.8?'color:#ffd700':'color:#00e676';}
-          else{const p=n/cap;bg=p>=1.05?'background:rgba(0,180,80,.3)':p>=.9?'background:rgba(0,120,60,.2)':p>=.7?'background:rgba(180,130,0,.2)':'background:rgba(180,30,30,.3)';style=p>=1.05?'color:#00e676;font-weight:bold':p>=.9?'color:#7ddc9f':p>=.7?'color:#ffd700':'color:#ff7070';}
+          const capH=capForHour(m,cap,i,day.date);
+          if(isInv){bg=n>capH?'background:rgba(200,20,20,.5)':n>capH*.8?'background:rgba(180,130,0,.25)':'background:rgba(0,120,60,.25)';style=n>capH?'color:#ff4c4c;font-weight:bold':n>capH*.8?'color:#ffd700':'color:#00e676';}
+          else{const p=n/capH;bg=p>=1.05?'background:rgba(0,180,80,.3)':p>=.9?'background:rgba(0,120,60,.2)':p>=.7?'background:rgba(180,130,0,.2)':'background:rgba(180,30,30,.3)';style=p>=1.05?'color:#00e676;font-weight:bold':p>=.9?'color:#7ddc9f':p>=.7?'color:#ffd700':'color:#ff7070';}
         }
         const isExtra=isCK&&i>=H_CK;
         h2+=`<td style="text-align:center;${bg}" title="${isExtra?'⚡ Hora extra':''}"><span style="${style}">${v!==''?v:isExtra?'·':'-'}</span></td>`;
@@ -1762,8 +1772,9 @@ function buildHoraTable(hd){
         let bg='';
         if(cap&&vDelta!==null){
           const n=vDelta;
-          if(isInv){bg=n>cap?'background:rgba(200,20,20,.55)':n>cap*.8?'background:rgba(180,130,0,.4)':'background:rgba(0,100,50,.45)';}
-          else{const p=n/cap;bg=p>=1.05?'background:rgba(0,180,80,.45)':p>=.9?'background:rgba(0,120,60,.35)':p>=.7?'background:rgba(180,130,0,.4)':'background:rgba(180,20,20,.5)';}
+          const capH=capForHour(m,cap,i,currentFormDate());
+          if(isInv){bg=n>capH?'background:rgba(200,20,20,.55)':n>capH*.8?'background:rgba(180,130,0,.4)':'background:rgba(0,100,50,.45)';}
+          else{const p=n/capH;bg=p>=1.05?'background:rgba(0,180,80,.45)':p>=.9?'background:rgba(0,120,60,.35)':p>=.7?'background:rgba(180,130,0,.4)':'background:rgba(180,20,20,.5)';}
         }
         const isCKMetric=['Linhas Med.','Linhas Perf.','Erros Sep. Med.','Vol. Checkout','Linhas Checkout','Unid. Checkout'].includes(m);
         const isExtra=isCKMetric&&i>=H_CK;
@@ -1808,18 +1819,20 @@ function colorCellByDelta(inp,m,delta){
   const isInv=MHORA_INV.includes(m);
   const capEl=document.getElementById(CAP_MAP[m]);const cap=capEl&&capEl.value!==''?+capEl.value:null;
   if(!cap||delta===''||delta===null){inp.parentNode.style.background='';return;}
+  const capH=capForHour(m,cap,+inp.dataset.i,currentFormDate());
   const n=+delta;
-  if(isInv){inp.parentNode.style.background=n>cap?'rgba(200,20,20,.55)':n>cap*.8?'rgba(180,130,0,.4)':'rgba(0,100,50,.45)';}
-  else{const p=n/cap;inp.parentNode.style.background=p>=1.05?'rgba(0,180,80,.45)':p>=.9?'rgba(0,120,60,.35)':p>=.7?'rgba(180,130,0,.4)':'rgba(180,20,20,.5)';}
+  if(isInv){inp.parentNode.style.background=n>capH?'rgba(200,20,20,.55)':n>capH*.8?'rgba(180,130,0,.4)':'rgba(0,100,50,.45)';}
+  else{const p=n/capH;inp.parentNode.style.background=p>=1.05?'rgba(0,180,80,.45)':p>=.9?'rgba(0,120,60,.35)':p>=.7?'rgba(180,130,0,.4)':'rgba(180,20,20,.5)';}
 }
 
 function colorCell(inp){
   const m=inp.dataset.m;const isInv=MHORA_INV.includes(m);
   const capEl=document.getElementById(CAP_MAP[m]);const cap=capEl&&capEl.value!==''?+capEl.value:null;
   if(!cap){inp.parentNode.style.background='';return;}
+  const capH=capForHour(m,cap,+inp.dataset.i,currentFormDate());
   const v=inp.value!==''?+inp.value:null;if(v===null){inp.parentNode.style.background='';return;}
-  if(isInv){inp.parentNode.style.background=v>cap?'rgba(200,20,20,.55)':v>cap*.8?'rgba(180,130,0,.4)':'rgba(0,100,50,.45)';}
-  else{const p=v/cap;inp.parentNode.style.background=p>=1.05?'rgba(0,180,80,.45)':p>=.9?'rgba(0,120,60,.35)':p>=.7?'rgba(180,130,0,.4)':'rgba(180,20,20,.5)';}
+  if(isInv){inp.parentNode.style.background=v>capH?'rgba(200,20,20,.55)':v>capH*.8?'rgba(180,130,0,.4)':'rgba(0,100,50,.45)';}
+  else{const p=v/capH;inp.parentNode.style.background=p>=1.05?'rgba(0,180,80,.45)':p>=.9?'rgba(0,120,60,.35)':p>=.7?'rgba(180,130,0,.4)':'rgba(180,20,20,.5)';}
 }
 
 function readHoraData(){
