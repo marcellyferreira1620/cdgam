@@ -1767,7 +1767,7 @@ function buildHoraTable(hd){
         const deltaHint=useDelta?`<div class="delta-hint ${vDelta===null?'delta-empty':''}">${deltaHintHtml(vDelta)}</div>`:'';
         html+=`<td class="hora-cell" style="${bg};${extraStyle}" title="${isExtra?'⚡ Hora extra — ':''}${useDelta?'Resultado da hora = acumulado atual - acumulado anterior':''}">
           <input class="${useDelta?'hora-acum-input':''}" type="number" data-m="${m}" data-i="${i}" data-use-delta="${useDelta?1:0}" value="${vDisplay}" placeholder="-"
-            oninput="onHoraInput(this);liveUpdate()"
+            oninput="onHoraInput(this);persistDayNow();liveUpdate()"
             style="${isExtra?'opacity:0.75':''}"/>
           ${deltaHint}
         </td>`;
@@ -1925,16 +1925,23 @@ function loadFormFrom(day){
 function prepNewDay(){loadFormFrom(emptyDay(today()));}
 // Auto-save debounce timer
 let autoSaveTimer=null;
+function persistDayNow(){
+  const day=readFormAsDay();
+  if(!day)return null;
+  const idx=db.days.findIndex(d=>d.date===day.date);
+  const wasNew=idx<0;
+  if(idx>=0)db.days[idx]=day;else db.days.push(day);
+  db.days.sort((a,b)=>a.date.localeCompare(b.date));
+  curDate=day.date;
+  save();
+  if(wasNew)buildDayNav();
+  return day;
+}
 function autoSave(){
   clearTimeout(autoSaveTimer);
   autoSaveTimer=setTimeout(()=>{
-    const day=readFormAsDay();
-    if(!day)return;
-    const idx=db.days.findIndex(d=>d.date===day.date);
-    if(idx>=0)db.days[idx]=day;else db.days.push(day);
-    db.days.sort((a,b)=>a.date.localeCompare(b.date));
-    save();
-  },500);
+    persistDayNow();
+  },150);
 }
 function saveDay(){
   const day=readFormAsDay();if(!day){alert('⚠️ Informe a data!');return;}
@@ -2800,7 +2807,8 @@ function preenchInput(inp){
   updateRealAuto();
   const st=document.getElementById('preenchStatus');
   if(st){st.textContent='⏳ Salvando...';st.style.color='#ffd700';}
-  autoSave();
+  const saved=persistDayNow();
+  if(st&&saved){st.textContent='✅ Salvo';st.style.color='#00e676';}
   setTimeout(()=>{const s=document.getElementById('preenchStatus');if(s)s.textContent='';},3000);
 }
 
