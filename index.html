@@ -1278,7 +1278,10 @@ function renderDashCharts(day){
               y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'},position:'left'},
               y2:{ticks:{color:'#00e5ff',font:{size:9}},grid:{display:false},position:'right'}}}});
   const alertEl=document.getElementById('rotaAlerta');
-  const expImpactedRoutes=buildRotasMerged(day).filter(r=>r.hReal&&((calcExpRotaImpact(day,r.hPrev)||{}).delayMin>0)).length;
+  const expImpactedRoutes=buildRotasMerged(day).filter(r=>{
+    const st=calcRotaStatus(day,r);
+    return r.hReal&&st.stClass==='st-atrasado'&&st.exp&&st.exp.delayMin>0;
+  }).length;
   if(totalExp>0){
     alertEl.style.display='block';
     if(totalExp>=expPrev&&expPrev>0&&expImpactedRoutes>0){alertEl.style.background='rgba(180,130,0,.2)';alertEl.style.color='#ffd700';alertEl.textContent=`⚠️ Expedição 100%, mas ${expImpactedRoutes} rota(s) tiveram impacto pelo atraso hora a hora.`;}
@@ -2158,9 +2161,10 @@ function calcExpRotaImpact(day,hPrev){
 function calcRotaStatus(day,r){
   const realDelay=calcAtraso(r.hPrev,r.hReal);
   if(!r.hReal)return{delay:null,realDelay,exp:null,stClass:'st-pendente',stLabel:'— PENDENTE'};
+  const baseDelay=realDelay===null?0:realDelay;
+  if(baseDelay<=0)return{delay:baseDelay,realDelay,exp:null,stClass:'st-ok',stLabel:'✔ DENTRO DO HORÁRIO'};
   const exp=calcExpRotaImpact(day,r.hPrev);
   const expDelay=exp&&exp.delayMin>0?exp.delayMin:0;
-  const baseDelay=realDelay===null?0:realDelay;
   const delay=Math.max(baseDelay,expDelay);
   if(delay>0)return{delay,realDelay,exp,stClass:'st-atrasado',stLabel:'✖ FORA DO HORÁRIO'};
   return{delay:baseDelay,realDelay,exp,stClass:'st-ok',stLabel:'✔ DENTRO DO HORÁRIO'};
