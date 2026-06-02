@@ -695,6 +695,7 @@ const REAL_AUTO=[
 const SK='cdgam_v6';
 const PWD='gam2025';
 const NEW_RULES_FROM='2026-06-02';
+const CORREIA_DIRECT_HOUR_METRICS=['Linhas Med.','Linhas Perf.'];
 let db={days:[]};
 let curDate=null;
 let adminOk=false;
@@ -727,6 +728,7 @@ function load(){
     console.error('Load error:',e);
     db={days:[]};
   }
+  db.days=db.days.map(normalizeDay);
   db.days.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
 }
 
@@ -746,7 +748,13 @@ function normalizeRouteCode(cod){return String(cod??'');}
 
 function normalizeDay(day){
   if(!day)return day;
-  const copy={...day};
+  const copy={...day,hd:day.hd?{...day.hd}:day.hd};
+  if(useNewRules(copy.date)&&!copy._correiaDirectHour&&copy.hd){
+    CORREIA_DIRECT_HOUR_METRICS.forEach(m=>{
+      if(Array.isArray(copy.hd[m]))copy.hd[m]=deltasToAcums(copy.hd[m]);
+    });
+    copy._correiaDirectHour=true;
+  }
   if(Array.isArray(copy.rotas)){
     copy.rotas=copy.rotas.map(r=>({...r,cod:normalizeRouteCode(r.cod)}));
   }
@@ -940,7 +948,7 @@ function useNewRules(dt){return String(dt||currentFormDate())>=NEW_RULES_FROM;}
 function hourTargetFactor(i){return i===0?0.5:1;}
 function capForHour(metric,cap,i,dt){
   if(!cap)return cap;
-  if(useNewRules(dt)&&['Linhas Med.','Linhas Perf.'].includes(metric))return cap*hourTargetFactor(i);
+  if(useNewRules(dt)&&CORREIA_DIRECT_HOUR_METRICS.includes(metric))return cap*hourTargetFactor(i);
   return cap;
 }
 function getDay(dt){return db.days.find(d=>d.date===dt)||null;}
@@ -955,7 +963,7 @@ function sumHoraField(metric,hd){
 function sumHoraInput(metric){
   const inputs=[...document.querySelectorAll(`#hTblBody input[data-m="${metric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
   if(!inputs.length)return 0;
-  if(isDeltaMetric(metric)){
+  if(isDeltaMetric(metric,currentFormDate())){
     // inputs contêm acumulados → o último valor preenchido = total acumulado
     let last=0;
     inputs.forEach(inp=>{if(inp.value!=='')last=+inp.value;});
@@ -1691,7 +1699,7 @@ function getCapacities(){
 // ── ACUMULADO → DELTA ────────────────────────────────────
 // Métricas que NÃO usam modo acumulado (valores já são por hora discreta)
 const DELTA_SKIP=['Vales','Conf. Planejado','Conf. Ativo'];
-function isDeltaMetric(m){return!DELTA_SKIP.includes(m);}
+function isDeltaMetric(m,dt){return!DELTA_SKIP.includes(m)&&!(useNewRules(dt)&&CORREIA_DIRECT_HOUR_METRICS.includes(m));}
 
 // Dado array de acumulados (alguns podem ser ''), retorna array de deltas por hora
 function acumToDeltas(acums){
@@ -1738,6 +1746,7 @@ function buildHoraTable(hd){
   hdr.innerHTML='<th style="text-align:left;padding:3px 8px;min-width:140px">Indicador</th>'+HOURS.map(h=>`<th style="min-width:86px;white-space:nowrap">${h}</th>`).join('');
   body.innerHTML='';
   const caps=getCapacities();
+  const formDate=currentFormDate();
   const MHORA_GROUPS=[
     {title:'🔴 CORREIA — Separação', color:'rgba(255,149,0,.15)',
      metrics:['Linhas Med.','Linhas Perf.','Erros Sep. Med.']},
@@ -1754,7 +1763,7 @@ function buildHoraTable(hd){
     sepTr.innerHTML=`<td colspan="${HOURS.length+1}" style="background:${group.color};color:#89b4d4;font-size:9px;font-weight:bold;padding:3px 8px;text-transform:uppercase;letter-spacing:.5px;border-top:2px solid rgba(255,255,255,.08)">${group.title}</td>`;
     body.appendChild(sepTr);
     group.metrics.forEach(m=>{
-      const cap=caps[m]||null;const isInv=MHORA_INV.includes(m);const useDelta=isDeltaMetric(m);
+      const cap=caps[m]||null;const isInv=MHORA_INV.includes(m);const useDelta=isDeltaMetric(m,formDate);
       const tr=document.createElement('tr');
       const modeHint=useDelta?`<span style="font-size:8px;color:#4a7a9b;display:block">▲ acumulado</span>`:'';
       let html=`<td class="hlbl">${m}${cap?`<span style="font-size:9px;color:#6a9fc0;font-weight:normal;display:block">${isInv?'máx':'meta'}: ${cap.toLocaleString('pt-BR')}/h</span>`:''} ${modeHint}</td>`;
@@ -1772,7 +1781,7 @@ function buildHoraTable(hd){
         let bg='';
         if(cap&&vDelta!==null){
           const n=vDelta;
-          const capH=capForHour(m,cap,i,currentFormDate());
+          const capH=capForHour(m,cap,i,formDate);
           if(isInv){bg=n>capH?'background:rgba(200,20,20,.55)':n>capH*.8?'background:rgba(180,130,0,.4)':'background:rgba(0,100,50,.45)';}
           else{const p=n/capH;bg=p>=1.05?'background:rgba(0,180,80,.45)':p>=.9?'background:rgba(0,120,60,.35)':p>=.7?'background:rgba(180,130,0,.4)':'background:rgba(180,20,20,.5)';}
         }
@@ -1836,6 +1845,7 @@ function colorCell(inp){
 }
 
 function readHoraData(){
+  const dt=currentFormDate();
   const hd={};MHORA.forEach(m=>{hd[m]=new Array(HOURS.length).fill('');});
   // Agrupar inputs por métrica
   const byMetric={};
@@ -1847,7 +1857,7 @@ function readHoraData(){
   // Para métricas de delta: converter acumulados digitados → deltas para armazenar
   MHORA.forEach(m=>{
     const vals=byMetric[m]||new Array(HOURS.length).fill('');
-    if(isDeltaMetric(m)){
+    if(isDeltaMetric(m,dt)){
       hd[m]=acumToDeltas(vals);
     } else {
       hd[m]=vals;
@@ -1862,6 +1872,7 @@ function readFormAsDay(){
   return{
     date:dt,
     _updatedAt:Date.now(),
+    _correiaDirectHour:useNewRules(dt),
     pnVol:+document.getElementById('iPNVol').value||0,
     pnUnid:+document.getElementById('iPNUnid').value||0,
     pnCorreia:+document.getElementById('iPNCorreia').value||0,
