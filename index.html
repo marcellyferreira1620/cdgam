@@ -158,6 +158,7 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
 .st-atrasado{background:#3d0a0a;color:#ff4c4c;font-weight:bold;padding:3px 12px;border-radius:4px;font-size:10px;letter-spacing:.3px}
 .st-pendente{background:#1a2a3a;color:#6a9fc0;padding:3px 12px;border-radius:4px;font-size:10px}
 .st-critico{background:#3d1a00;color:#ff9500;font-weight:bold;padding:3px 12px;border-radius:4px;font-size:10px;letter-spacing:.3px;animation:blink 1.4s infinite}
+.rota-impact-note{display:block;margin-top:3px;color:#ff9500;font-size:9px;line-height:1.2;white-space:normal}
 /* LOGIN */
 .login-ov{display:flex;position:fixed;inset:0;background:#080f18;z-index:20000;align-items:center;justify-content:center}
 .login-box{background:#0a2340;border:2px solid #e94560;border-radius:10px;padding:36px 32px;width:340px;text-align:center;box-shadow:0 8px 40px rgba(0,0,0,.7)}
@@ -1279,9 +1280,11 @@ function renderDashCharts(day){
               y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'},position:'left'},
               y2:{ticks:{color:'#00e5ff',font:{size:9}},grid:{display:false},position:'right'}}}});
   const alertEl=document.getElementById('rotaAlerta');
+  const expImpactedRoutes=buildRotasMerged(day).filter(r=>r.hReal&&((calcExpRotaImpact(day,r.hPrev)||{}).delayMin>0)).length;
   if(totalExp>0){
     alertEl.style.display='block';
-    if(totalExp>=expPrev&&expPrev>0){alertEl.style.background='rgba(0,180,80,.25)';alertEl.style.color='#00e676';alertEl.textContent=`✅ Expedição 100% — todos os volumes expedidos no prazo.`;}
+    if(totalExp>=expPrev&&expPrev>0&&expImpactedRoutes>0){alertEl.style.background='rgba(180,130,0,.2)';alertEl.style.color='#ffd700';alertEl.textContent=`⚠️ Expedição 100%, mas ${expImpactedRoutes} rota(s) tiveram impacto pelo atraso hora a hora.`;}
+    else if(totalExp>=expPrev&&expPrev>0){alertEl.style.background='rgba(0,180,80,.25)';alertEl.style.color='#00e676';alertEl.textContent=`✅ Expedição 100% — todos os volumes expedidos no prazo.`;}
     else if(totalExp>capVEh*H_EX){alertEl.style.background='rgba(0,150,255,.2)';alertEl.style.color='#00e5ff';alertEl.textContent=`📢 Volume ACIMA da capacidade horária — reforço necessário na expedição.`;}
     else if(expPct>=90){alertEl.style.background='rgba(0,180,80,.2)';alertEl.style.color='#00e676';alertEl.textContent=`✅ Expedição dentro da meta (${expPct}%) — rotas no prazo.`;}
     else if(expPct>=70){alertEl.style.background='rgba(180,130,0,.2)';alertEl.style.color='#ffd700';alertEl.textContent=`⚠️ Expedição a ${expPct}% — monitorar rotas com saída próxima.`;}
@@ -2066,6 +2069,103 @@ function fmtAtraso(min){
   return(min>0?'+':'-')+h+':'+m+':00';
 }
 
+const SHIFT_START_MIN=17*60+30;
+function horaToShiftMin(h){
+  if(!h)return null;
+  const p=String(h).split(':').map(Number);
+  if(p.length<2||p.some(Number.isNaN))return null;
+  let min=p[0]*60+p[1];
+  if(min<SHIFT_START_MIN)min+=1440;
+  return min-SHIFT_START_MIN;
+}
+function shiftMinToHora(min){
+  let total=SHIFT_START_MIN+Math.round(min);
+  total=((total%1440)+1440)%1440;
+  const h=Math.floor(total/60).toString().padStart(2,'0');
+  const m=(total%60).toString().padStart(2,'0');
+  return`${h}:${m}`;
+}
+function horaSlotStartMin(i){return i===0?0:30+(i-1)*60;}
+function horaSlotEndMin(i){return i===0?30:30+i*60;}
+function docaHoraVals(day){
+  const vals=day&&day.hd&&day.hd['Vol. Doca']?day.hd['Vol. Doca']:[];
+  return HOURS.map((_,i)=>{
+    const v=vals[i];
+    return v!==''&&v!==null&&v!==undefined?+v:null;
+  });
+}
+function hasDocaHoraData(vals){return vals.some(v=>v!==null&&Number.isFinite(v)&&v>0);}
+function docaExpectedAt(day,shiftMin){
+  const cap=day&&day.capVE?+day.capVE:1303;
+  const prev=(day&&(+day.pnDoca||+day.pnVol))||0;
+  const expected=Math.max(0,shiftMin)/60*cap;
+  return prev>0?Math.min(prev,expected):expected;
+}
+function docaActualAt(day,shiftMin){
+  const vals=docaHoraVals(day);
+  let total=0;
+  for(let i=0;i<vals.length;i++){
+    const v=vals[i]||0;
+    const start=horaSlotStartMin(i),end=horaSlotEndMin(i);
+    if(shiftMin>=end){
+      total+=v;
+    }else if(shiftMin>start){
+      total+=v*((shiftMin-start)/(end-start));
+      break;
+    }else break;
+  }
+  return total;
+}
+function docaCatchupMin(day,required){
+  const vals=docaHoraVals(day);
+  if(!hasDocaHoraData(vals))return null;
+  let total=0,lastEnd=0;
+  for(let i=0;i<vals.length;i++){
+    const v=vals[i]||0;
+    const start=horaSlotStartMin(i),end=horaSlotEndMin(i);
+    if(total+v>=required){
+      if(v<=0)return end;
+      return start+(end-start)*((required-total)/v);
+    }
+    total+=v;
+    lastEnd=end;
+  }
+  const cap=day&&day.capVE?+day.capVE:1303;
+  return cap>0?lastEnd+((required-total)/cap)*60:null;
+}
+function calcExpRotaImpact(day,hPrev){
+  const routeMin=horaToShiftMin(hPrev);
+  if(routeMin===null||!day)return null;
+  const vals=docaHoraVals(day);
+  if(!hasDocaHoraData(vals))return null;
+  const shiftEnd=horaSlotEndMin(HOURS.length-1);
+  const expectedMin=Math.min(routeMin,shiftEnd);
+  const required=docaExpectedAt(day,expectedMin);
+  if(required<=0)return null;
+  const actual=docaActualAt(day,expectedMin);
+  const deficit=Math.ceil(required-actual);
+  if(deficit<=0)return{delayMin:0,deficit:0,required,actual,catchupMin:expectedMin};
+  const catchupMin=docaCatchupMin(day,required);
+  if(catchupMin===null)return null;
+  return{
+    delayMin:Math.max(Math.round(catchupMin-routeMin),0),
+    deficit,
+    required,
+    actual,
+    catchupMin
+  };
+}
+function calcRotaStatus(day,r){
+  const realDelay=calcAtraso(r.hPrev,r.hReal);
+  if(!r.hReal)return{delay:null,realDelay,exp:null,stClass:'st-pendente',stLabel:'— PENDENTE'};
+  const exp=calcExpRotaImpact(day,r.hPrev);
+  const expDelay=exp&&exp.delayMin>0?exp.delayMin:0;
+  const baseDelay=realDelay===null?0:realDelay;
+  const delay=Math.max(baseDelay,expDelay);
+  if(delay>0)return{delay,realDelay,exp,stClass:'st-atrasado',stLabel:'✖ FORA DO HORÁRIO'};
+  return{delay:baseDelay,realDelay,exp,stClass:'st-ok',stLabel:'✔ DENTRO DO HORÁRIO'};
+}
+
 // Inline input style helper
 function escAttr(v){
   return String(v??'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -2091,13 +2191,12 @@ function renderRotasTbl(day,tblId){
       <th style="text-align:left;min-width:160px">Obs</th>
     </tr></thead><tbody>`;
   rotas.forEach(r=>{
-    const atr=calcAtraso(r.hPrev,r.hReal);
-    let stClass,stLabel;
-    if(!r.hReal){
-      // Sem horário realizado = sempre PENDENTE, independente da hora atual
-      stClass='st-pendente';stLabel='— PENDENTE';
-    }else if(atr>0){stClass='st-atrasado';stLabel='✖ FORA DO HORÁRIO';}
-    else{stClass='st-ok';stLabel='✔ DENTRO DO HORÁRIO';}
+    const st=calcRotaStatus(day,r);
+    const atr=st.delay;
+    const stClass=st.stClass,stLabel=st.stLabel;
+    const expNote=st.exp&&st.exp.delayMin>0
+      ?`<span class="rota-impact-note">Expedição +${fmtAtraso(st.exp.delayMin).replace('+','')} — doca ${Math.round(st.exp.actual).toLocaleString('pt-BR')}/${Math.round(st.exp.required).toLocaleString('pt-BR')} até ${r.hPrev}; libera ~${shiftMinToHora(st.exp.catchupMin)}</span>`
+      :'';
     const atrColor=atr===null?'#445':atr>0?'#ff4c4c':'#00e676';
     const rowBg=stClass==='st-atrasado'?'background:rgba(180,20,20,.12)':stClass==='st-critico'?'background:rgba(180,80,0,.12)':'';
     html+=`<tr style="${rowBg}">
@@ -2128,8 +2227,8 @@ function renderRotasTbl(day,tblId){
       <td style="text-align:center"><span class="${stClass}">${stLabel}</span></td>
       <td style="text-align:left">
         ${editable
-          ?`<input type="text" value="${escAttr(r.obs||'')}" oninput="saveRotaField('${r.cod}','obs',this.value)" onchange="renderRotasTblFull(getDay(curDate))" style="${inpS}" placeholder="Observação..."/>`
-          :`<span style="color:#89b4d4;font-size:10px">${r.obs||''}</span>`}
+          ?`<input type="text" value="${escAttr(r.obs||'')}" oninput="saveRotaField('${r.cod}','obs',this.value)" onchange="renderRotasTblFull(getDay(curDate))" style="${inpS}" placeholder="Observação..."/>${expNote}`
+          :`<span style="color:#89b4d4;font-size:10px">${r.obs||''}</span>${expNote}`}
       </td>
     </tr>`;
   });
@@ -2155,10 +2254,11 @@ function renderRotasTblFull(day){
 }
 
 function updateRotasKPIs(day){
-  const rotas=day&&day.rotas?day.rotas:[];
+  const rotas=buildRotasMerged(day);
   const total=rotas.reduce((s,r)=>s+(r.vol||0),0);
-  const ok=rotas.filter(r=>r.hReal&&calcAtraso(r.hPrev,r.hReal)<=0).length;
-  const atras=rotas.filter(r=>r.hReal&&calcAtraso(r.hPrev,r.hReal)>0).length;
+  const status=rotas.map(r=>calcRotaStatus(day,r));
+  const ok=status.filter((st,i)=>rotas[i].hReal&&st.stClass==='st-ok').length;
+  const atras=status.filter((st,i)=>rotas[i].hReal&&st.stClass==='st-atrasado').length;
   const pend=rotas.filter(r=>!r.hReal).length;
   const finalizadas=rotas.filter(r=>r.hReal).length;
   const efic=finalizadas>0?Math.round(ok/finalizadas*100):0;
