@@ -758,7 +758,11 @@ function mergeDays(remoteDays,localDays){
     if(!current){byDate[normalized.date]=normalized;return;}
     const curTs=+current._updatedAt||0;
     const nextTs=+normalized._updatedAt||0;
-    byDate[normalized.date]=(curTs&&nextTs&&curTs>nextTs)?current:normalized;
+    if(curTs||nextTs){
+      byDate[normalized.date]=nextTs>=curTs?normalized:current;
+    }else{
+      byDate[normalized.date]=normalized;
+    }
   };
   (Array.isArray(remoteDays)?remoteDays:[]).forEach(putDay);
   (Array.isArray(localDays)?localDays:[]).forEach(putDay);
