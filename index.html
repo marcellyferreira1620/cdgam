@@ -1378,7 +1378,7 @@ function renderDocaBalance(day){
         {label:'Entrada (CK+Esp+Fralda)',data:entradas,backgroundColor:entradaColors,borderRadius:3,order:2},
         {label:'Saída (expedido)',data:saidas,backgroundColor:saidaColors,borderRadius:3,order:2},
         {label:'Capacidade/h',data:HOURS.map(()=>capDoca),type:'line',borderColor:'#ffd700',borderDash:[5,3],borderWidth:1.5,pointRadius:0,fill:false,order:1},
-        {label:'Estoque Doca',data:estoque,type:'line',borderColor:'#ff4c4c',borderWidth:2,pointRadius:3,
+        {label:'Volume Acumulado',data:estoque,type:'line',borderColor:'#ff4c4c',borderWidth:2,pointRadius:3,
          pointBackgroundColor:estoque.map(v=>v===null?'transparent':v<=0?'#00e676':v<=capDoca?'#ffd700':'#ff4c4c'),
          fill:false,order:0,yAxisID:'y2'}
       ]
@@ -1393,7 +1393,7 @@ function renderDocaBalance(day){
             const e=entradas[i]||0,s=saidas[i]||0,diff=e-s;
             const est=estoque[i];
             const lines=[`Δ Hora: ${diff>0?'+':''}${diff.toLocaleString('pt-BR')}`];
-            if(est!==null)lines.push(`Estoque acum: ${est.toLocaleString('pt-BR')}`);
+            if(est!==null)lines.push(`Volume acum: ${est.toLocaleString('pt-BR')}`);
             if(diff>0)lines.push('⚠ Entrada > Saída — risco acúmulo');
             return lines;
           }
@@ -1402,7 +1402,7 @@ function renderDocaBalance(day){
       scales:{
         x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},
         y:{ticks:{color:'#89b4d4',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'},title:{display:true,text:'Vol/h',color:'#6a9fc0',font:{size:9}}},
-        y2:{ticks:{color:'#ff7070',font:{size:9}},grid:{display:false},position:'right',title:{display:true,text:'Estoque',color:'#ff7070',font:{size:9}}}
+        y2:{ticks:{color:'#ff7070',font:{size:9}},grid:{display:false},position:'right',title:{display:true,text:'Volume',color:'#ff7070',font:{size:9}}}
       }
     }
   });
@@ -1532,7 +1532,7 @@ function renderDashTables(day){
       h2+='</tr>';
     });
   });
-  // ── Linha especial: Estoque Doca (acúmulo hora a hora) ──
+  // ── Linha especial: Volume Acumulado (acúmulo hora a hora) ──
   const docaEntradaArr=hd['Vol. Checkout']||new Array(HOURS.length).fill('');
   const docaSaidaArr=hd['Vol. Doca']||new Array(HOURS.length).fill('');
   // somar entradas: CK + Esp + Fraldas (todos já são deltas armazenados)
@@ -1546,8 +1546,8 @@ function renderDashTables(day){
     if(anyData){estoqueRunning+=entrada-saida;}
     return anyData?estoqueRunning:null;
   });
-  h2+=`<tr><td colspan="${HOURS.length+1}" style="background:rgba(0,230,118,.06);color:#00e676;font-size:9px;font-weight:bold;padding:3px 8px;border-top:2px solid rgba(0,230,118,.3)">📦 EQUILÍBRIO DOCA — Estoque acumulado por hora (Entrada - Saída) — meta: 0 | capacidade entrega: 1.303/h</td></tr>`;
-  h2+=`<tr><td class="row-lbl">Estoque Doca<span style="font-size:9px;color:#6a9fc0;font-weight:normal;display:block">CK+Esp+Fralda−Doca</span></td>`;
+  h2+=`<tr><td colspan="${HOURS.length+1}" style="background:rgba(0,230,118,.06);color:#00e676;font-size:9px;font-weight:bold;padding:3px 8px;border-top:2px solid rgba(0,230,118,.3)">📦 EQUILÍBRIO DOCA — Volume acumulado por hora (Entrada - Saída) — meta: 0 | capacidade entrega: 1.303/h</td></tr>`;
+  h2+=`<tr><td class="row-lbl">Volume Acumulado<span style="font-size:9px;color:#6a9fc0;font-weight:normal;display:block">CK+Esp+Fralda−Doca</span></td>`;
   estoqueArr.forEach((v,i)=>{
     if(v===null){h2+=`<td style="text-align:center;color:#2a3a4a">-</td>`;return;}
     const capH=1303; // capacidade doca/h
@@ -1555,7 +1555,7 @@ function renderDashTables(day){
     if(v<=0){bg='background:rgba(0,180,80,.3)';col='color:#00e676;font-weight:bold';}
     else if(v<=capH){bg='background:rgba(180,130,0,.3)';col='color:#ffd700;font-weight:bold';}
     else{bg='background:rgba(180,20,20,.5)';col='color:#ff4c4c;font-weight:bold';}
-    h2+=`<td style="text-align:center;${bg}" title="Estoque acumulado na doca: ${v.toLocaleString('pt-BR')} vol"><span style="${col}">${v.toLocaleString('pt-BR')}</span></td>`;
+    h2+=`<td style="text-align:center;${bg}" title="Volume acumulado na doca: ${v.toLocaleString('pt-BR')} vol"><span style="${col}">${v.toLocaleString('pt-BR')}</span></td>`;
   });
   h2+='</tr>';
   h2+='</tbody></table>';
