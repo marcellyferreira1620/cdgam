@@ -139,6 +139,12 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
 .no-data{padding:40px;text-align:center;color:#445;font-size:14px}
 .real-auto-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px}
 .real-auto-item{background:#0a1825;border-radius:3px;padding:4px 8px;display:flex;justify-content:space-between;align-items:center;border:1px solid #1a3550}
+.media-hora-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin-bottom:8px}
+.media-hora-item{background:#071525;border-radius:3px;padding:4px 8px;border:1px solid rgba(0,229,255,.25)}
+.media-hora-item .media-top{display:flex;justify-content:space-between;gap:6px;align-items:center}
+.media-hora-item .media-lbl{font-size:10px;color:#89b4d4}
+.media-hora-item .media-val{font-size:12px;font-weight:bold;color:#00e5ff}
+.media-hora-item .media-sub{font-size:8px;color:#6a9fc0;margin-top:2px}
 /* ROTAS TABLE */
 .rotas-wrap{margin:8px;background:#0a1825;border-radius:6px;border:1px solid rgba(0,230,118,.3);overflow:hidden}
 .rotas-hdr{display:flex;align-items:center;justify-content:space-between;padding:6px 12px;background:rgba(0,230,118,.1);border-bottom:1px solid rgba(0,230,118,.25)}
@@ -571,6 +577,10 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
         <h4>✅ Realizado Total <span style="color:#00e676;font-size:9px;font-weight:normal">(automático da tabela hora a hora)</span></h4>
         <div class="real-auto-grid" id="realAutoGrid"></div>
         <div style="border-top:1px solid #1a3550;padding-top:6px;margin-top:4px">
+          <h4 style="color:#89b4d4;font-size:10px;margin-bottom:6px">MÉDIA POR HORA <span style="color:#00e5ff;font-size:9px;font-weight:normal">(realizado ÷ horas trabalhadas)</span></h4>
+          <div class="media-hora-grid" id="mediaHoraGrid"></div>
+        </div>
+        <div style="border-top:1px solid #1a3550;padding-top:6px;margin-top:4px">
           <h4 style="color:#89b4d4;font-size:10px;margin-bottom:6px">MANUAL — volumes sem linha hora a hora</h4>
           <div class="adm-row"><label>Real. Cx Fech. Psico (vol.)</label><input type="number" id="iRPsico" placeholder="0" oninput="liveUpdate()"/></div>
           <div class="adm-row"><label>Real. Geladeira (vol.)</label><input type="number" id="iRGel" placeholder="0" oninput="liveUpdate()"/></div>
@@ -698,6 +708,20 @@ const REAL_AUTO=[
   {id:'aDoca', lbl:'Vol. Doca',         m:'Vol. Doca'},
   {id:'aErros',lbl:'Erros Sep.',        m:'Erros Sep. Med.'},
   {id:'aVales',lbl:'Vales',          m:'Vales'},
+];
+const MEDIA_HORA_AUTO=[
+  {lbl:'Linhas Med.',m:'Linhas Med.',ini:'iCMed',fim:'iCMedFim'},
+  {lbl:'Linhas Perf.',m:'Linhas Perf.',ini:'iCPer',fim:'iCPerFim'},
+  {lbl:'Vol. Checkout',m:'Vol. Checkout',ini:'iCkOut',fim:'iCkOutFim'},
+  {lbl:'Lin. Checkout',m:'Linhas Checkout',ini:'iCkOut',fim:'iCkOutFim'},
+  {lbl:'Unid. Checkout',m:'Unid. Checkout',ini:'iCkOut',fim:'iCkOutFim'},
+  {lbl:'Vol. Especial',m:'Vol. Especial',ini:'iEsp',fim:'iEspFim'},
+  {lbl:'Esp. Frac.',m:'Vol. Esp. Frac.',ini:'iEsp',fim:'iEspFim'},
+  {lbl:'Esp. Med.',m:'Vol. Esp. Med.',ini:'iEsp',fim:'iEspFim'},
+  {lbl:'Esp. Perf.',m:'Vol. Esp. Perf.',ini:'iEsp',fim:'iEspFim'},
+  {lbl:'Fraldas Cx Fech.',m:'Vol. Fraldas Cx Fech.',ini:'iFrF',fim:'iFrFFim'},
+  {lbl:'Fraldas Frac.',m:'Vol. Fraldas Frac.',ini:'iFrFc',fim:'iFrFcFim'},
+  {lbl:'Vol. Doca',m:'Vol. Doca',ini:'iExp',fim:'iExpFim'},
 ];
 
 const SK='cdgam_v6';
@@ -1018,6 +1042,44 @@ function updateRealAuto(){
     const div=document.createElement('div');
     div.className='real-auto-item';
     div.innerHTML=`<span style="font-size:10px;color:#89b4d4">${lbl}</span><span style="font-size:12px;font-weight:bold;color:#00e676">${val.toLocaleString('pt-BR')}</span>`;
+    grid.appendChild(div);
+  });
+  updateMediaHoraAuto();
+}
+function timeToDec(v){
+  if(!v)return null;
+  const parts=String(v).split(':');
+  if(parts.length<2)return null;
+  return (+parts[0]||0)+(+parts[1]||0)/60;
+}
+function workedHoursFromInputs(iniId,fimId){
+  const iniEl=document.getElementById(iniId),fimEl=document.getElementById(fimId);
+  const ini=timeToDec(iniEl&&iniEl.value),fim=timeToDec(fimEl&&fimEl.value);
+  if(ini===null||fim===null)return null;
+  let dur=fim-ini;
+  if(dur<0)dur+=24;
+  return dur>0?dur:null;
+}
+function fmtHorasDecimal(h){
+  if(h===null)return '—';
+  return h.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1})+'h';
+}
+function fmtMediaHora(v){
+  if(!Number.isFinite(v))return '—';
+  const opts=v>=10?{maximumFractionDigits:0}:{minimumFractionDigits:1,maximumFractionDigits:1};
+  return v.toLocaleString('pt-BR',opts)+'/h';
+}
+function updateMediaHoraAuto(){
+  const grid=document.getElementById('mediaHoraGrid');
+  if(!grid)return;
+  grid.innerHTML='';
+  MEDIA_HORA_AUTO.forEach(({lbl,m,ini,fim})=>{
+    const realizado=sumHoraInput(m);
+    const horas=workedHoursFromInputs(ini,fim);
+    const media=horas?realizado/horas:null;
+    const div=document.createElement('div');
+    div.className='media-hora-item';
+    div.innerHTML=`<div class="media-top"><span class="media-lbl">${lbl}</span><span class="media-val">${media!==null?fmtMediaHora(media):'—'}</span></div><div class="media-sub">${realizado.toLocaleString('pt-BR')} em ${fmtHorasDecimal(horas)}</div>`;
     grid.appendChild(div);
   });
 }
