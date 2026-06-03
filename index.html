@@ -2048,16 +2048,15 @@ function renderCurrentDay(day){
 function prepNewDay(){
   clearTimeout(autoSaveTimer);
   const current=readFormAsDay();
-  if(current){
+  const dt=today();
+  if(current&&current.date!==dt){
     const curIdx=db.days.findIndex(d=>d.date===current.date);
     if(curIdx>=0)db.days[curIdx]=current;else db.days.push(current);
   }
-  const dt=today();
-  let day=getDay(dt);
-  if(!day){
-    day=emptyDay(dt);
-    db.days.push(day);
-  }
+  const day=emptyDay(dt);
+  day._updatedAt=Date.now();
+  const idx=db.days.findIndex(d=>d.date===dt);
+  if(idx>=0)db.days[idx]=day;else db.days.push(day);
   db.days.sort((a,b)=>a.date.localeCompare(b.date));
   curDate=dt;
   save();
