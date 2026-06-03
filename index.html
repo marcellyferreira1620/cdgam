@@ -820,6 +820,7 @@ function applyRemoteData(remote){
     renderKPIs(day);renderFlowBar(day);renderDashCharts(day);
     renderDashTables(day);renderRotasTbl(day,'rotasTblFull');
     updateRotasKPIs(day);
+    refreshOpenPrevisaoEncerramento(day);
   }
 }
 
@@ -960,6 +961,19 @@ function sumHoraField(metric,hd){
   if(!hd||!hd[metric])return 0;
   return hd[metric].reduce((s,v)=>s+(v!==''&&v!==null&&v!==undefined?+v:0),0);
 }
+function prevTipoCheckoutTotal(day){
+  if(!day)return 0;
+  const typeTotal=[
+    'pnCorreia','pnPsico','pnEspecial','pnEspFrac','pnEspMed','pnEspPerf',
+    'pnFralda','pnFraldaF','pnGel','pnOnco','pnOncoT','pnJuncao'
+  ].reduce((s,k)=>s+(+day[k]||0),0);
+  return typeTotal||(+day.pnVol||0);
+}
+function prevCheckoutBase(day){
+  if(!day)return 0;
+  if(useNewRules(day.date))return prevTipoCheckoutTotal(day);
+  return (+day.pnCorreia||0)+(+day.pnJuncao||0);
+}
 function sumHoraInput(metric){
   const inputs=[...document.querySelectorAll(`#hTblBody input[data-m="${metric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
   if(!inputs.length)return 0;
@@ -988,6 +1002,7 @@ function liveUpdate(){
       renderFlowBar(day);
       renderDashCharts(day);
       renderDashTables(day);
+      refreshOpenPrevisaoEncerramento(day);
       autoSave();
     }
   },300);
@@ -1033,7 +1048,7 @@ function buildDayNav(){
 function selectDay(dt){
   curDate=dt;buildDayNav();
   const day=getDay(dt);
-  if(day){renderKPIs(day);renderFlowBar(day);renderDashCharts(day);renderDashTables(day);renderRotasTbl(day,'rotasTblFull');updateRotasKPIs(day);}
+  if(day){renderKPIs(day);renderFlowBar(day);renderDashCharts(day);renderDashTables(day);renderRotasTbl(day,'rotasTblFull');updateRotasKPIs(day);refreshOpenPrevisaoEncerramento(day);}
   if(adminOk)loadFormFrom(day||emptyDay(dt));
 }
 
@@ -1059,6 +1074,7 @@ function refreshFromDb(){
     renderRotasTbl(day,'rotasTbl');
     if(!(tab==='rotas'&&editing))renderRotasTbl(day,'rotasTblFull');
     updateRotasKPIs(day);
+    refreshOpenPrevisaoEncerramento(day);
   }
   if(tab==='hist')renderHist();
   if(tab==='comp')renderComp();
@@ -1119,9 +1135,9 @@ function renderFlowBar(day){
   if(bCK){bCK.style.width=pCK+'%';bCK.style.background=pCK>=90?'#00e5ff':pCK>=70?'#ffd700':'#ff4c4c';}
   if(document.getElementById('fsCKPsi'))document.getElementById('fsCKPsi').textContent='—';
   if(document.getElementById('fsCKGel'))document.getElementById('fsCKGel').textContent='—';
-  // Checkout = Correia + Junção
-  const prevCKtotal=(day.pnCorreia||0)+(day.pnJuncao||0);
-  document.getElementById('fsCKEsp').textContent='Prev: '+(day.pnCorreia||0).toLocaleString('pt-BR');
+  // Checkout = volumes previstos por tipo nos dias novos.
+  const prevCKtotal=prevCheckoutBase(day);
+  document.getElementById('fsCKEsp').textContent='Prev: '+prevCKtotal.toLocaleString('pt-BR');
   document.getElementById('fsCKFrFc').textContent='Junção: '+(day.pnJuncao||0).toLocaleString('pt-BR');
   document.getElementById('fsCKFrF').textContent='Total: '+prevCKtotal.toLocaleString('pt-BR');
   document.getElementById('kCkOut').textContent=day.ckOut||'—:—';
@@ -1174,7 +1190,7 @@ function renderDashCharts(day){
   const sumH=m=>sumHoraField(m,hd);
   const realCheckout=sumH('Vol. Checkout');
   const realCorreia=day.pnCorreia>0?Math.min(realCheckout,day.pnCorreia):realCheckout;
-  const prevCheckout = (day.pnCorreia||0)+(day.pnJuncao||0);
+  const prevCheckout = prevCheckoutBase(day);
   const realDoca=Math.max(sumH('Vol. Doca'),day.rDoc||0);
 
   const volDefs=[
@@ -1965,6 +1981,7 @@ function persistDayNow(){
   curDate=day.date;
   save();
   if(wasNew)buildDayNav();
+  refreshOpenPrevisaoEncerramento(day);
   return day;
 }
 function autoSave(){
@@ -1980,6 +1997,7 @@ function saveDay(){
   db.days.sort((a,b)=>a.date.localeCompare(b.date));
   save();curDate=day.date;buildDayNav();
   renderKPIs(day);renderFlowBar(day);renderDashCharts(day);renderDashTables(day);renderRotasTbl(day,'rotasTblFull');updateRotasKPIs(day);
+  refreshOpenPrevisaoEncerramento(day);
   document.getElementById('liveBadge').style.display='none';
   document.getElementById('btnDel').style.display='';
   document.getElementById('admDayLbl').textContent=`(editando: ${fmtDate(day.date)})`;
@@ -2573,9 +2591,14 @@ function clearSyncConfig(){
 // save() já foi atualizado acima para incluir Supabase
 
 // ── PREVISÃO DE ENCERRAMENTO ─────────────────────────────
-function calcPrevisaoEncerramento(){
-  const day=getDay(curDate);
-  if(!day){alert('Nenhum dia selecionado!');return;}
+function refreshOpenPrevisaoEncerramento(day){
+  const panel=document.getElementById('prevEncPanel');
+  if(panel&&panel.style.display!=='none')calcPrevisaoEncerramento(day,{scroll:false,silent:true});
+}
+function calcPrevisaoEncerramento(dayOverride,options){
+  const opts=options||{};
+  const day=dayOverride||getDay(curDate);
+  if(!day){if(!opts.silent)alert('Nenhum dia selecionado!');return;}
   const hd=day.hd||{};
   const now=new Date();
   const horaAtual=now.getHours()+now.getMinutes()/60;
@@ -2640,8 +2663,8 @@ function calcPrevisaoEncerramento(){
 
   // 3. CHECKOUT (Vol.)
   const capVC=day.capVC||1280;
-  // Checkout processa o que veio da correia: pnCorreia + pnJuncao
-  const prevCK=(day.pnCorreia||0)+(day.pnJuncao||0);
+  // Checkout usa a base dos volumes previstos por tipo nos dias novos.
+  const prevCK=prevCheckoutBase(day);
   const realCK=realizado('Vol. Checkout');
   const faltaCK=Math.max(prevCK-realCK,0);
   const tempoCK=faltaCK>0?faltaCK/capVC:0;
@@ -2780,7 +2803,7 @@ function calcPrevisaoEncerramento(){
 
   // Mostrar painel
   document.getElementById('prevEncPanel').style.display='block';
-  document.getElementById('prevEncPanel').scrollIntoView({behavior:'smooth',block:'nearest'});
+  if(opts.scroll!==false)document.getElementById('prevEncPanel').scrollIntoView({behavior:'smooth',block:'nearest'});
 }
 
 // ══════════════════════════════════════════════════════════
