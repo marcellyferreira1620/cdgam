@@ -525,6 +525,14 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
         <div class="adm-row"><label>Faltas no dia</label><input type="number" id="iFaltas" placeholder="0" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>Observações</label></div>
         <textarea id="iObs" style="width:100%;background:#0d1c2e;border:1px solid #1e4a72;color:#fff;border-radius:3px;padding:5px;font-size:11px;resize:vertical;min-height:50px" oninput="liveUpdate()"></textarea>
+        <h4 style="margin-top:12px">Horários de Finalização dos Processos</h4>
+        <div class="adm-row"><label>Correia Perfumaria</label><input type="time" id="iCPerFim" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Correia Medicamentos</label><input type="time" id="iCMedFim" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Check-Out</label><input type="time" id="iCkOutFim" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Especial</label><input type="time" id="iEspFim" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Fralda Fechado</label><input type="time" id="iFrFFim" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Fralda Fracionado</label><input type="time" id="iFrFcFim" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Expedição</label><input type="time" id="iExpFim" oninput="liveUpdate()"/></div>
       </div>
 
       <!-- COL 2: HORÁRIOS E CAPACIDADE/HORA -->
@@ -935,6 +943,7 @@ function emptyDay(dt){
     pnFralda:0,pnFraldaF:0,pnGel:0,pnOnco:0,pnOncoT:0,pnJuncao:0,pnDoca:0,
     acum:0,meta:0,osImp:0,osFin:0,osProd:0,medIt:0,faltas:0,obs:'',
     cPer:'',cMed:'',ckOut:'',esp:'',frF:'',frFc:'',exp:'',
+    cPerFim:'',cMedFim:'',ckOutFim:'',espFim:'',frFFim:'',frFcFim:'',expFim:'',
     capLM:3500,capLP:3000,capErros:2500,capVC:1280,capLC:6500,capUC:20800,
     capVales:1,
     capEsp:340,capEspFrac:0,capEspMed:newRules?100:0,capEspPerf:0,capFrF:newRules?100:114,capFrFc:89,capVE:1303,
@@ -1910,6 +1919,10 @@ function readFormAsDay(){
     ckOut:document.getElementById('iCkOut').value,esp:document.getElementById('iEsp').value,
     frF:document.getElementById('iFrF').value,frFc:document.getElementById('iFrFc').value,
     exp:document.getElementById('iExp').value,
+    cPerFim:document.getElementById('iCPerFim').value,cMedFim:document.getElementById('iCMedFim').value,
+    ckOutFim:document.getElementById('iCkOutFim').value,espFim:document.getElementById('iEspFim').value,
+    frFFim:document.getElementById('iFrFFim').value,frFcFim:document.getElementById('iFrFcFim').value,
+    expFim:document.getElementById('iExpFim').value,
     capLM:+document.getElementById('iCapLM').value||3500,capLP:+document.getElementById('iCapLP').value||3000,
     capErros:+document.getElementById('iCapErros').value||2500,capVC:+document.getElementById('iCapVC').value||1280,
     capLC:+document.getElementById('iCapLC').value||6500,capUC:+document.getElementById('iCapUC').value||20800,
@@ -1947,6 +1960,8 @@ function loadFormFrom(day){
   document.getElementById('iObs').value=day.obs||'';
   s('iCPer',day.cPer||'');s('iCMed',day.cMed||'');s('iCkOut',day.ckOut||'');
   s('iEsp',day.esp||'');s('iFrF',day.frF||'');s('iFrFc',day.frFc||'');s('iExp',day.exp||'');
+  s('iCPerFim',day.cPerFim||'');s('iCMedFim',day.cMedFim||'');s('iCkOutFim',day.ckOutFim||'');
+  s('iEspFim',day.espFim||'');s('iFrFFim',day.frFFim||'');s('iFrFcFim',day.frFcFim||'');s('iExpFim',day.expFim||'');
   s('iCapLM',day.capLM||3500);s('iCapLP',day.capLP||3000);s('iCapErros',day.capErros||2500);
   s('iCapVC',day.capVC||1280);s('iCapLC',day.capLC||6500);s('iCapUC',day.capUC||20800);
   s('iCapVales',day.capVales||1);
