@@ -962,17 +962,9 @@ function sumHoraField(metric,hd){
   if(!hd||!hd[metric])return 0;
   return hd[metric].reduce((s,v)=>s+(v!==''&&v!==null&&v!==undefined?+v:0),0);
 }
-function prevTipoCheckoutTotal(day){
-  if(!day)return 0;
-  const typeTotal=[
-    'pnCorreia','pnPsico','pnEspecial','pnEspFrac','pnEspMed','pnEspPerf',
-    'pnFralda','pnFraldaF','pnGel','pnOnco','pnOncoT','pnJuncao'
-  ].reduce((s,k)=>s+(+day[k]||0),0);
-  return typeTotal||(+day.pnVol||0);
-}
 function prevCheckoutBase(day){
   if(!day)return 0;
-  if(useNewRules(day.date))return prevTipoCheckoutTotal(day);
+  if(useNewRules(day.date))return +day.pnCorreia||0;
   return (+day.pnCorreia||0)+(+day.pnJuncao||0);
 }
 function sumHoraInput(metric){
@@ -1136,7 +1128,7 @@ function renderFlowBar(day){
   if(bCK){bCK.style.width=pCK+'%';bCK.style.background=pCK>=90?'#00e5ff':pCK>=70?'#ffd700':'#ff4c4c';}
   if(document.getElementById('fsCKPsi'))document.getElementById('fsCKPsi').textContent='—';
   if(document.getElementById('fsCKGel'))document.getElementById('fsCKGel').textContent='—';
-  // Checkout = volumes previstos por tipo nos dias novos.
+  // Checkout = Correia (vol.) nos dias novos.
   const prevCKtotal=prevCheckoutBase(day);
   document.getElementById('fsCKEsp').textContent='Prev: '+prevCKtotal.toLocaleString('pt-BR');
   document.getElementById('fsCKFrFc').textContent='Junção: '+(day.pnJuncao||0).toLocaleString('pt-BR');
@@ -2666,7 +2658,7 @@ function calcPrevisaoEncerramento(dayOverride,options){
 
   // 3. CHECKOUT (Vol.)
   const capVC=day.capVC||1280;
-  // Checkout usa a base dos volumes previstos por tipo nos dias novos.
+  // Checkout usa Correia (vol.) como base nos dias novos.
   const prevCK=prevCheckoutBase(day);
   const realCK=realizado('Vol. Checkout');
   const faltaCK=Math.max(prevCK-realCK,0);
