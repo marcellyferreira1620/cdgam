@@ -550,9 +550,9 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
           <div style="font-size:9px;color:#00e676;font-weight:bold;margin-bottom:4px">EXPEDIÇÃO — capacidade /hora</div>
           <div class="adm-row"><label>Vol. Especial /h</label><input type="number" id="iCapEsp" value="340" oninput="liveUpdate()"/></div>
           <div class="adm-row"><label>Vol. Esp. Frac. /h</label><input type="number" id="iCapEspFrac" value="0" oninput="liveUpdate()"/></div>
-          <div class="adm-row"><label>Vol. Esp. Med. /h</label><input type="number" id="iCapEspMed" value="0" oninput="liveUpdate()"/></div>
+          <div class="adm-row"><label>Vol. Esp. Med. /h</label><input type="number" id="iCapEspMed" value="100" oninput="liveUpdate()"/></div>
           <div class="adm-row"><label>Vol. Esp. Perf. /h</label><input type="number" id="iCapEspPerf" value="0" oninput="liveUpdate()"/></div>
-          <div class="adm-row"><label>Fraldas Cx Fech. /h</label><input type="number" id="iCapFrF" value="114" oninput="liveUpdate()"/></div>
+          <div class="adm-row"><label>Fraldas Cx Fech. /h</label><input type="number" id="iCapFrF" value="100" oninput="liveUpdate()"/></div>
           <div class="adm-row"><label>Fraldas Frac. /h</label><input type="number" id="iCapFrFc" value="89" oninput="liveUpdate()"/></div>
           <div class="adm-row"><label>Vol. Doca /h</label><input type="number" id="iCapVE" value="1303" oninput="liveUpdate()"/></div>
         </div>
@@ -927,6 +927,7 @@ function reconnectFirebase(){
 // ── EMPTY DAY ─────────────────────────────────────────────
 function emptyDay(dt){
   const hd={};MHORA.forEach(m=>{hd[m]=new Array(HOURS.length).fill('');});
+  const newRules=String(dt||today())>=NEW_RULES_FROM;
   return{
     date:dt||today(),
     pnVol:0,pnUnid:0,
@@ -936,7 +937,7 @@ function emptyDay(dt){
     cPer:'',cMed:'',ckOut:'',esp:'',frF:'',frFc:'',exp:'',
     capLM:3500,capLP:3000,capErros:2500,capVC:1280,capLC:6500,capUC:20800,
     capVales:1,
-    capEsp:340,capEspFrac:0,capEspMed:0,capEspPerf:0,capFrF:114,capFrFc:89,capVE:1303,
+    capEsp:340,capEspFrac:0,capEspMed:newRules?100:0,capEspPerf:0,capFrF:newRules?100:114,capFrFc:89,capVE:1303,
     rPsico:0,rGel:0,rOnco:0,rOncoT:0,rJuncao:0,rDoc:0,
     hd
   };
@@ -1885,6 +1886,7 @@ function readFormAsDay(){
   const dt=document.getElementById('iData').value;if(!dt)return null;
   const existing=getDay(dt);
   const savedRotas=existing&&Array.isArray(existing.rotas)?JSON.parse(JSON.stringify(existing.rotas)):null;
+  const newRules=useNewRules(dt);
   return{
     date:dt,
     _updatedAt:Date.now(),
@@ -1922,9 +1924,9 @@ function readFormAsDay(){
     capVales:+document.getElementById('iCapVales').value||1,
     capEsp:+document.getElementById('iCapEsp').value||340,
     capEspFrac:+document.getElementById('iCapEspFrac').value||0,
-    capEspMed:+document.getElementById('iCapEspMed').value||0,
+    capEspMed:+document.getElementById('iCapEspMed').value||(newRules?100:0),
     capEspPerf:+document.getElementById('iCapEspPerf').value||0,
-    capFrF:+document.getElementById('iCapFrF').value||114,
+    capFrF:+document.getElementById('iCapFrF').value||(newRules?100:114),
     capFrFc:+document.getElementById('iCapFrFc').value||89,
     capVE:+document.getElementById('iCapVE').value||1303,
     rPsico:+document.getElementById('iRPsico').value||0,rGel:+document.getElementById('iRGel').value||0,
@@ -1936,6 +1938,7 @@ function readFormAsDay(){
 }
 function loadFormFrom(day){
   if(!day)day=emptyDay();
+  const newRules=useNewRules(day.date);
   const s=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
   s('iData',day.date);
   s('iPNVol',day.pnVol||'');s('iPNUnid',day.pnUnid||'');
@@ -1956,8 +1959,8 @@ function loadFormFrom(day){
   s('iCapVC',day.capVC||1280);s('iCapLC',day.capLC||6500);s('iCapUC',day.capUC||20800);
   s('iCapVales',day.capVales||1);
   s('iCapEsp',day.capEsp||340);s('iCapEspFrac',day.capEspFrac||0);
-  s('iCapEspMed',day.capEspMed||0);s('iCapEspPerf',day.capEspPerf||0);
-  s('iCapFrF',day.capFrF||114);s('iCapFrFc',day.capFrFc||89);
+  s('iCapEspMed',newRules?100:(day.capEspMed||0));s('iCapEspPerf',day.capEspPerf||0);
+  s('iCapFrF',newRules?100:(day.capFrF||114));s('iCapFrFc',day.capFrFc||89);
   s('iCapVE',day.capVE||1303);
   s('iRPsico',day.rPsico||'');s('iRGel',day.rGel||'');
   s('iROnco',day.rOnco||'');s('iROncoT',day.rOncoT||'');
@@ -2703,8 +2706,21 @@ function calcPrevisaoEncerramento(dayOverride,options){
     unidade:'vol'
   });
 
-  // 6. FRALDAS CX FECHADA
-  const capFrF=day.capFrF||114;
+  // 6. ESP. MEDICAMENTO
+  const capEspMed=useNewRules(day.date)?100:(day.capEspMed||0);
+  const prevEspMed=day.pnEspMed||0;
+  const realEspMed=realizado('Vol. Esp. Med.');
+  const faltaEspMed=Math.max(prevEspMed-realEspMed,0);
+  if(prevEspMed>0&&capEspMed>0)setores.push({
+    nome:'Esp. Med.',cor:'#9b59b6',icone:'🟣',
+    prev:prevEspMed,real:realEspMed,falta:faltaEspMed,cap:capEspMed,
+    termino:fmtTermino(hAtual+faltaEspMed/capEspMed,faltaEspMed),
+    terminoDec:faltaEspMed>0?hAtual+faltaEspMed/capEspMed:hAtual,
+    unidade:'vol'
+  });
+
+  // 7. FRALDAS CX FECHADA
+  const capFrF=useNewRules(day.date)?100:(day.capFrF||114);
   const prevFrF=day.pnFraldaF||0;
   const realFrF=realizado('Vol. Fraldas Cx Fech.');
   const faltaFrF=Math.max(prevFrF-realFrF,0);
@@ -2716,7 +2732,7 @@ function calcPrevisaoEncerramento(dayOverride,options){
     unidade:'vol'
   });
 
-  // 7. FRALDAS FRACIONADO
+  // 8. FRALDAS FRACIONADO
   const capFrFc=day.capFrFc||89;
   const prevFrFc=day.pnFralda||0;
   const realFrFc=realizado('Vol. Fraldas Frac.');
@@ -2729,7 +2745,7 @@ function calcPrevisaoEncerramento(dayOverride,options){
     unidade:'vol'
   });
 
-  // 8. DOCA — usa o campo manual "Doca (vol.)" como previsto de expedição
+  // 9. DOCA — usa o campo manual "Doca (vol.)" como previsto de expedição
   const capVE=day.capVE||1303;
   const prevDoca=day.pnDoca||day.pnVol||0;
   const realDoca=realizado('Vol. Doca');
