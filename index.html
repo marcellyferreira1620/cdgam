@@ -2040,7 +2040,33 @@ function loadFormFrom(day){
   document.getElementById('admDayLbl').textContent=existing?`(editando: ${fmtDate(day.date)})`:'(novo dia)';
   setTimeout(updateRealAuto,100);
 }
-function prepNewDay(){loadFormFrom(emptyDay(today()));}
+function renderCurrentDay(day){
+  renderKPIs(day);renderFlowBar(day);renderDashCharts(day);renderDashTables(day);
+  renderRotasTbl(day,'rotasTbl');renderRotasTbl(day,'rotasTblFull');updateRotasKPIs(day);
+  refreshOpenPrevisaoEncerramento(day);
+}
+function prepNewDay(){
+  clearTimeout(autoSaveTimer);
+  const current=readFormAsDay();
+  if(current){
+    const curIdx=db.days.findIndex(d=>d.date===current.date);
+    if(curIdx>=0)db.days[curIdx]=current;else db.days.push(current);
+  }
+  const dt=today();
+  let day=getDay(dt);
+  if(!day){
+    day=emptyDay(dt);
+    db.days.push(day);
+  }
+  db.days.sort((a,b)=>a.date.localeCompare(b.date));
+  curDate=dt;
+  save();
+  buildDayNav();
+  renderCurrentDay(day);
+  loadFormFrom(day);
+  document.getElementById('liveBadge').style.display='none';
+  showSyncStatus('☁ Novo dia pronto',false);
+}
 // Auto-save debounce timer
 let autoSaveTimer=null;
 function persistDayNow(){
