@@ -455,12 +455,12 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
 <!-- TAB COMPARATIVO -->
 <div class="tab-body" id="tb-comp">
   <div class="chart-grid">
-    <div class="chart-box"><div class="chart-ttl">% Produzido por Dia</div><div style="position:relative;height:220px"><canvas id="cCompPerc" role="img" aria-label="Percentual por dia"></canvas></div></div>
-    <div class="chart-box"><div class="chart-ttl">Venda vs Acumulado</div><div style="position:relative;height:220px"><canvas id="cCompVA" role="img" aria-label="Venda vs acumulado"></canvas></div></div>
+    <div class="chart-box"><div class="chart-ttl">% Expedido por Dia</div><div style="position:relative;height:220px"><canvas id="cCompPerc" role="img" aria-label="Percentual expedido por dia"></canvas></div></div>
+    <div class="chart-box"><div class="chart-ttl">Previsto Doca vs Expedido</div><div style="position:relative;height:220px"><canvas id="cCompVA" role="img" aria-label="Previsto doca vs expedido"></canvas></div></div>
   </div>
   <div class="chart-grid">
-    <div class="chart-box"><div class="chart-ttl">O.S. Impressas vs Finalizadas</div><div style="position:relative;height:200px"><canvas id="cCompOS" role="img" aria-label="OS"></canvas></div></div>
-    <div class="chart-box"><div class="chart-ttl">Faltas por Dia</div><div style="position:relative;height:200px"><canvas id="cCompFlt" role="img" aria-label="Faltas"></canvas></div></div>
+    <div class="chart-box"><div class="chart-ttl">Correia Med. vs Correia Perf.</div><div style="position:relative;height:200px"><canvas id="cCompOS" role="img" aria-label="Correia medicamentos vs perfumaria"></canvas></div></div>
+    <div class="chart-box"><div class="chart-ttl">Checkout vs Doca</div><div style="position:relative;height:200px"><canvas id="cCompFlt" role="img" aria-label="Checkout vs doca"></canvas></div></div>
   </div>
   <div class="separator">Tabela Resumo — Todos os Dias</div>
   <div class="tbl-wrap" id="compTbl"></div>
@@ -1735,35 +1735,53 @@ function renderComp(){
   const days=sortedDays();
   if(!days.length){document.getElementById('compTbl').innerHTML='<div class="no-data">Sem dados</div>';return;}
   const labels=days.map(d=>fmtDateShort(d.date));
-  const percs=days.map(d=>d.meta>0?Math.round(d.acum/d.meta*100):0);
+  const stats=days.map(day=>{
+    const hd=day.hd||{};
+    const sumH=metric=>sumHoraField(metric,hd);
+    const prevDoca=+day.pnDoca||+day.pnVol||0;
+    const doca=Math.max(sumH('Vol. Doca'),+day.rDoc||0);
+    return {
+      day,prevDoca,doca,
+      perc:prevDoca>0?Math.round(doca/prevDoca*100):0,
+      med:sumH('Linhas Med.'),
+      perf:sumH('Linhas Perf.'),
+      checkout:sumH('Vol. Checkout'),
+      especial:sumH('Vol. Especial'),
+      fraldaFech:sumH('Vol. Fraldas Cx Fech.'),
+      fraldaFrac:sumH('Vol. Fraldas Frac.')
+    };
+  });
+  const percs=stats.map(s=>s.perc);
   if(CH.cPerc)CH.cPerc.destroy();
   CH.cPerc=new Chart(document.getElementById('cCompPerc'),{type:'bar',
-    data:{labels,datasets:[{label:'% Produzido',data:percs,backgroundColor:percs.map(p=>p>=90?'#00e676':p>=70?'#ff9500':'#ff4c4c'),borderRadius:4}]},
+    data:{labels,datasets:[{label:'% Expedido',data:percs,backgroundColor:percs.map(p=>p>=90?'#00e676':p>=70?'#ff9500':'#ff4c4c'),borderRadius:4}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},
-      scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'}},y:{max:110,ticks:{color:'#6a9fc0',font:{size:9},callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.07)'}}}}});
+      scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'}},y:{suggestedMax:110,ticks:{color:'#6a9fc0',font:{size:9},callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.07)'}}}}});
   if(CH.cVA)CH.cVA.destroy();
   CH.cVA=new Chart(document.getElementById('cCompVA'),{type:'line',
-    data:{labels,datasets:[{label:'Prev.Vol',data:days.map(d=>d.pnVol||0),borderColor:'#ffd700',borderWidth:2,pointRadius:3,fill:false,tension:.3},{label:'Acumulado',data:days.map(d=>d.acum||0),borderColor:'#00e676',borderWidth:2,pointRadius:3,fill:false,tension:.3}]},
+    data:{labels,datasets:[{label:'Prev. Doca',data:stats.map(s=>s.prevDoca),borderColor:'#ffd700',borderWidth:2,pointRadius:3,fill:false,tension:.3},{label:'Expedido',data:stats.map(s=>s.doca),borderColor:'#00e676',borderWidth:2,pointRadius:3,fill:false,tension:.3}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'}}}}});
   if(CH.cOS)CH.cOS.destroy();
   CH.cOS=new Chart(document.getElementById('cCompOS'),{type:'bar',
-    data:{labels,datasets:[{label:'O.S. Impressas',data:days.map(d=>d.osImp||0),backgroundColor:'rgba(0,229,255,.3)',borderColor:'#00e5ff',borderWidth:1},{label:'O.S. Finalizadas',data:days.map(d=>d.osFin||0),backgroundColor:'#00e676',borderRadius:3}]},
+    data:{labels,datasets:[{label:'Correia Med.',data:stats.map(s=>s.med),backgroundColor:'rgba(255,149,0,.35)',borderColor:'#ff9500',borderWidth:1},{label:'Correia Perf.',data:stats.map(s=>s.perf),backgroundColor:'#00e5ff',borderRadius:3}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'}}}}});
   if(CH.cFlt)CH.cFlt.destroy();
   CH.cFlt=new Chart(document.getElementById('cCompFlt'),{type:'bar',
-    data:{labels,datasets:[{label:'Faltas',data:days.map(d=>d.faltas||0),backgroundColor:days.map(d=>(d.faltas||0)>3?'#ff4c4c':(d.faltas||0)>0?'#ffd700':'#00e676'),borderRadius:3}]},
+    data:{labels,datasets:[{label:'Vol. Checkout',data:stats.map(s=>s.checkout),backgroundColor:'rgba(77,166,255,.45)',borderColor:'#4da6ff',borderWidth:1},{label:'Vol. Doca',data:stats.map(s=>s.doca),backgroundColor:'#00e676',borderRadius:3}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'}}}}});
-  const cols=['Data','Prev.Vol','Prev.Unid','Acumulado','Meta','% Prod.','O.S.Imp.','O.S.Fin.','Faltas','Correia Med.','Expedição','Obs'];
+  const cols=['Data','Prev. Doca','Expedido','% Exp.','Correia Med.','Correia Perf.','Vol. Checkout','Vol. Especial','Fraldas Fech.','Fraldas Frac.','O.S.Imp.','O.S.Fin.','Faltas','Obs'];
   let t=`<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>`;
-  [...days].reverse().forEach(d=>{
-    const hd=d.hd||{};const perc=d.meta>0?Math.round(d.acum/d.meta*100):0;const pc=perc>=90?'#00e676':perc>=70?'#ffd700':'#ff4c4c';
+  [...stats].reverse().forEach(s=>{
+    const d=s.day;const pc=s.perc>=90?'#00e676':s.perc>=70?'#ffd700':'#ff4c4c';
     t+=`<tr><td style="white-space:nowrap;font-weight:bold;color:#ffd700">${fmtDateShort(d.date)}</td>
-      <td>${(d.pnVol||0).toLocaleString('pt-BR')}</td><td>${(d.pnUnid||0).toLocaleString('pt-BR')}</td>
-      <td style="color:#00e676">${(d.acum||0).toLocaleString('pt-BR')}</td><td>${(d.meta||0).toLocaleString('pt-BR')}</td>
-      <td style="color:${pc};font-weight:bold">${perc}%</td><td>${d.osImp||0}</td><td>${d.osFin||0}</td>
+      <td>${s.prevDoca.toLocaleString('pt-BR')}</td>
+      <td style="color:#00e676">${s.doca.toLocaleString('pt-BR')}</td>
+      <td style="color:${pc};font-weight:bold">${s.perc}%</td>
+      <td>${s.med.toLocaleString('pt-BR')}</td><td>${s.perf.toLocaleString('pt-BR')}</td>
+      <td>${s.checkout.toLocaleString('pt-BR')}</td><td>${s.especial.toLocaleString('pt-BR')}</td>
+      <td>${s.fraldaFech.toLocaleString('pt-BR')}</td><td>${s.fraldaFrac.toLocaleString('pt-BR')}</td>
+      <td>${d.osImp||0}</td><td>${d.osFin||0}</td>
       <td style="color:${(d.faltas||0)>3?'#ff4c4c':(d.faltas||0)>0?'#ffd700':'#00e676'}">${d.faltas||0}</td>
-      <td>${sumHoraField('Linhas Med.',hd).toLocaleString('pt-BR')}</td>
-      <td>${sumHoraField('Vol. Expedição',hd).toLocaleString('pt-BR')}</td>
       <td style="font-size:10px;color:#6a9fc0;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.obs||''}</td>
     </tr>`;
   });
