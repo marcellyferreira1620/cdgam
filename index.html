@@ -370,7 +370,7 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
       <div style="position:relative;height:220px"><canvas id="cHoraPerf" role="img" aria-label="Producao da correia perfumaria por hora"></canvas></div>
     </div>
     <div class="chart-box" id="horaCheckoutBox" style="display:none">
-      <div class="chart-ttl">Produção hora a hora — Checkout | Conferentes em linha</div>
+      <div class="chart-ttl"><span>Produção hora a hora — Checkout | Conferentes em linha</span><span style="font-size:9px;font-weight:normal">Intervalos alternados 21:30→22:30</span></div>
       <div style="position:relative;height:220px"><canvas id="cHoraCheckout" role="img" aria-label="Producao do checkout por hora"></canvas></div>
       <div class="checkout-conf-wrap" id="confTbl"></div>
     </div>
@@ -760,6 +760,7 @@ const CAPACITY_LOW_COLOR='#ff4c4c';
 const CORREIA_DIRECT_HOUR_METRICS=['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.'];
 const MED_BREAK_METRICS=['Linhas Med.','Vol. Med.','Unid. Med.'];
 const PERF_BREAK_METRICS=['Linhas Perf.','Vol. Perf.','Unid. Perf.'];
+const CHECKOUT_BREAK_METRICS=['Vol. Checkout','Linhas Checkout','Unid. Checkout'];
 let db={days:[]};
 let curDate=null;
 let adminOk=false;
@@ -1023,6 +1024,8 @@ function hourTargetFactor(metric,i,dt){
   // Intervalos: Medicamentos 21:30→22h e Perfumaria 22→22:30.
   if(MED_BREAK_METRICS.includes(metric)&&i===4)return 0.5;
   if(PERF_BREAK_METRICS.includes(metric)&&i===5)return 0.5;
+  // Checkout: meia hora com equipe completa + meia hora com metade da equipe = 75%.
+  if(CHECKOUT_BREAK_METRICS.includes(metric)&&(i===4||i===5))return 0.75;
   return 1;
 }
 function capForHour(metric,cap,i,dt){
