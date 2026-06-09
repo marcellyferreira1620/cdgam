@@ -118,6 +118,10 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
 .hora-tbl-wrap .hora-cell{min-width:86px;padding:4px 5px;vertical-align:top}
 .hora-tbl-wrap .hora-acum-input{width:74px;background:#071525;border:1px solid rgba(106,159,192,.18);border-radius:2px;color:#dcecff;font-size:10px;font-weight:600;height:20px;padding:2px 5px}
 .hora-tbl-wrap .delta-hint{margin-top:3px;background:rgba(0,0,0,.24);border-left:3px solid #00e5ff;border-radius:3px;padding:3px 5px;min-height:25px;line-height:1.05}
+.route-initial-wrap{display:flex;align-items:center;gap:4px;margin-top:3px;color:#6a9fc0;font-size:8px;font-weight:normal}
+.route-initial-input{width:72px!important;height:18px!important;background:#071525!important;border:1px solid #00c878!important;color:#00e676!important;text-align:right}
+.route-pending-input{border-color:rgba(255,215,0,.45)!important;color:#ffd700!important}
+.route-mode-hint{display:block;color:#ffd700;font-size:8px;font-weight:normal;margin-top:2px}
 .hora-tbl-wrap .delta-label{display:block;color:#77b9dc;font-size:7px;text-transform:uppercase;letter-spacing:.4px;font-weight:800}
 .hora-tbl-wrap .delta-val{display:block;color:#fff;font-size:14px;font-weight:900}
 .hora-tbl-wrap .delta-empty{display:none}
@@ -490,7 +494,7 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
   <div style="padding:8px">
     <div style="background:#0a2340;border-radius:6px;padding:8px 14px;margin-bottom:8px;border:1px solid rgba(0,230,118,.3);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span style="font-size:11px;font-weight:bold;color:#00e676">⏱️ PRODUÇÃO HORA A HORA</span>
-      <span style="font-size:10px;color:#6a9fc0">Preencha o acumulado de cada período. O resultado por hora aparece abaixo e salva automaticamente.</span>
+      <span style="font-size:10px;color:#6a9fc0">Demais indicadores: preencha o acumulado. Rotas: informe o total inicial e o saldo pendente de cada hora.</span>
       <span id="preenchStatus" style="font-size:10px;color:#ffd700;margin-left:auto"></span>
     </div>
     <div style="background:#122033;border-radius:6px;border:1px solid #1a3550;overflow-x:auto">
@@ -1024,6 +1028,13 @@ function useNewRules(dt){return String(dt||currentFormDate())>=NEW_RULES_FROM;}
 function useSplitIndicators(dt){return String(dt||currentFormDate())>=SPLIT_INDICATORS_FROM;}
 function routeMetricKey(r){return`Rota ${r.cod} — ${r.cidade}`;}
 function routeHourMetrics(){return ROTAS_FIXAS.map(routeMetricKey);}
+function routeFromMetric(metric){return ROTAS_FIXAS.find(r=>routeMetricKey(r)===metric)||null;}
+function isRouteMetric(metric){return !!routeFromMetric(metric);}
+function routeInitialTotal(day,metric){
+  const route=routeFromMetric(metric);if(!route)return 0;
+  const saved=day&&Array.isArray(day.rotas)?day.rotas.find(r=>normalizeRouteCode(r.cod)===normalizeRouteCode(route.cod)):null;
+  return saved?+saved.vol||0:0;
+}
 function activeHourMetrics(dt){return useSplitIndicators(dt)?[...MHORA,...routeHourMetrics()]:MHORA.filter(m=>!NEW_CORREIA_DETAIL_METRICS.includes(m));}
 function hourTargetFactor(metric,i,dt){
   // Antes de 09/06, preserva a regra já aplicada somente à Correia no primeiro período.
@@ -1058,6 +1069,12 @@ function prevCheckoutBase(day){
 function sumHoraInput(metric){
   const inputs=[...document.querySelectorAll(`#hTblBody input[data-m="${metric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
   if(!inputs.length)return 0;
+  if(isRouteMetric(metric)){
+    const initial=routeInitialTotal(getDay(currentFormDate()),metric);
+    let last=initial,hasValue=false;
+    inputs.forEach(inp=>{if(inp.value!==''){last=+inp.value;hasValue=true;}});
+    return hasValue?Math.max(initial-last,0):0;
+  }
   if(isDeltaMetric(metric,currentFormDate())){
     // inputs contêm acumulados → o último valor preenchido = total acumulado
     let last=0;
@@ -1810,11 +1827,14 @@ function renderDashTables(day){
   DASH_GROUPS.forEach(group=>{
     h2+=`<tr><td colspan="${HOURS.length+1}" style="background:${group.bg};color:#89b4d4;font-size:9px;font-weight:bold;padding:3px 8px;letter-spacing:.5px;border-top:2px solid rgba(255,255,255,.08)">${group.title}</td></tr>`;
     group.metrics.forEach(m=>{
-      const cap=CAP_VALS[m]||null;const isInv=MHORA_INV.includes(m);
+      const cap=CAP_VALS[m]||null;const isInv=MHORA_INV.includes(m);const isRoute=isRouteMetric(m);
       const isCK=['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.','Vol. Checkout','Linhas Checkout','Unid. Checkout'].includes(m);
-      const vals=hd[m]||new Array(HOURS.length).fill('');
+      const rawVals=hd[m]||new Array(HOURS.length).fill('');
+      const initialTotal=isRoute?routeInitialTotal(day,m):0;
+      const vals=isRoute?routeDoneToPending(rawVals,initialTotal):rawVals;
       const capLbl=cap?`<span style="font-size:9px;color:#6a9fc0;font-weight:normal;display:block">${isInv?'máx':'meta'}: ${cap.toLocaleString('pt-BR')}/h</span>`:'';
-      h2+=`<tr><td class="row-lbl">${m}${capLbl}</td>`;
+      const routeLbl=isRoute?`<span style="font-size:9px;color:#00e676;font-weight:normal;display:block">Inicial: ${initialTotal.toLocaleString('pt-BR')} | saldo pendente</span>`:'';
+      h2+=`<tr><td class="row-lbl">${m}${capLbl}${routeLbl}</td>`;
       vals.forEach((v,i)=>{
         const dimmed=isCK&&i>=H_CK;
         let bg='',style='';
@@ -1828,7 +1848,8 @@ function renderDashTables(day){
         const isExtra=isCK&&i>=H_CK;
         const periodTarget=cap?capForHour(m,cap,i,day.date):null;
         const targetTitle=periodTarget?`${isInv?'Limite':'Meta'} do período: ${periodTarget.toLocaleString('pt-BR')}`:'';
-        h2+=`<td style="text-align:center;${bg}" title="${[isExtra?'⚡ Hora extra':'',targetTitle].filter(Boolean).join(' | ')}"><span style="${style}">${v!==''?v:isExtra?'·':'-'}</span></td>`;
+        const routeDone=isRoute&&rawVals[i]!==''?`<span style="display:block;font-size:8px;color:#00e5ff">feito: ${(+rawVals[i]).toLocaleString('pt-BR')}</span>`:'';
+        h2+=`<td style="text-align:center;${bg}" title="${[isExtra?'⚡ Hora extra':'',targetTitle].filter(Boolean).join(' | ')}"><span style="${style}">${v!==''?v:isExtra?'·':'-'}</span>${routeDone}</td>`;
       });
       h2+='</tr>';
     });
@@ -1996,7 +2017,7 @@ function getCapacities(){
 // ── ACUMULADO → DELTA ────────────────────────────────────
 // Métricas que NÃO usam modo acumulado (valores já são por hora discreta)
 const DELTA_SKIP=['Vales','Conf. Planejado','Conf. Ativo'];
-function isDeltaMetric(m,dt){return!DELTA_SKIP.includes(m)&&!(useNewRules(dt)&&CORREIA_DIRECT_HOUR_METRICS.includes(m));}
+function isDeltaMetric(m,dt){return!isRouteMetric(m)&&!DELTA_SKIP.includes(m)&&!(useNewRules(dt)&&CORREIA_DIRECT_HOUR_METRICS.includes(m));}
 
 // Dado array de acumulados (alguns podem ser ''), retorna array de deltas por hora
 function acumToDeltas(acums){
@@ -2033,9 +2054,35 @@ function deltasToAcums(deltas){
   return acums;
 }
 
-function deltaHintHtml(delta){
+// Rotas armazenam o realizado por hora, mas o operador preenche o saldo pendente.
+function routeDoneToPending(done,totalInitial){
+  const pending=new Array(done.length).fill('');
+  let remaining=Math.max(+totalInitial||0,0);
+  for(let i=0;i<done.length;i++){
+    if(done[i]!==''&&done[i]!==null&&done[i]!==undefined){
+      remaining=Math.max(remaining-(+done[i]||0),0);
+      pending[i]=remaining;
+    }
+  }
+  return pending;
+}
+
+function routePendingToDone(pending,totalInitial){
+  const done=new Array(pending.length).fill('');
+  let previous=Math.max(+totalInitial||0,0);
+  for(let i=0;i<pending.length;i++){
+    if(pending[i]!==''&&pending[i]!==null&&pending[i]!==undefined){
+      const current=Math.max(+pending[i]||0,0);
+      done[i]=Math.max(previous-current,0);
+      previous=current;
+    }
+  }
+  return done;
+}
+
+function deltaHintHtml(delta,label='resultado/hora'){
   if(delta===''||delta===null||delta===undefined)return '';
-  return `<span class="delta-label">resultado/hora</span><span class="delta-val">${Number(delta).toLocaleString('pt-BR')}</span>`;
+  return `<span class="delta-label">${label}</span><span class="delta-val">${Number(delta).toLocaleString('pt-BR')}</span>`;
 }
 
 function buildHoraTable(hd){
@@ -2044,6 +2091,7 @@ function buildHoraTable(hd){
   body.innerHTML='';
   const caps=getCapacities();
   const formDate=currentFormDate();
+  const formDay=getDay(formDate);
   const correiaMetrics=useSplitIndicators(formDate)
     ?['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.']
     :['Linhas Med.','Linhas Perf.','Erros Sep. Med.'];
@@ -2064,13 +2112,16 @@ function buildHoraTable(hd){
     sepTr.innerHTML=`<td colspan="${HOURS.length+1}" style="background:${group.color};color:#89b4d4;font-size:9px;font-weight:bold;padding:3px 8px;text-transform:uppercase;letter-spacing:.5px;border-top:2px solid rgba(255,255,255,.08)">${group.title}</td>`;
     body.appendChild(sepTr);
     group.metrics.forEach(m=>{
-      const cap=caps[m]||null;const isInv=MHORA_INV.includes(m);const useDelta=isDeltaMetric(m,formDate);
+      const cap=caps[m]||null;const isInv=MHORA_INV.includes(m);const isRoute=isRouteMetric(m);const useDelta=isDeltaMetric(m,formDate);
+      const route=routeFromMetric(m);const initialTotal=isRoute?routeInitialTotal(formDay,m):0;
       const tr=document.createElement('tr');
-      const modeHint=useDelta?`<span style="font-size:8px;color:#4a7a9b;display:block">▲ acumulado</span>`:'';
+      const modeHint=isRoute
+        ?`<div class="route-initial-wrap"><span>Total inicial</span><input class="route-initial-input" type="number" min="0" data-route-cod="${route.cod}" data-route-m="${m}" value="${initialTotal||''}" placeholder="0" oninput="onRouteInitialInput(this)"/></div><span class="route-mode-hint">▼ preencher saldo pendente</span>`
+        :useDelta?`<span style="font-size:8px;color:#4a7a9b;display:block">▲ acumulado</span>`:'';
       let html=`<td class="hlbl">${m}${cap?`<span style="font-size:9px;color:#6a9fc0;font-weight:normal;display:block">${isInv?'máx':'meta'}: ${cap.toLocaleString('pt-BR')}/h</span>`:''} ${modeHint}</td>`;
       // Para modo delta: converter deltas armazenados → acumulados para exibir
       const rawVals=hd&&hd[m]?hd[m]:new Array(HOURS.length).fill('');
-      const displayVals=useDelta?deltasToAcums(rawVals):rawVals;
+      const displayVals=isRoute?routeDoneToPending(rawVals,initialTotal):useDelta?deltasToAcums(rawVals):rawVals;
       // Deltas calculados para colorir célula (baseado no ritmo/hora)
       const deltaVals=useDelta?rawVals:rawVals;
 
@@ -2089,11 +2140,11 @@ function buildHoraTable(hd){
         const isCKMetric=['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.','Vol. Checkout','Linhas Checkout','Unid. Checkout'].includes(m);
         const isExtra=isCKMetric&&i>=H_CK;
         const extraStyle=isExtra&&!bg?'background:rgba(255,149,0,.06);border-left:2px solid rgba(255,149,0,.2)':'';
-        const deltaHint=useDelta?`<div class="delta-hint ${vDelta===null?'delta-empty':''}">${deltaHintHtml(vDelta)}</div>`:'';
+        const deltaHint=(useDelta||isRoute)?`<div class="delta-hint ${vDelta===null?'delta-empty':''}">${deltaHintHtml(vDelta,isRoute?'feito/hora':'resultado/hora')}</div>`:'';
         const periodTarget=cap?capForHour(m,cap,i,formDate):null;
         const targetTitle=periodTarget?`${isInv?'Limite':'Meta'} do período: ${periodTarget.toLocaleString('pt-BR')}`:'';
-        html+=`<td class="hora-cell" style="${bg};${extraStyle}" title="${[isExtra?'⚡ Hora extra':'',targetTitle,useDelta?'Resultado da hora = acumulado atual - acumulado anterior':''].filter(Boolean).join(' | ')}">
-          <input class="${useDelta?'hora-acum-input':''}" type="number" data-m="${m}" data-i="${i}" data-use-delta="${useDelta?1:0}" value="${vDisplay}" placeholder="-"
+        html+=`<td class="hora-cell" style="${bg};${extraStyle}" title="${[isExtra?'⚡ Hora extra':'',targetTitle,isRoute?'Feito na hora = pendente anterior - pendente atual':useDelta?'Resultado da hora = acumulado atual - acumulado anterior':''].filter(Boolean).join(' | ')}">
+          <input class="${isRoute?'hora-acum-input route-pending-input':useDelta?'hora-acum-input':''}" type="number" min="0" data-m="${m}" data-i="${i}" data-use-delta="${useDelta?1:0}" data-route-pending="${isRoute?1:0}" value="${vDisplay}" placeholder="${isRoute?'pendente':'-'}"
             oninput="onHoraInput(this);persistDayNow();liveUpdate()"
             style="${isExtra?'opacity:0.75':''}"/>
           ${deltaHint}
@@ -2105,8 +2156,26 @@ function buildHoraTable(hd){
 }
 
 function onHoraInput(inp){
-  const m=inp.dataset.m;const useDelta=inp.dataset.useDelta==='1';
-  if(useDelta){
+  const m=inp.dataset.m;const isRoute=inp.dataset.routePending==='1';const useDelta=inp.dataset.useDelta==='1';
+  if(isRoute){
+    const row=inp.closest('tr');
+    const inputs=[...row.querySelectorAll(`input[data-m="${m}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
+    const pending=inputs.map(el=>el.value!==''?+el.value:'');
+    const totalInput=[...document.querySelectorAll('input[data-route-m]')].find(el=>el.dataset.routeM===m);
+    const initialTotal=totalInput&&totalInput.value!==''?+totalInput.value:routeInitialTotal(getDay(currentFormDate()),m);
+    const done=routePendingToDone(pending,initialTotal);
+    let previous=initialTotal;
+    inputs.forEach((el,idx)=>{
+      const td=el.parentNode;
+      let hint=td.querySelector('.delta-hint');
+      if(!hint){hint=document.createElement('div');hint.className='delta-hint';td.appendChild(hint);}
+      hint.classList.toggle('delta-empty',done[idx]==='');
+      hint.innerHTML=deltaHintHtml(done[idx],'feito/hora');
+      const current=pending[idx];
+      td.style.background=current!==''&&current>previous?'rgba(180,20,20,.5)':current===0?'rgba(0,100,50,.45)':'';
+      if(current!=='')previous=current;
+    });
+  } else if(useDelta){
     // Recalcular e atualizar os hints Δ da linha inteira
     const row=inp.closest('tr');
     const inputs=[...row.querySelectorAll(`input[data-m="${m}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
@@ -2125,6 +2194,31 @@ function onHoraInput(inp){
   } else {
     colorCell(inp);
   }
+}
+
+function onRouteInitialInput(inp){
+  const cod=normalizeRouteCode(inp.dataset.routeCod),metric=inp.dataset.routeM;
+  const dt=currentFormDate();
+  let day=getDay(dt);
+  if(!day){
+    day=emptyDay(dt);
+    db.days.push(day);
+    db.days.sort((a,b)=>a.date.localeCompare(b.date));
+    buildDayNav();
+  }
+  if(!Array.isArray(day.rotas))day.rotas=[];
+  let route=day.rotas.find(r=>normalizeRouteCode(r.cod)===cod);
+  if(!route){route={cod};day.rotas.push(route);}
+  route.vol=inp.value!==''?Math.max(+inp.value||0,0):0;
+  day._updatedAt=Date.now();
+  document.querySelectorAll('input[data-route-cod]').forEach(el=>{
+    if(el!==inp&&normalizeRouteCode(el.dataset.routeCod)===cod)el.value=inp.value;
+  });
+  const main=[...document.querySelectorAll('#hTblBody input[data-m]')].find(el=>el.dataset.m===metric);
+  if(main)onHoraInput(main);
+  updatePreenchRouteDone(metric);
+  const saved=persistDayNow();
+  if(saved){renderRouteClosure(saved);updateRotasKPIs(saved);}
 }
 
 function colorCellByDelta(inp,m,delta){
@@ -2158,10 +2252,12 @@ function readHoraData(){
     if(!byMetric[m])byMetric[m]=new Array(HOURS.length).fill('');
     byMetric[m][i]=inp.value!==''?+inp.value:'';
   });
-  // Para métricas de delta: converter acumulados digitados → deltas para armazenar
+  // Rotas: saldo pendente digitado → realizado por hora. Demais deltas: acumulado → realizado por hora.
   metrics.forEach(m=>{
     const vals=byMetric[m]||new Array(HOURS.length).fill('');
-    if(isDeltaMetric(m,dt)){
+    if(isRouteMetric(m)){
+      hd[m]=routePendingToDone(vals,routeInitialTotal(getDay(dt),m));
+    } else if(isDeltaMetric(m,dt)){
       hd[m]=acumToDeltas(vals);
     } else {
       hd[m]=vals;
@@ -3274,9 +3370,11 @@ function renderPreench(){
   grupos.forEach(g=>{
     rows+=`<tr><td colspan="${HOURS.length+1}" style="background:#071525;color:${g.cor};font-size:9px;font-weight:bold;padding:3px 8px;border:1px solid #1a3550;text-transform:uppercase;letter-spacing:.5px">${g.lbl}</td></tr>`;
     g.metrics.forEach(m=>{
+      const isRoute=isRouteMetric(m);const route=routeFromMetric(m);const initialTotal=isRoute?routeInitialTotal(day,m):0;
       const rawVals=day.hd&&day.hd[m]?day.hd[m]:new Array(HOURS.length).fill('');
-      const displayVals=isDeltaMetric(m,day.date)?deltasToAcums(rawVals):rawVals;
-      rows+=`<tr><td style="background:#0a1825;color:#89b4d4;font-size:10px;font-weight:bold;padding:3px 8px;border:1px solid #1a3550;white-space:nowrap">${m}</td>`;
+      const displayVals=isRoute?routeDoneToPending(rawVals,initialTotal):isDeltaMetric(m,day.date)?deltasToAcums(rawVals):rawVals;
+      const routeInitial=isRoute?`<div class="route-initial-wrap"><span>Total inicial</span><input class="route-initial-input" type="number" min="0" data-route-cod="${route.cod}" data-route-m="${m}" value="${initialTotal||''}" placeholder="0" oninput="onRouteInitialInput(this)"/></div><span class="route-mode-hint">▼ preencher saldo pendente</span>`:'';
+      rows+=`<tr><td style="background:#0a1825;color:#89b4d4;font-size:10px;font-weight:bold;padding:3px 8px;border:1px solid #1a3550;white-space:nowrap">${m}${routeInitial}</td>`;
       HOURS.forEach((_,i)=>{
         const val=displayVals[i]??'';
         const extra=i>=H_CK;
@@ -3285,11 +3383,13 @@ function renderPreench(){
           rows+=`<td style="background:#060e18;border:1px solid #1a3550"></td>`;
         }else{
           rows+=`<td style="border:1px solid #1a3550;padding:1px 2px;background:${extra?'rgba(255,149,0,.06)':'#0d1c2e'}">
-            <input type="number" value="${val}" data-m="${m}" data-i="${i}"
-              style="width:56px;background:transparent;border:none;color:#fff;padding:2px 4px;font-size:10px;text-align:center;outline:none"
+            <input type="number" min="0" value="${val}" data-m="${m}" data-i="${i}"
+              style="width:56px;background:transparent;border:none;color:${isRoute?'#ffd700':'#fff'};padding:2px 4px;font-size:10px;text-align:center;outline:none"
+              placeholder="${isRoute?'pend.':''}"
               onfocus="this.style.outline='1px solid #ffd700'"
               onblur="this.style.outline='none'"
               oninput="preenchInput(this)"/>
+            ${isRoute?`<div data-route-done-m="${m}" data-route-done-i="${i}" style="font-size:8px;color:#00e5ff;text-align:center;min-height:10px">${rawVals[i]!==''?`feito: ${(+rawVals[i]).toLocaleString('pt-BR')}`:''}</div>`:''}
           </td>`;
         }
       });
@@ -3298,14 +3398,28 @@ function renderPreench(){
   });
   body.innerHTML=rows;
 }
+function updatePreenchRouteDone(metric){
+  if(!isRouteMetric(metric))return;
+  const inputs=[...document.querySelectorAll(`#preenchBody input[data-m="${metric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
+  const pending=inputs.map(el=>el.value!==''?+el.value:'');
+  const done=routePendingToDone(pending,routeInitialTotal(getDay(currentFormDate()),metric));
+  document.querySelectorAll('[data-route-done-m]').forEach(el=>{
+    if(el.dataset.routeDoneM===metric){
+      const value=done[+el.dataset.routeDoneI];
+      el.textContent=value===''?'':`feito: ${Number(value).toLocaleString('pt-BR')}`;
+    }
+  });
+}
 function preenchInput(inp){
   const m=inp.dataset.m,i=+inp.dataset.i;
   const main=document.querySelector(`#hTblBody input[data-m="${m}"][data-i="${i}"]`);
   if(main){main.value=inp.value;onHoraInput(main);}
+  updatePreenchRouteDone(m);
   updateRealAuto();
   const st=document.getElementById('preenchStatus');
   if(st){st.textContent='⏳ Salvando...';st.style.color='#ffd700';}
   const saved=persistDayNow();
+  if(saved&&isRouteMetric(m)){renderRouteClosure(saved);renderDashTables(saved);}
   if(st&&saved){st.textContent='✅ Salvo';st.style.color='#00e676';}
   setTimeout(()=>{const s=document.getElementById('preenchStatus');if(s)s.textContent='';},3000);
 }
