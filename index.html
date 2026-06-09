@@ -50,6 +50,11 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
 .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px}
 .chart-box{background:#122033;border-radius:6px;padding:8px;border:1px solid #1a3550}
 .chart-ttl{font-size:10px;color:#6a9fc0;font-weight:bold;text-transform:uppercase;margin-bottom:6px;border-bottom:1px solid #1a3550;padding-bottom:4px;display:flex;align-items:center;justify-content:space-between;gap:6px}
+.checkout-conf-wrap{margin-top:8px;overflow-x:auto;border-top:1px solid #1a3550;padding-top:6px}
+.checkout-conf-wrap table{width:100%;border-collapse:collapse;font-size:10px;min-width:900px}
+.checkout-conf-wrap th{background:#0a2340;color:#6a9fc0;padding:3px 5px;text-align:center;border:1px solid #1a3550;white-space:nowrap}
+.checkout-conf-wrap td{padding:3px 5px;text-align:center;border:1px solid #162a3d;background:#0d1c2e}
+.checkout-conf-wrap .row-lbl{text-align:left!important;min-width:110px}
 /* TABLES */
 .tbl-wrap{margin:8px;background:#122033;border-radius:6px;border:1px solid #1a3550;overflow-x:auto}
 .tbl-wrap table{width:100%;border-collapse:collapse;font-size:11px;min-width:900px}
@@ -365,8 +370,9 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
       <div style="position:relative;height:220px"><canvas id="cHoraPerf" role="img" aria-label="Producao da correia perfumaria por hora"></canvas></div>
     </div>
     <div class="chart-box" id="horaCheckoutBox" style="display:none">
-      <div class="chart-ttl">Produção hora a hora — Checkout</div>
+      <div class="chart-ttl">Produção hora a hora — Checkout | Conferentes em linha</div>
       <div style="position:relative;height:220px"><canvas id="cHoraCheckout" role="img" aria-label="Producao do checkout por hora"></canvas></div>
+      <div class="checkout-conf-wrap" id="confTbl"></div>
     </div>
     <div class="chart-box" id="volTipoBox">
       <div class="chart-ttl">
@@ -405,18 +411,12 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
       <div id="docaKpiPanel" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px"></div>
     </div>
   </div>
-  <div class="chart-grid">
-    <div class="chart-box">
-      <div class="chart-ttl">Conferentes Planejado vs Ativo por Hora</div>
-      <div style="position:relative;height:180px"><canvas id="cConf" role="img" aria-label="Conferentes"></canvas></div>
-    </div>
+  <div class="chart-grid" style="grid-template-columns:1fr">
     <div class="chart-box">
       <div class="chart-ttl"><span>EPM e Vales por Hora</span><span style="font-size:9px;color:#6a9fc0;font-weight:normal">EPM máx 2.500/h | Vale máx 1/h</span></div>
       <div style="position:relative;height:180px"><canvas id="cEPM" role="img" aria-label="EPM e vales"></canvas></div>
     </div>
   </div>
-  <div class="separator">Quadro de Conferentes por Hora</div>
-  <div class="tbl-wrap" id="confTbl"></div>
   <div class="separator">Produção Hora a Hora — Todos os Indicadores</div>
   <div class="tbl-wrap" id="horaTbl"></div>
   <div class="separator">🚛 Controle de Saída das Rotas — Eficiência da Expedição</div>
@@ -1269,6 +1269,7 @@ function renderDashCharts(day){
   const lm=dv(hd,'Linhas Med.'),vMed=dv(hd,'Vol. Med.'),uMed=dv(hd,'Unid. Med.');
   const lp=dv(hd,'Linhas Perf.'),vPerf=dv(hd,'Vol. Perf.'),uPerf=dv(hd,'Unid. Perf.');
   const vc=dv(hd,'Vol. Checkout');
+  const cp=dv(hd,'Conf. Planejado'),ca=dv(hd,'Conf. Ativo');
   const capLM=day.capLM||3500,capVMed=day.capVMed||575,capUMed=day.capUMed||10000;
   const capLP=day.capLP||3000,capVPerf=day.capVPerf||425,capUPerf=day.capUPerf||6666;
   const capVC=day.capVC||1280;
@@ -1279,11 +1280,12 @@ function renderDashCharts(day){
   const perfBox=document.getElementById('horaPerfBox');
   const checkoutBox=document.getElementById('horaCheckoutBox');
   const volTipoBox=document.getElementById('volTipoBox');
-  productionGrid.style.gridTemplateColumns=splitIndicators?'repeat(3,minmax(0,1fr))':'1fr 1fr';
+  productionGrid.style.gridTemplateColumns='1fr 1fr';
   combinedBox.style.display=splitIndicators?'none':'block';
   medBox.style.display=splitIndicators?'block':'none';
   perfBox.style.display=splitIndicators?'block':'none';
   checkoutBox.style.display=splitIndicators?'block':'none';
+  checkoutBox.style.gridColumn=splitIndicators?'1 / -1':'auto';
   volTipoBox.style.gridColumn=splitIndicators?'1 / -1':'auto';
 
   const hourChartOptions=(dualUnits=false)=>({responsive:true,maintainAspectRatio:false,
@@ -1316,8 +1318,15 @@ function renderDashCharts(day){
       ]},options:hourChartOptions(true)});
     destroyChart('horaCheckout');
     CH.horaCheckout=new Chart(document.getElementById('cHoraCheckout'),{type:'bar',
-      data:{labels:HOURS,datasets:[hourDataset('Vol. Checkout',vc,capVC,'#00e676','#004030')]},
-      options:hourChartOptions()});
+      data:{labels:HOURS,datasets:[
+        hourDataset('Vol. Checkout',vc,capVC,'#00e676','#004030'),
+        {label:'Conferentes Planejado',data:cp,type:'line',yAxisID:'yConf',borderColor:'#00e5ff',borderWidth:2,pointRadius:3,fill:false,tension:.25},
+        {label:'Conferentes Ativo',data:ca,type:'line',yAxisID:'yConf',borderColor:'#ffd700',borderWidth:2,pointRadius:3,fill:false,tension:.25}
+      ]},
+      options:{...hourChartOptions(),scales:{
+        ...hourChartOptions().scales,
+        yConf:{beginAtZero:true,position:'right',ticks:{color:'#ffd700',font:{size:9},precision:0},grid:{display:false},title:{display:true,text:'Conferentes',color:'#ffd700',font:{size:9}}}
+      }}});
   }else{
     destroyChart('horaMed');destroyChart('horaPerf');destroyChart('horaCheckout');
     destroyChart('hora');
@@ -1478,19 +1487,6 @@ function renderDashCharts(day){
     data:{labels:HOURS,datasets:[
       {label:'Meta Acumulada',data:meta,borderColor:'#e94560',borderDash:[5,3],borderWidth:2,pointRadius:2,fill:false,tension:.3},
       {label:'Prod. Acumulada',data:prodA,borderColor:'#00e676',borderWidth:2,pointRadius:3,fill:false,tension:.3}
-    ]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},
-      scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},
-              y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'}}}}});
-
-  // Conferentes
-  const cp=dv(hd,'Conf. Planejado'),ca=dv(hd,'Conf. Ativo');
-  if(CH.conf)CH.conf.destroy();
-  CH.conf=new Chart(document.getElementById('cConf'),{type:'bar',
-    data:{labels:HOURS,datasets:[
-      {label:'Planejado',data:cp,backgroundColor:'rgba(0,229,255,.2)',borderColor:'#00e5ff',borderWidth:1},
-      {label:'Ativo',data:ca,backgroundColor:ca.map((v,i)=>{if(v===null)return'transparent';const p=cp[i];return(p&&v<p*.8)?'#ff4c4c':v>=p?'#ffd700':'#ff9500';}),borderRadius:2}
     ]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},
