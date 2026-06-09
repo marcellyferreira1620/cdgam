@@ -755,6 +755,8 @@ const SK='cdgam_v6';
 const PWD='gam2025';
 const NEW_RULES_FROM='2026-06-02';
 const SPLIT_INDICATORS_FROM='2026-06-09';
+const CAPACITY_OK_COLOR='#00a8ff';
+const CAPACITY_LOW_COLOR='#ff4c4c';
 const CORREIA_DIRECT_HOUR_METRICS=['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.'];
 let db={days:[]};
 let curDate=null;
@@ -1294,9 +1296,9 @@ function renderDashCharts(day){
             y:{beginAtZero:true,ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'},title:{display:dualUnits,text:'Linhas / Volumes',color:'#6a9fc0',font:{size:9}}},
             ...(dualUnits?{yUnits:{beginAtZero:true,position:'right',ticks:{color:'#c39bd3',font:{size:9}},grid:{display:false},title:{display:true,text:'Unidades',color:'#c39bd3',font:{size:9}}}}:{})}});
   const destroyChart=key=>{if(CH[key]){CH[key].destroy();CH[key]=null;}};
-  const hourDataset=(label,values,cap,goodColor,lowColor,yAxisID='y')=>({
+  const hourDataset=(label,values,cap,yAxisID='y',metric=label)=>({
     label,data:values,yAxisID,
-    backgroundColor:values.map(v=>v===null?'transparent':v>=cap*.9?goodColor:lowColor),
+    backgroundColor:values.map((v,i)=>v===null?'transparent':v>=capForHour(metric,cap,i,day.date)?CAPACITY_OK_COLOR:CAPACITY_LOW_COLOR),
     borderRadius:3
   });
 
@@ -1305,23 +1307,26 @@ function renderDashCharts(day){
     destroyChart('horaMed');
     CH.horaMed=new Chart(document.getElementById('cHoraMed'),{type:'bar',
       data:{labels:HOURS,datasets:[
-        hourDataset('Linhas Med.',lm,capLM,'#ff9500','#c04000'),
-        hourDataset('Volume Med.',vMed,capVMed,'#ffd700','#806c00'),
-        hourDataset('Unidade Med.',uMed,capUMed,'#c39bd3','#614d69','yUnits')
+        hourDataset('Linhas Med.',lm,capLM),
+        hourDataset('Volume Med.',vMed,capVMed,'y','Vol. Med.'),
+        hourDataset('Unidade Med.',uMed,capUMed,'yUnits','Unid. Med.')
       ]},options:hourChartOptions(true)});
     destroyChart('horaPerf');
     CH.horaPerf=new Chart(document.getElementById('cHoraPerf'),{type:'bar',
       data:{labels:HOURS,datasets:[
-        hourDataset('Linhas Perf.',lp,capLP,'#00e5ff','#006080'),
-        hourDataset('Volume Perf.',vPerf,capVPerf,'#4da6ff','#234f80'),
-        hourDataset('Unidade Perf.',uPerf,capUPerf,'#c39bd3','#614d69','yUnits')
+        hourDataset('Linhas Perf.',lp,capLP),
+        hourDataset('Volume Perf.',vPerf,capVPerf,'y','Vol. Perf.'),
+        hourDataset('Unidade Perf.',uPerf,capUPerf,'yUnits','Unid. Perf.')
       ]},options:hourChartOptions(true)});
     destroyChart('horaCheckout');
     CH.horaCheckout=new Chart(document.getElementById('cHoraCheckout'),{type:'bar',
       data:{labels:HOURS,datasets:[
-        hourDataset('Vol. Checkout',vc,capVC,'#00e676','#004030'),
-        {label:'Conferentes Planejado',data:cp,type:'line',yAxisID:'yConf',borderColor:'#00e5ff',borderWidth:2,pointRadius:3,fill:false,tension:.25},
-        {label:'Conferentes Ativo',data:ca,type:'line',yAxisID:'yConf',borderColor:'#ffd700',borderWidth:2,pointRadius:3,fill:false,tension:.25}
+        hourDataset('Vol. Checkout',vc,capVC),
+        {label:'Conferentes Planejado',data:cp,type:'line',yAxisID:'yConf',borderColor:CAPACITY_OK_COLOR,borderDash:[5,3],borderWidth:2,pointRadius:3,pointBackgroundColor:CAPACITY_OK_COLOR,fill:false,tension:.25},
+        {label:'Conferentes Ativo',data:ca,type:'line',yAxisID:'yConf',borderColor:CAPACITY_OK_COLOR,borderWidth:2,pointRadius:3,
+         pointBackgroundColor:ca.map((v,i)=>v===null?'transparent':cp[i]!==null&&v>=cp[i]?CAPACITY_OK_COLOR:CAPACITY_LOW_COLOR),
+         segment:{borderColor:ctx=>{const i=ctx.p1DataIndex,v=ca[i],p=cp[i];return v!==null&&p!==null&&v>=p?CAPACITY_OK_COLOR:CAPACITY_LOW_COLOR;}},
+         fill:false,tension:.25}
       ]},
       options:{...hourChartOptions(),scales:{
         ...hourChartOptions().scales,
@@ -1332,9 +1337,9 @@ function renderDashCharts(day){
     destroyChart('hora');
     CH.hora=new Chart(document.getElementById('cHora'),{type:'bar',
       data:{labels:HOURS,datasets:[
-        hourDataset('Linhas Med.',lm,capLM,'#ff9500','#c04000'),
-        hourDataset('Linhas Perf.',lp,capLP,'#00e5ff','#006080'),
-        hourDataset('Vol. Checkout',vc,capVC,'#00e676','#004030')
+        hourDataset('Linhas Med.',lm,capLM),
+        hourDataset('Linhas Perf.',lp,capLP),
+        hourDataset('Vol. Checkout',vc,capVC)
       ]},
       options:hourChartOptions()});
   }
@@ -1454,9 +1459,9 @@ function renderDashCharts(day){
   if(CH.exp)CH.exp.destroy();
   CH.exp=new Chart(document.getElementById('cExp'),{type:'bar',
     data:{labels:HOURS,datasets:[
-      {label:'Meta/h',data:HOURS.map(()=>capVEh),type:'line',borderColor:'#ffd700',borderDash:[5,3],borderWidth:1.5,pointRadius:0,fill:false},
-      {label:'Vol. Expedição/h',data:ve,backgroundColor:ve.map(v=>v===null?'transparent':v>=capVEh?'#00e5ff':v>=capVEh*.9?'#00e676':v>=capVEh*.7?'#ffd700':'#ff4c4c'),borderRadius:3},
-      {label:'Acumulado',data:veAcum,type:'line',borderColor:'#00e5ff',borderWidth:2,pointRadius:2,fill:false,yAxisID:'y2'}
+      {label:'Meta/h',data:HOURS.map(()=>capVEh),type:'line',borderColor:CAPACITY_OK_COLOR,borderDash:[5,3],borderWidth:1.5,pointRadius:0,fill:false},
+      {label:'Vol. Expedição/h',data:ve,backgroundColor:ve.map(v=>v===null?'transparent':v>=capVEh?CAPACITY_OK_COLOR:CAPACITY_LOW_COLOR),borderRadius:3},
+      {label:'Acumulado',data:veAcum,type:'line',borderColor:CAPACITY_OK_COLOR,borderWidth:2,pointRadius:2,fill:false,yAxisID:'y2'}
     ]},
     options:{responsive:true,maintainAspectRatio:false,
       plugins:{legend:{labels:{color:'#89b4d4',font:{size:9}}}},
