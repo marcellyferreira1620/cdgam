@@ -362,11 +362,11 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
       <div style="position:relative;height:220px"><canvas id="cHora" role="img" aria-label="Producao por hora"></canvas></div>
     </div>
     <div class="chart-box" id="horaMedBox" style="display:none">
-      <div class="chart-ttl">Produção hora a hora — Correia Medicamentos</div>
+      <div class="chart-ttl"><span>Produção hora a hora — Correia Medicamentos</span><span style="font-size:9px;font-weight:normal">Intervalo 21:30→22:00</span></div>
       <div style="position:relative;height:220px"><canvas id="cHoraMed" role="img" aria-label="Producao da correia medicamentos por hora"></canvas></div>
     </div>
     <div class="chart-box" id="horaPerfBox" style="display:none">
-      <div class="chart-ttl">Produção hora a hora — Correia Perfumaria</div>
+      <div class="chart-ttl"><span>Produção hora a hora — Correia Perfumaria</span><span style="font-size:9px;font-weight:normal">Intervalo 22:00→22:30</span></div>
       <div style="position:relative;height:220px"><canvas id="cHoraPerf" role="img" aria-label="Producao da correia perfumaria por hora"></canvas></div>
     </div>
     <div class="chart-box" id="horaCheckoutBox" style="display:none">
@@ -758,6 +758,8 @@ const SPLIT_INDICATORS_FROM='2026-06-09';
 const CAPACITY_OK_COLOR='#00a8ff';
 const CAPACITY_LOW_COLOR='#ff4c4c';
 const CORREIA_DIRECT_HOUR_METRICS=['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.'];
+const MED_BREAK_METRICS=['Linhas Med.','Vol. Med.','Unid. Med.'];
+const PERF_BREAK_METRICS=['Linhas Perf.','Vol. Perf.','Unid. Perf.'];
 let db={days:[]};
 let curDate=null;
 let adminOk=false;
@@ -1013,11 +1015,19 @@ function currentFormDate(){const el=document.getElementById('iData');return el&&
 function useNewRules(dt){return String(dt||currentFormDate())>=NEW_RULES_FROM;}
 function useSplitIndicators(dt){return String(dt||currentFormDate())>=SPLIT_INDICATORS_FROM;}
 function activeHourMetrics(dt){return useSplitIndicators(dt)?MHORA:MHORA.filter(m=>!NEW_CORREIA_DETAIL_METRICS.includes(m));}
-function hourTargetFactor(i){return i===0?0.5:1;}
+function hourTargetFactor(metric,i,dt){
+  // Antes de 09/06, preserva a regra já aplicada somente à Correia no primeiro período.
+  if(!useSplitIndicators(dt))return useNewRules(dt)&&CORREIA_DIRECT_HOUR_METRICS.includes(metric)&&i===0?0.5:1;
+  // 17:30→18h representa apenas 30 minutos para todos os indicadores.
+  if(i===0)return 0.5;
+  // Intervalos: Medicamentos 21:30→22h e Perfumaria 22→22:30.
+  if(MED_BREAK_METRICS.includes(metric)&&i===4)return 0.5;
+  if(PERF_BREAK_METRICS.includes(metric)&&i===5)return 0.5;
+  return 1;
+}
 function capForHour(metric,cap,i,dt){
   if(!cap)return cap;
-  if(useNewRules(dt)&&CORREIA_DIRECT_HOUR_METRICS.includes(metric))return cap*hourTargetFactor(i);
-  return cap;
+  return cap*hourTargetFactor(metric,i,dt);
 }
 function getDay(dt){return db.days.find(d=>d.date===dt)||null;}
 function sortedDays(){return [...db.days].sort((a,b)=>a.date.localeCompare(b.date));}
@@ -1459,8 +1469,8 @@ function renderDashCharts(day){
   if(CH.exp)CH.exp.destroy();
   CH.exp=new Chart(document.getElementById('cExp'),{type:'bar',
     data:{labels:HOURS,datasets:[
-      {label:'Meta/h',data:HOURS.map(()=>capVEh),type:'line',borderColor:CAPACITY_OK_COLOR,borderDash:[5,3],borderWidth:1.5,pointRadius:0,fill:false},
-      {label:'Vol. Expedição/h',data:ve,backgroundColor:ve.map(v=>v===null?'transparent':v>=capVEh?CAPACITY_OK_COLOR:CAPACITY_LOW_COLOR),borderRadius:3},
+      {label:'Meta do período',data:HOURS.map((_,i)=>capForHour('Vol. Doca',capVEh,i,day.date)),type:'line',borderColor:CAPACITY_OK_COLOR,borderDash:[5,3],borderWidth:1.5,pointRadius:0,fill:false},
+      {label:'Vol. Expedição/h',data:ve,backgroundColor:ve.map((v,i)=>v===null?'transparent':v>=capForHour('Vol. Doca',capVEh,i,day.date)?CAPACITY_OK_COLOR:CAPACITY_LOW_COLOR),borderRadius:3},
       {label:'Acumulado',data:veAcum,type:'line',borderColor:CAPACITY_OK_COLOR,borderWidth:2,pointRadius:2,fill:false,yAxisID:'y2'}
     ]},
     options:{responsive:true,maintainAspectRatio:false,
@@ -1714,7 +1724,9 @@ function renderDashTables(day){
           else{const p=n/capH;bg=p>=1.05?'background:rgba(0,180,80,.3)':p>=.9?'background:rgba(0,120,60,.2)':p>=.7?'background:rgba(180,130,0,.2)':'background:rgba(180,30,30,.3)';style=p>=1.05?'color:#00e676;font-weight:bold':p>=.9?'color:#7ddc9f':p>=.7?'color:#ffd700':'color:#ff7070';}
         }
         const isExtra=isCK&&i>=H_CK;
-        h2+=`<td style="text-align:center;${bg}" title="${isExtra?'⚡ Hora extra':''}"><span style="${style}">${v!==''?v:isExtra?'·':'-'}</span></td>`;
+        const periodTarget=cap?capForHour(m,cap,i,day.date):null;
+        const targetTitle=periodTarget?`${isInv?'Limite':'Meta'} do período: ${periodTarget.toLocaleString('pt-BR')}`:'';
+        h2+=`<td style="text-align:center;${bg}" title="${[isExtra?'⚡ Hora extra':'',targetTitle].filter(Boolean).join(' | ')}"><span style="${style}">${v!==''?v:isExtra?'·':'-'}</span></td>`;
       });
       h2+='</tr>';
     });
@@ -1975,7 +1987,9 @@ function buildHoraTable(hd){
         const isExtra=isCKMetric&&i>=H_CK;
         const extraStyle=isExtra&&!bg?'background:rgba(255,149,0,.06);border-left:2px solid rgba(255,149,0,.2)':'';
         const deltaHint=useDelta?`<div class="delta-hint ${vDelta===null?'delta-empty':''}">${deltaHintHtml(vDelta)}</div>`:'';
-        html+=`<td class="hora-cell" style="${bg};${extraStyle}" title="${isExtra?'⚡ Hora extra — ':''}${useDelta?'Resultado da hora = acumulado atual - acumulado anterior':''}">
+        const periodTarget=cap?capForHour(m,cap,i,formDate):null;
+        const targetTitle=periodTarget?`${isInv?'Limite':'Meta'} do período: ${periodTarget.toLocaleString('pt-BR')}`:'';
+        html+=`<td class="hora-cell" style="${bg};${extraStyle}" title="${[isExtra?'⚡ Hora extra':'',targetTitle,useDelta?'Resultado da hora = acumulado atual - acumulado anterior':''].filter(Boolean).join(' | ')}">
           <input class="${useDelta?'hora-acum-input':''}" type="number" data-m="${m}" data-i="${i}" data-use-delta="${useDelta?1:0}" value="${vDisplay}" placeholder="-"
             oninput="onHoraInput(this);persistDayNow();liveUpdate()"
             style="${isExtra?'opacity:0.75':''}"/>
