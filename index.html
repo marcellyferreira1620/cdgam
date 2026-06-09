@@ -565,7 +565,11 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
         <div class="adm-row"><label>Expedição</label><input type="time" id="iExp" oninput="liveUpdate()"/></div>
         <h4 style="margin-top:10px">⚡ Capacidade por Hora <span style="color:#6a9fc0;font-size:9px;font-weight:normal">(configura 1x)</span></h4>
         <div class="adm-row"><label>Linhas Med. /h</label><input type="number" id="iCapLM" value="3500" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Volume Med. /h</label><input type="number" id="iCapVMed" value="575" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Unidade Med. /h</label><input type="number" id="iCapUMed" value="10000" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>Linhas Perf. /h</label><input type="number" id="iCapLP" value="3000" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Volume Perf. /h</label><input type="number" id="iCapVPerf" value="425" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Unidade Perf. /h</label><input type="number" id="iCapUPerf" value="6666" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>EPM máx /h <span style="color:#ff4c4c;font-size:9px">(máximo)</span></label><input type="number" id="iCapErros" value="2500" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>Vol. Checkout /h</label><input type="number" id="iCapVC" value="1280" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>Linhas Checkout /h</label><input type="number" id="iCapLC" value="6500" oninput="liveUpdate()"/></div>
@@ -684,7 +688,8 @@ const H_EX=HOURS.length; // expedição: todos os 11 slots
 // MÉTRICAS hora a hora — 3 estágios do fluxo
 const MHORA=[
   // CORREIA (separação) — encerra ~23:00
-  'Linhas Med.','Linhas Perf.','Erros Sep. Med.',
+  'Linhas Med.','Vol. Med.','Unid. Med.',
+  'Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.',
   // CHECKOUT (conferência) — encerra ~23:00 — apenas os 3 volumes principais
   'Vol. Checkout','Linhas Checkout','Unid. Checkout',
   // EXPEDIÇÃO (DOCA) — vai até 04:00 — todos os tipos de volume
@@ -695,8 +700,10 @@ const MHORA=[
   'Vales','Conf. Planejado','Conf. Ativo'
 ];
 const MHORA_INV=['Erros Sep. Med.','Vales'];
+const NEW_CORREIA_DETAIL_METRICS=['Vol. Med.','Unid. Med.','Vol. Perf.','Unid. Perf.'];
 const CAP_MAP={
-  'Linhas Med.':'iCapLM','Linhas Perf.':'iCapLP','Erros Sep. Med.':'iCapErros',
+  'Linhas Med.':'iCapLM','Vol. Med.':'iCapVMed','Unid. Med.':'iCapUMed',
+  'Linhas Perf.':'iCapLP','Vol. Perf.':'iCapVPerf','Unid. Perf.':'iCapUPerf','Erros Sep. Med.':'iCapErros',
   'Vol. Checkout':'iCapVC','Linhas Checkout':'iCapLC','Unid. Checkout':'iCapUC',
   'Vol. Especial':'iCapEsp','Vol. Esp. Frac.':'iCapEspFrac',
   'Vol. Esp. Med.':'iCapEspMed','Vol. Esp. Perf.':'iCapEspPerf',
@@ -707,7 +714,11 @@ const CAP_MAP={
 // métricas que somam automaticamente no "Realizado Total"
 const REAL_AUTO=[
   {id:'aLM',   lbl:'Linhas Med.',       m:'Linhas Med.'},
+  {id:'aVMed', lbl:'Volume Med.',       m:'Vol. Med.'},
+  {id:'aUMed', lbl:'Unidade Med.',      m:'Unid. Med.'},
   {id:'aLP',   lbl:'Linhas Perf.',      m:'Linhas Perf.'},
+  {id:'aVPerf',lbl:'Volume Perf.',      m:'Vol. Perf.'},
+  {id:'aUPerf',lbl:'Unidade Perf.',     m:'Unid. Perf.'},
   {id:'aVC',   lbl:'Vol. Checkout',     m:'Vol. Checkout'},
   {id:'aLC',   lbl:'Lin. Checkout',     m:'Linhas Checkout'},
   {id:'aUC',   lbl:'Unid. Checkout',    m:'Unid. Checkout'},
@@ -723,7 +734,11 @@ const REAL_AUTO=[
 ];
 const MEDIA_HORA_AUTO=[
   {lbl:'Linhas Med.',m:'Linhas Med.',ini:'iCMed',fim:'iCMedFim'},
+  {lbl:'Volume Med.',m:'Vol. Med.',ini:'iCMed',fim:'iCMedFim'},
+  {lbl:'Unidade Med.',m:'Unid. Med.',ini:'iCMed',fim:'iCMedFim'},
   {lbl:'Linhas Perf.',m:'Linhas Perf.',ini:'iCPer',fim:'iCPerFim'},
+  {lbl:'Volume Perf.',m:'Vol. Perf.',ini:'iCPer',fim:'iCPerFim'},
+  {lbl:'Unidade Perf.',m:'Unid. Perf.',ini:'iCPer',fim:'iCPerFim'},
   {lbl:'Vol. Checkout',m:'Vol. Checkout',ini:'iCkOut',fim:'iCkOutFim'},
   {lbl:'Lin. Checkout',m:'Linhas Checkout',ini:'iCkOut',fim:'iCkOutFim'},
   {lbl:'Unid. Checkout',m:'Unid. Checkout',ini:'iCkOut',fim:'iCkOutFim'},
@@ -740,7 +755,7 @@ const SK='cdgam_v6';
 const PWD='gam2025';
 const NEW_RULES_FROM='2026-06-02';
 const SPLIT_INDICATORS_FROM='2026-06-09';
-const CORREIA_DIRECT_HOUR_METRICS=['Linhas Med.','Linhas Perf.'];
+const CORREIA_DIRECT_HOUR_METRICS=['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.'];
 let db={days:[]};
 let curDate=null;
 let adminOk=false;
@@ -971,7 +986,7 @@ function reconnectFirebase(){
 
 // ── EMPTY DAY ─────────────────────────────────────────────
 function emptyDay(dt){
-  const hd={};MHORA.forEach(m=>{hd[m]=new Array(HOURS.length).fill('');});
+  const hd={};activeHourMetrics(dt||today()).forEach(m=>{hd[m]=new Array(HOURS.length).fill('');});
   const newRules=String(dt||today())>=NEW_RULES_FROM;
   return{
     date:dt||today(),
@@ -981,7 +996,8 @@ function emptyDay(dt){
     acum:0,meta:0,osImp:0,osFin:0,osProd:0,medIt:0,faltas:0,obs:'',
     cPer:'',cMed:'',ckOut:'',esp:'',frF:'',frFc:'',exp:'',
     cPerFim:'',cMedFim:'',ckOutFim:'',espFim:'',frFFim:'',frFcFim:'',expFim:'',
-    capLM:3500,capLP:3000,capErros:2500,capVC:1280,capLC:6500,capUC:20800,
+    capLM:3500,capVMed:575,capUMed:10000,capLP:3000,capVPerf:425,capUPerf:6666,
+    capErros:2500,capVC:1280,capLC:6500,capUC:20800,
     capVales:1,
     capEsp:340,capEspFrac:0,capEspMed:newRules?100:0,capEspPerf:0,capFrF:newRules?100:114,capFrFc:89,capVE:1303,
     rPsico:0,rGel:0,rOnco:0,rOncoT:0,rJuncao:0,rDoc:0,
@@ -994,6 +1010,7 @@ function fmtDateShort(d){return new Date(d+'T12:00:00').toLocaleDateString('pt-B
 function currentFormDate(){const el=document.getElementById('iData');return el&&el.value?el.value:(curDate||today());}
 function useNewRules(dt){return String(dt||currentFormDate())>=NEW_RULES_FROM;}
 function useSplitIndicators(dt){return String(dt||currentFormDate())>=SPLIT_INDICATORS_FROM;}
+function activeHourMetrics(dt){return useSplitIndicators(dt)?MHORA:MHORA.filter(m=>!NEW_CORREIA_DETAIL_METRICS.includes(m));}
 function hourTargetFactor(i){return i===0?0.5:1;}
 function capForHour(metric,cap,i,dt){
   if(!cap)return cap;
@@ -1051,7 +1068,7 @@ function updateRealAuto(){
   const grid=document.getElementById('realAutoGrid');
   if(!grid)return;
   grid.innerHTML='';
-  REAL_AUTO.forEach(({lbl,m})=>{
+  REAL_AUTO.filter(({m})=>useSplitIndicators(currentFormDate())||!NEW_CORREIA_DETAIL_METRICS.includes(m)).forEach(({lbl,m})=>{
     const val=sumHoraInput(m);
     const div=document.createElement('div');
     div.className='real-auto-item';
@@ -1087,7 +1104,7 @@ function updateMediaHoraAuto(){
   const grid=document.getElementById('mediaHoraGrid');
   if(!grid)return;
   grid.innerHTML='';
-  MEDIA_HORA_AUTO.forEach(({lbl,m,ini,fim})=>{
+  MEDIA_HORA_AUTO.filter(({m})=>useSplitIndicators(currentFormDate())||!NEW_CORREIA_DETAIL_METRICS.includes(m)).forEach(({lbl,m,ini,fim})=>{
     const realizado=sumHoraInput(m);
     const horas=workedHoursFromInputs(ini,fim);
     const media=horas?realizado/horas:null;
@@ -1249,8 +1266,12 @@ function renderFlowBar(day){
 function dv(hd,m){return HOURS.map((_,i)=>{const v=hd&&hd[m]?hd[m][i]:'';return(v!==''&&v!==null)?+v:null;});}
 function renderDashCharts(day){
   const hd=day.hd||{};
-  const lm=dv(hd,'Linhas Med.'),lp=dv(hd,'Linhas Perf.'),vc=dv(hd,'Vol. Checkout');
-  const capLM=day.capLM||3500,capLP=day.capLP||3000,capVC=day.capVC||1280;
+  const lm=dv(hd,'Linhas Med.'),vMed=dv(hd,'Vol. Med.'),uMed=dv(hd,'Unid. Med.');
+  const lp=dv(hd,'Linhas Perf.'),vPerf=dv(hd,'Vol. Perf.'),uPerf=dv(hd,'Unid. Perf.');
+  const vc=dv(hd,'Vol. Checkout');
+  const capLM=day.capLM||3500,capVMed=day.capVMed||575,capUMed=day.capUMed||10000;
+  const capLP=day.capLP||3000,capVPerf=day.capVPerf||425,capUPerf=day.capUPerf||6666;
+  const capVC=day.capVC||1280;
   const splitIndicators=useSplitIndicators(day.date);
   const productionGrid=document.getElementById('productionChartsGrid');
   const combinedBox=document.getElementById('horaCombinedBox');
@@ -1265,32 +1286,46 @@ function renderDashCharts(day){
   checkoutBox.style.display=splitIndicators?'block':'none';
   volTipoBox.style.gridColumn=splitIndicators?'1 / -1':'auto';
 
-  const hourChartOptions=()=>({responsive:true,maintainAspectRatio:false,
+  const hourChartOptions=(dualUnits=false)=>({responsive:true,maintainAspectRatio:false,
     plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},
     scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},
-            y:{beginAtZero:true,ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'}}}});
+            y:{beginAtZero:true,ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'},title:{display:dualUnits,text:'Linhas / Volumes',color:'#6a9fc0',font:{size:9}}},
+            ...(dualUnits?{yUnits:{beginAtZero:true,position:'right',ticks:{color:'#c39bd3',font:{size:9}},grid:{display:false},title:{display:true,text:'Unidades',color:'#c39bd3',font:{size:9}}}}:{})}});
   const destroyChart=key=>{if(CH[key]){CH[key].destroy();CH[key]=null;}};
+  const hourDataset=(label,values,cap,goodColor,lowColor,yAxisID='y')=>({
+    label,data:values,yAxisID,
+    backgroundColor:values.map(v=>v===null?'transparent':v>=cap*.9?goodColor:lowColor),
+    borderRadius:3
+  });
 
   if(splitIndicators){
     destroyChart('hora');
-    [
-      ['horaMed','cHoraMed','Linhas Med.',lm,capLM,'#ff9500','#c04000'],
-      ['horaPerf','cHoraPerf','Linhas Perf.',lp,capLP,'#00e5ff','#006080'],
-      ['horaCheckout','cHoraCheckout','Vol. Checkout',vc,capVC,'#00e676','#004030']
-    ].forEach(([key,canvas,label,values,cap,goodColor,lowColor])=>{
-      destroyChart(key);
-      CH[key]=new Chart(document.getElementById(canvas),{type:'bar',
-        data:{labels:HOURS,datasets:[{label,data:values,backgroundColor:values.map(v=>v===null?'transparent':v>=cap*.9?goodColor:lowColor),borderRadius:3}]},
-        options:hourChartOptions()});
-    });
+    destroyChart('horaMed');
+    CH.horaMed=new Chart(document.getElementById('cHoraMed'),{type:'bar',
+      data:{labels:HOURS,datasets:[
+        hourDataset('Linhas Med.',lm,capLM,'#ff9500','#c04000'),
+        hourDataset('Volume Med.',vMed,capVMed,'#ffd700','#806c00'),
+        hourDataset('Unidade Med.',uMed,capUMed,'#c39bd3','#614d69','yUnits')
+      ]},options:hourChartOptions(true)});
+    destroyChart('horaPerf');
+    CH.horaPerf=new Chart(document.getElementById('cHoraPerf'),{type:'bar',
+      data:{labels:HOURS,datasets:[
+        hourDataset('Linhas Perf.',lp,capLP,'#00e5ff','#006080'),
+        hourDataset('Volume Perf.',vPerf,capVPerf,'#4da6ff','#234f80'),
+        hourDataset('Unidade Perf.',uPerf,capUPerf,'#c39bd3','#614d69','yUnits')
+      ]},options:hourChartOptions(true)});
+    destroyChart('horaCheckout');
+    CH.horaCheckout=new Chart(document.getElementById('cHoraCheckout'),{type:'bar',
+      data:{labels:HOURS,datasets:[hourDataset('Vol. Checkout',vc,capVC,'#00e676','#004030')]},
+      options:hourChartOptions()});
   }else{
     destroyChart('horaMed');destroyChart('horaPerf');destroyChart('horaCheckout');
     destroyChart('hora');
     CH.hora=new Chart(document.getElementById('cHora'),{type:'bar',
       data:{labels:HOURS,datasets:[
-        {label:'Linhas Med.',data:lm,backgroundColor:lm.map(v=>v===null?'transparent':v>=capLM*.9?'#ff9500':'#c04000'),borderRadius:3},
-        {label:'Linhas Perf.',data:lp,backgroundColor:lp.map(v=>v===null?'transparent':v>=capLP*.9?'#00e5ff':'#006080'),borderRadius:3},
-        {label:'Vol. Checkout',data:vc,backgroundColor:vc.map(v=>v===null?'transparent':v>=capVC*.9?'#00e676':'#004030'),borderRadius:3}
+        hourDataset('Linhas Med.',lm,capLM,'#ff9500','#c04000'),
+        hourDataset('Linhas Perf.',lp,capLP,'#00e5ff','#006080'),
+        hourDataset('Vol. Checkout',vc,capVC,'#00e676','#004030')
       ]},
       options:hourChartOptions()});
   }
@@ -1627,7 +1662,8 @@ function renderDocaBalance(day){
 // ── DASHBOARD TABLES ──────────────────────────────────────
 function renderDashTables(day){
   const hd=day.hd||{};
-  const CAP_VALS={'Linhas Med.':day.capLM,'Linhas Perf.':day.capLP,'Erros Sep. Med.':day.capErros,
+  const CAP_VALS={'Linhas Med.':day.capLM,'Vol. Med.':day.capVMed||575,'Unid. Med.':day.capUMed||10000,
+    'Linhas Perf.':day.capLP,'Vol. Perf.':day.capVPerf||425,'Unid. Perf.':day.capUPerf||6666,'Erros Sep. Med.':day.capErros,
     'Vol. Checkout':day.capVC,'Linhas Checkout':day.capLC,'Unid. Checkout':day.capUC,
     'Vol. Psico CK':day.capVPsi,'Unid. Psico CK':day.capUPsi,'Vol. Gel. CK':day.capVGel,
     'Vales':day.capVales,'Vol. Expedição':day.capVE,'Vol. Especial':day.capEsp,
@@ -1643,9 +1679,12 @@ function renderDashTables(day){
   }).join('')}</tr></tbody></table>`;
   document.getElementById('confTbl').innerHTML=h;
 
+  const correiaMetrics=useSplitIndicators(day.date)
+    ?['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.']
+    :['Linhas Med.','Linhas Perf.','Erros Sep. Med.'];
   const DASH_GROUPS=[
     {title:'🔴 CORREIA — Separação',    bg:'rgba(255,149,0,.12)',
-     metrics:['Linhas Med.','Linhas Perf.','Erros Sep. Med.']},
+     metrics:correiaMetrics},
     {title:'🔵 CHECKOUT — Conferência', bg:'rgba(0,229,255,.08)',
      metrics:['Vol. Checkout','Linhas Checkout','Unid. Checkout']},
     {title:'🟢 EXPEDIÇÃO — DOCA (vai até 04:00)', bg:'rgba(0,230,118,.1)',
@@ -1659,7 +1698,7 @@ function renderDashTables(day){
     h2+=`<tr><td colspan="${HOURS.length+1}" style="background:${group.bg};color:#89b4d4;font-size:9px;font-weight:bold;padding:3px 8px;letter-spacing:.5px;border-top:2px solid rgba(255,255,255,.08)">${group.title}</td></tr>`;
     group.metrics.forEach(m=>{
       const cap=CAP_VALS[m]||null;const isInv=MHORA_INV.includes(m);
-      const isCK=['Linhas Med.','Linhas Perf.','Erros Sep. Med.','Vol. Checkout','Linhas Checkout','Unid. Checkout'].includes(m);
+      const isCK=['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.','Vol. Checkout','Linhas Checkout','Unid. Checkout'].includes(m);
       const vals=hd[m]||new Array(HOURS.length).fill('');
       const capLbl=cap?`<span style="font-size:9px;color:#6a9fc0;font-weight:normal;display:block">${isInv?'máx':'meta'}: ${cap.toLocaleString('pt-BR')}/h</span>`:'';
       h2+=`<tr><td class="row-lbl">${m}${capLbl}</td>`;
@@ -1768,7 +1807,7 @@ function buildHistContent(day){
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#89b4d4',font:{size:9}},position:'bottom'}},
       scales:{x:{ticks:{color:'#6a9fc0',font:{size:8},maxRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#6a9fc0',font:{size:8}},grid:{color:'rgba(255,255,255,0.07)'}}}}});
   let ht=`<table style="width:100%;border-collapse:collapse;font-size:10px"><thead><tr><th style="background:#0a2340;color:#6a9fc0;padding:2px 4px;text-align:left">Indicador</th>${HOURS.map(x=>`<th style="background:#0a2340;color:#6a9fc0;padding:2px 4px">${x}</th>`).join('')}</tr></thead><tbody>`;
-  MHORA.forEach(m=>{
+  activeHourMetrics(day.date).forEach(m=>{
     const vals=hd[m]||new Array(HOURS.length).fill('');
     ht+=`<tr><td style="padding:2px 4px;color:#89b4d4;background:#0a1825;white-space:nowrap;font-weight:bold">${m}</td>${vals.map(v=>`<td style="padding:2px 4px;text-align:center;border:1px solid #162a3d">${v!==''?v:'-'}</td>`).join('')}</tr>`;
   });
@@ -1890,9 +1929,12 @@ function buildHoraTable(hd){
   body.innerHTML='';
   const caps=getCapacities();
   const formDate=currentFormDate();
+  const correiaMetrics=useSplitIndicators(formDate)
+    ?['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.']
+    :['Linhas Med.','Linhas Perf.','Erros Sep. Med.'];
   const MHORA_GROUPS=[
     {title:'🔴 CORREIA — Separação', color:'rgba(255,149,0,.15)',
-     metrics:['Linhas Med.','Linhas Perf.','Erros Sep. Med.']},
+     metrics:correiaMetrics},
     {title:'🔵 CHECKOUT — Conferência', color:'rgba(0,229,255,.1)',
      metrics:['Vol. Checkout','Linhas Checkout','Unid. Checkout']},
     {title:'🟢 EXPEDIÇÃO — DOCA (vai até 04:00)', color:'rgba(0,230,118,.12)',
@@ -1928,7 +1970,7 @@ function buildHoraTable(hd){
           if(isInv){bg=n>capH?'background:rgba(200,20,20,.55)':n>capH*.8?'background:rgba(180,130,0,.4)':'background:rgba(0,100,50,.45)';}
           else{const p=n/capH;bg=p>=1.05?'background:rgba(0,180,80,.45)':p>=.9?'background:rgba(0,120,60,.35)':p>=.7?'background:rgba(180,130,0,.4)':'background:rgba(180,20,20,.5)';}
         }
-        const isCKMetric=['Linhas Med.','Linhas Perf.','Erros Sep. Med.','Vol. Checkout','Linhas Checkout','Unid. Checkout'].includes(m);
+        const isCKMetric=['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.','Vol. Checkout','Linhas Checkout','Unid. Checkout'].includes(m);
         const isExtra=isCKMetric&&i>=H_CK;
         const extraStyle=isExtra&&!bg?'background:rgba(255,149,0,.06);border-left:2px solid rgba(255,149,0,.2)':'';
         const deltaHint=useDelta?`<div class="delta-hint ${vDelta===null?'delta-empty':''}">${deltaHintHtml(vDelta)}</div>`:'';
@@ -1989,7 +2031,8 @@ function colorCell(inp){
 
 function readHoraData(){
   const dt=currentFormDate();
-  const hd={};MHORA.forEach(m=>{hd[m]=new Array(HOURS.length).fill('');});
+  const metrics=activeHourMetrics(dt);
+  const hd={};metrics.forEach(m=>{hd[m]=new Array(HOURS.length).fill('');});
   // Agrupar inputs por métrica
   const byMetric={};
   document.querySelectorAll('#hTblBody input[data-m]').forEach(inp=>{
@@ -1998,7 +2041,7 @@ function readHoraData(){
     byMetric[m][i]=inp.value!==''?+inp.value:'';
   });
   // Para métricas de delta: converter acumulados digitados → deltas para armazenar
-  MHORA.forEach(m=>{
+  metrics.forEach(m=>{
     const vals=byMetric[m]||new Array(HOURS.length).fill('');
     if(isDeltaMetric(m,dt)){
       hd[m]=acumToDeltas(vals);
@@ -2048,7 +2091,10 @@ function readFormAsDay(){
     ckOutFim:document.getElementById('iCkOutFim').value,espFim:document.getElementById('iEspFim').value,
     frFFim:document.getElementById('iFrFFim').value,frFcFim:document.getElementById('iFrFcFim').value,
     expFim:document.getElementById('iExpFim').value,
-    capLM:+document.getElementById('iCapLM').value||3500,capLP:+document.getElementById('iCapLP').value||3000,
+    capLM:+document.getElementById('iCapLM').value||3500,
+    capVMed:+document.getElementById('iCapVMed').value||575,capUMed:+document.getElementById('iCapUMed').value||10000,
+    capLP:+document.getElementById('iCapLP').value||3000,
+    capVPerf:+document.getElementById('iCapVPerf').value||425,capUPerf:+document.getElementById('iCapUPerf').value||6666,
     capErros:+document.getElementById('iCapErros').value||2500,capVC:+document.getElementById('iCapVC').value||1280,
     capLC:+document.getElementById('iCapLC').value||6500,capUC:+document.getElementById('iCapUC').value||20800,
     capVales:+document.getElementById('iCapVales').value||1,
@@ -2087,7 +2133,9 @@ function loadFormFrom(day){
   s('iEsp',day.esp||'');s('iFrF',day.frF||'');s('iFrFc',day.frFc||'');s('iExp',day.exp||'');
   s('iCPerFim',day.cPerFim||'');s('iCMedFim',day.cMedFim||'');s('iCkOutFim',day.ckOutFim||'');
   s('iEspFim',day.espFim||'');s('iFrFFim',day.frFFim||'');s('iFrFcFim',day.frFcFim||'');s('iExpFim',day.expFim||'');
-  s('iCapLM',day.capLM||3500);s('iCapLP',day.capLP||3000);s('iCapErros',day.capErros||2500);
+  s('iCapLM',day.capLM||3500);s('iCapVMed',day.capVMed||575);s('iCapUMed',day.capUMed||10000);
+  s('iCapLP',day.capLP||3000);s('iCapVPerf',day.capVPerf||425);s('iCapUPerf',day.capUPerf||6666);
+  s('iCapErros',day.capErros||2500);
   s('iCapVC',day.capVC||1280);s('iCapLC',day.capLC||6500);s('iCapUC',day.capUC||20800);
   s('iCapVales',day.capVales||1);
   s('iCapEsp',day.capEsp||340);s('iCapEspFrac',day.capEspFrac||0);
@@ -3091,13 +3139,16 @@ function renderPreench(){
     h+=`<th style="background:${extra?'rgba(255,149,0,.12)':'#0a2340'};color:${extra?'#ff9500':'#6a9fc0'};padding:3px 5px;border:1px solid #1a3550;font-size:9px;white-space:nowrap;text-align:center">${lbl}</th>`;
   });
   hdr.innerHTML=h;
+  const correiaMetrics=useSplitIndicators(day.date)
+    ?['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.']
+    :['Linhas Med.','Linhas Perf.','Erros Sep. Med.'];
   const grupos=[
-    {lbl:'CORREIA',cor:'rgba(255,149,0,.7)',metrics:['Linhas Med.','Linhas Perf.','Erros Sep. Med.']},
+    {lbl:'CORREIA',cor:'rgba(255,149,0,.7)',metrics:correiaMetrics},
     {lbl:'CHECKOUT',cor:'rgba(0,229,255,.7)',metrics:['Vol. Checkout','Linhas Checkout','Unid. Checkout']},
     {lbl:'EXPEDIÇÃO',cor:'rgba(0,230,118,.7)',metrics:['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.','Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca']},
     {lbl:'CONTROLE',cor:'rgba(170,170,170,.5)',metrics:['Vales','Conf. Planejado','Conf. Ativo']},
   ];
-  const soCK=new Set(['Vol. Checkout','Linhas Checkout','Unid. Checkout','Linhas Med.','Linhas Perf.','Erros Sep. Med.','Vales','Conf. Planejado','Conf. Ativo']);
+  const soCK=new Set(['Vol. Checkout','Linhas Checkout','Unid. Checkout','Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.','Vales','Conf. Planejado','Conf. Ativo']);
   let rows='';
   grupos.forEach(g=>{
     rows+=`<tr><td colspan="${HOURS.length+1}" style="background:#071525;color:${g.cor};font-size:9px;font-weight:bold;padding:3px 8px;border:1px solid #1a3550;text-transform:uppercase;letter-spacing:.5px">${g.lbl}</td></tr>`;
