@@ -55,6 +55,12 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
 .checkout-conf-wrap th{background:#0a2340;color:#6a9fc0;padding:3px 5px;text-align:center;border:1px solid #1a3550;white-space:nowrap}
 .checkout-conf-wrap td{padding:3px 5px;text-align:center;border:1px solid #162a3d;background:#0d1c2e}
 .checkout-conf-wrap .row-lbl{text-align:left!important;min-width:110px}
+.doca-route-chart-scroll{overflow-x:auto;padding-bottom:4px}
+.doca-route-chart-inner{position:relative;height:340px;min-width:1800px}
+.doca-routes-hour{margin-top:6px;overflow-x:auto;border-top:1px solid #1a3550;padding-top:6px}
+.doca-routes-hour table{width:100%;min-width:900px;border-collapse:collapse;font-size:9px}
+.doca-routes-hour th,.doca-routes-hour td{border:1px solid #1a3550;padding:3px 5px;text-align:center}
+.doca-routes-hour th{background:#0a2340;color:#6a9fc0}.doca-routes-hour td{background:#0d1c2e;color:#fff}
 /* TABLES */
 .tbl-wrap{margin:8px;background:#122033;border-radius:6px;border:1px solid #1a3550;overflow-x:auto}
 .tbl-wrap table{width:100%;border-collapse:collapse;font-size:11px;min-width:900px}
@@ -400,10 +406,11 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
   <div class="chart-grid" style="grid-template-columns:2fr 1fr">
     <div class="chart-box" style="border-color:rgba(0,230,118,.4)">
       <div class="chart-ttl">
-        <span>⚖️ Equilíbrio da Doca — Entrada vs Saída por Hora</span>
-        <span style="font-size:9px;font-weight:normal;color:#6a9fc0">Entrada = CK + Especiais + Fraldas &nbsp;|&nbsp; Saída = Vol. Doca expedido</span>
+        <span>⚖️ Fechamento de Rotas — Volumes da Doca</span>
+        <span style="font-size:9px;font-weight:normal;color:#6a9fc0">Entrada = CK + Especiais + Fraldas &nbsp;|&nbsp; Saída = acumulado hora a hora de cada rota</span>
       </div>
-      <div style="position:relative;height:200px"><canvas id="cDocaBalance" role="img" aria-label="Equilibrio doca"></canvas></div>
+      <div class="doca-route-chart-scroll"><div class="doca-route-chart-inner"><canvas id="cDocaBalance" role="img" aria-label="Fechamento de rotas por volume"></canvas></div></div>
+      <div class="doca-routes-hour" id="docaRoutesHour"></div>
       <div id="docaBalanceAlert" style="margin-top:5px;font-size:10px;padding:5px 10px;border-radius:3px;display:none;font-weight:bold"></div>
     </div>
     <div class="chart-box" style="border-color:rgba(0,230,118,.4)">
@@ -1015,7 +1022,9 @@ function fmtDateShort(d){return new Date(d+'T12:00:00').toLocaleDateString('pt-B
 function currentFormDate(){const el=document.getElementById('iData');return el&&el.value?el.value:(curDate||today());}
 function useNewRules(dt){return String(dt||currentFormDate())>=NEW_RULES_FROM;}
 function useSplitIndicators(dt){return String(dt||currentFormDate())>=SPLIT_INDICATORS_FROM;}
-function activeHourMetrics(dt){return useSplitIndicators(dt)?MHORA:MHORA.filter(m=>!NEW_CORREIA_DETAIL_METRICS.includes(m));}
+function routeMetricKey(r){return`Rota ${r.cod} — ${r.cidade}`;}
+function routeHourMetrics(){return ROTAS_FIXAS.map(routeMetricKey);}
+function activeHourMetrics(dt){return useSplitIndicators(dt)?[...MHORA,...routeHourMetrics()]:MHORA.filter(m=>!NEW_CORREIA_DETAIL_METRICS.includes(m));}
 function hourTargetFactor(metric,i,dt){
   // Antes de 09/06, preserva a regra já aplicada somente à Correia no primeiro período.
   if(!useSplitIndicators(dt))return useNewRules(dt)&&CORREIA_DIRECT_HOUR_METRICS.includes(metric)&&i===0?0.5:1;
@@ -1083,7 +1092,7 @@ function updateRealAuto(){
   const grid=document.getElementById('realAutoGrid');
   if(!grid)return;
   grid.innerHTML='';
-  REAL_AUTO.filter(({m})=>useSplitIndicators(currentFormDate())||!NEW_CORREIA_DETAIL_METRICS.includes(m)).forEach(({lbl,m})=>{
+  REAL_AUTO.filter(({m})=>activeHourMetrics(currentFormDate()).includes(m)).forEach(({lbl,m})=>{
     const val=sumHoraInput(m);
     const div=document.createElement('div');
     div.className='real-auto-item';
@@ -1119,7 +1128,7 @@ function updateMediaHoraAuto(){
   const grid=document.getElementById('mediaHoraGrid');
   if(!grid)return;
   grid.innerHTML='';
-  MEDIA_HORA_AUTO.filter(({m})=>useSplitIndicators(currentFormDate())||!NEW_CORREIA_DETAIL_METRICS.includes(m)).forEach(({lbl,m,ini,fim})=>{
+  MEDIA_HORA_AUTO.filter(({m})=>activeHourMetrics(currentFormDate()).includes(m)).forEach(({lbl,m,ini,fim})=>{
     const realizado=sumHoraInput(m);
     const horas=workedHoursFromInputs(ini,fim);
     const media=horas?realizado/horas:null;
@@ -1526,10 +1535,99 @@ function renderDashCharts(day){
               y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'},position:'left'},
               y2:{ticks:{color:'#ffd700',font:{size:9}},grid:{display:false},position:'right'}}}});
 
-  renderDocaBalance(day);
+  renderRouteClosure(day);
 }
 
 // ── DOCA BALANCE CHART ────────────────────────────────────
+function renderRouteClosure(day){
+  const hd=day.hd||{};
+  const espMetrics=['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.','Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.'];
+  const entradas=HOURS.map((_,i)=>{
+    let total=(hd['Vol. Checkout']&&hd['Vol. Checkout'][i]!==''&&hd['Vol. Checkout'][i]!==null?+hd['Vol. Checkout'][i]:0);
+    espMetrics.forEach(m=>{const vals=hd[m]||[];total+=(vals[i]!==''&&vals[i]!==null?+vals[i]:0);});
+    return total;
+  });
+  const rotas=buildRotasMerged(day);
+  const totais=rotas.map(r=>+r.vol||0);
+  const expedidos=rotas.map((r,i)=>{
+    const realizado=sumHoraField(routeMetricKey(r),hd);
+    return totais[i]>0?Math.min(realizado,totais[i]):realizado;
+  });
+  const pendencias=rotas.map((_,i)=>Math.max(totais[i]-expedidos[i],0));
+  const percentuais=rotas.map((_,i)=>totais[i]>0?Math.round(expedidos[i]/totais[i]*100):null);
+  const labels=rotas.map(r=>[`${r.cod} — ${r.cidade}`,`Prev. ${r.hPrev}`]);
+  const rotasHora=HOURS.map((_,i)=>{
+    const total=rotas.reduce((sum,r)=>{
+      const vals=hd[routeMetricKey(r)]||[];
+      return sum+(vals[i]!==''&&vals[i]!==null&&vals[i]!==undefined?+vals[i]:0);
+    },0);
+    return total>0?total:null;
+  });
+  const totalEntrada=entradas.reduce((s,v)=>s+v,0);
+  const totalRotas=totais.reduce((s,v)=>s+v,0);
+  const totalSaida=expedidos.reduce((s,v)=>s+v,0);
+  const totalDocaHora=sumHoraField('Vol. Doca',hd);
+  const totalRotasHora=rotasHora.reduce((s,v)=>s+(v||0),0);
+  const rotasFinalizadas=rotas.filter((_,i)=>totais[i]>0&&expedidos[i]>=totais[i]).length;
+  const rotasPendentes=rotas.filter((_,i)=>totais[i]===0||expedidos[i]<totais[i]).length;
+  const volumePendente=totalRotas-totalSaida;
+  const saldoFinal=totalEntrada-totalSaida;
+
+  if(CH.docaBal)CH.docaBal.destroy();
+  CH.docaBal=new Chart(document.getElementById('cDocaBalance'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Volume Total da Rota',data:totais,backgroundColor:'rgba(0,168,255,.4)',borderColor:CAPACITY_OK_COLOR,borderWidth:1,borderRadius:3,order:3},
+      {label:'Volume Expedido',data:expedidos,backgroundColor:'#00c878',borderRadius:3,order:2},
+      {label:'Pendência por Rota',data:pendencias,type:'line',borderColor:'#00e5ff',backgroundColor:'#00e5ff',borderWidth:2,pointRadius:3,fill:false,order:1},
+      {label:'% Expedido',data:percentuais,type:'line',borderColor:CAPACITY_LOW_COLOR,backgroundColor:CAPACITY_LOW_COLOR,borderWidth:2,pointRadius:4,fill:false,order:0,yAxisID:'yPct'}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,
+      plugins:{legend:{labels:{color:'#89b4d4',font:{size:9}}},
+        tooltip:{callbacks:{
+          title:items=>{const r=rotas[items[0].dataIndex];return`${r.cod} — ${r.cidade}`;},
+          label:ctx=>ctx.dataset.yAxisID==='yPct'?` ${ctx.dataset.label}: ${ctx.raw===null?'—':ctx.raw+'%'}`:` ${ctx.dataset.label}: ${(ctx.raw||0).toLocaleString('pt-BR')}`,
+          afterBody:items=>{const r=rotas[items[0].dataIndex];return[`Horário previsto: ${r.hPrev}`,`Horário realizado: ${r.hReal||'Pendente'}`];}
+        }}},
+      scales:{
+        x:{ticks:{color:'#6a9fc0',font:{size:8},maxRotation:55,minRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},
+        y:{beginAtZero:true,ticks:{color:'#89b4d4',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'},title:{display:true,text:'Volumes',color:'#6a9fc0',font:{size:9}}},
+        yPct:{beginAtZero:true,max:100,ticks:{color:'#ff7070',font:{size:9},callback:v=>v+'%'},grid:{display:false},position:'right',title:{display:true,text:'% Expedido',color:'#ff7070',font:{size:9}}}
+      }}
+  });
+
+  const routesHourEl=document.getElementById('docaRoutesHour');
+  if(routesHourEl){
+    routesHourEl.innerHTML=`<table><thead><tr><th style="text-align:left">Volumes das Rotas / Hora</th>${HOURS.map(h=>`<th>${h}</th>`).join('')}<th>Total</th></tr></thead>
+      <tbody><tr><td class="row-lbl">Somatório das 18 rotas</td>${rotasHora.map(v=>`<td>${v===null?'-':v.toLocaleString('pt-BR')}</td>`).join('')}<td style="color:#00e5ff;font-weight:bold">${totalRotasHora.toLocaleString('pt-BR')}</td></tr></tbody></table>`;
+  }
+
+  const panel=document.getElementById('docaKpiPanel');
+  if(panel){
+    const kpis=[
+      {l:'Total Entrou',v:totalEntrada.toLocaleString('pt-BR'),c:'#ff9500'},
+      {l:'Vol. Rotas Previsto',v:totalRotas.toLocaleString('pt-BR'),c:'#4da6ff'},
+      {l:'Vol. Rotas Expedido',v:totalSaida.toLocaleString('pt-BR'),c:'#00e676'},
+      {l:'Vol. Pendente Rotas',v:volumePendente.toLocaleString('pt-BR'),c:volumePendente>0?'#ff4c4c':'#00e676',sub:`${rotasPendentes} rota(s) pendente(s)`},
+      {l:'Vol. Doca H/H',v:totalDocaHora.toLocaleString('pt-BR'),c:'#00e5ff',sub:'Realizado hora a hora'},
+      {l:'Rotas Finalizadas',v:`${rotasFinalizadas}/${rotas.length}`,c:rotasPendentes?'#ffd700':'#00e676'},
+      {l:'Vol. Rotas H/H',v:totalRotasHora.toLocaleString('pt-BR'),c:totalRotasHora===totalSaida?'#00e676':'#ffd700',sub:'Somatório das linhas por rota'},
+      {l:'Saldo Entrada x Rotas',v:(saldoFinal>0?'+':'')+saldoFinal.toLocaleString('pt-BR'),c:saldoFinal<=0?'#00e676':'#ff4c4c',sub:saldoFinal<=0?'Entrada coberta pelas rotas':'Volume ainda sem saída por rota'}
+    ];
+    panel.innerHTML=kpis.map(k=>`<div class="kpi" style="border-color:rgba(0,230,118,.3);padding:6px 8px">
+      <div class="kpi-lbl">${k.l}</div><div class="kpi-val" style="color:${k.c};font-size:14px">${k.v}</div>
+      ${k.sub?`<div style="font-size:8px;color:#4a7a9b;margin-top:2px;line-height:1.2">${k.sub}</div>`:''}</div>`).join('');
+  }
+
+  const alertEl=document.getElementById('docaBalanceAlert');
+  if(alertEl){
+    alertEl.style.display='block';
+    if(totalRotas===0){alertEl.style.background='rgba(180,130,0,.25)';alertEl.style.color='#ffd700';alertEl.textContent='Preencha a volumetria das rotas para acompanhar o fechamento da Doca.';}
+    else if(volumePendente>0){alertEl.style.background='rgba(180,20,20,.35)';alertEl.style.color='#ff4c4c';alertEl.textContent=`${volumePendente.toLocaleString('pt-BR')} volumes pendentes em ${rotasPendentes} rota(s).`;}
+    else{alertEl.style.background='rgba(0,180,80,.25)';alertEl.style.color='#00e676';alertEl.textContent='Todas as rotas com volumetria foram expedidas.';}
+  }
+}
+
 function renderDocaBalance(day){
   const hd=day.hd||{};
   const capDoca=day.capVE||1303;
@@ -1696,14 +1794,15 @@ function renderDashTables(day){
   const correiaMetrics=useSplitIndicators(day.date)
     ?['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.']
     :['Linhas Med.','Linhas Perf.','Erros Sep. Med.'];
+  const expedicaoMetrics=['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.',
+    'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca',...(useSplitIndicators(day.date)?routeHourMetrics():[])];
   const DASH_GROUPS=[
     {title:'🔴 CORREIA — Separação',    bg:'rgba(255,149,0,.12)',
      metrics:correiaMetrics},
     {title:'🔵 CHECKOUT — Conferência', bg:'rgba(0,229,255,.08)',
      metrics:['Vol. Checkout','Linhas Checkout','Unid. Checkout']},
     {title:'🟢 EXPEDIÇÃO — DOCA (vai até 04:00)', bg:'rgba(0,230,118,.1)',
-     metrics:['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.',
-              'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca']},
+     metrics:expedicaoMetrics},
     {title:'📋 CONTROLE',               bg:'rgba(100,100,180,.08)',
      metrics:['Vales','Conf. Planejado','Conf. Ativo']},
   ];
@@ -1948,14 +2047,15 @@ function buildHoraTable(hd){
   const correiaMetrics=useSplitIndicators(formDate)
     ?['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.']
     :['Linhas Med.','Linhas Perf.','Erros Sep. Med.'];
+  const expedicaoMetrics=['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.',
+    'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca',...(useSplitIndicators(formDate)?routeHourMetrics():[])];
   const MHORA_GROUPS=[
     {title:'🔴 CORREIA — Separação', color:'rgba(255,149,0,.15)',
      metrics:correiaMetrics},
     {title:'🔵 CHECKOUT — Conferência', color:'rgba(0,229,255,.1)',
      metrics:['Vol. Checkout','Linhas Checkout','Unid. Checkout']},
     {title:'🟢 EXPEDIÇÃO — DOCA (vai até 04:00)', color:'rgba(0,230,118,.12)',
-     metrics:['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.',
-              'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca']},
+     metrics:expedicaoMetrics},
     {title:'📋 CONTROLE', color:'rgba(100,100,180,.1)',
      metrics:['Vales','Conf. Planejado','Conf. Ativo']},
   ];
@@ -2318,6 +2418,7 @@ function saveRotaField(cod,field,val){
   save();
   updateRotasKPIs(day);
   renderRotasTbl(day,'rotasTbl');
+  renderRouteClosure(day);
 }
 
 function calcAtraso(hPrev,hReal){
@@ -3160,10 +3261,12 @@ function renderPreench(){
   const correiaMetrics=useSplitIndicators(day.date)
     ?['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.']
     :['Linhas Med.','Linhas Perf.','Erros Sep. Med.'];
+  const expedicaoMetrics=['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.',
+    'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca',...(useSplitIndicators(day.date)?routeHourMetrics():[])];
   const grupos=[
     {lbl:'CORREIA',cor:'rgba(255,149,0,.7)',metrics:correiaMetrics},
     {lbl:'CHECKOUT',cor:'rgba(0,229,255,.7)',metrics:['Vol. Checkout','Linhas Checkout','Unid. Checkout']},
-    {lbl:'EXPEDIÇÃO',cor:'rgba(0,230,118,.7)',metrics:['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.','Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca']},
+    {lbl:'EXPEDIÇÃO',cor:'rgba(0,230,118,.7)',metrics:expedicaoMetrics},
     {lbl:'CONTROLE',cor:'rgba(170,170,170,.5)',metrics:['Vales','Conf. Planejado','Conf. Ativo']},
   ];
   const soCK=new Set(['Vol. Checkout','Linhas Checkout','Unid. Checkout','Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.','Vales','Conf. Planejado','Conf. Ativo']);
@@ -3171,9 +3274,11 @@ function renderPreench(){
   grupos.forEach(g=>{
     rows+=`<tr><td colspan="${HOURS.length+1}" style="background:#071525;color:${g.cor};font-size:9px;font-weight:bold;padding:3px 8px;border:1px solid #1a3550;text-transform:uppercase;letter-spacing:.5px">${g.lbl}</td></tr>`;
     g.metrics.forEach(m=>{
+      const rawVals=day.hd&&day.hd[m]?day.hd[m]:new Array(HOURS.length).fill('');
+      const displayVals=isDeltaMetric(m,day.date)?deltasToAcums(rawVals):rawVals;
       rows+=`<tr><td style="background:#0a1825;color:#89b4d4;font-size:10px;font-weight:bold;padding:3px 8px;border:1px solid #1a3550;white-space:nowrap">${m}</td>`;
       HOURS.forEach((_,i)=>{
-        const val=(day.hd&&day.hd[m])?(day.hd[m][i]??''):'';
+        const val=displayVals[i]??'';
         const extra=i>=H_CK;
         const blocked=soCK.has(m)&&i>=H_CK;
         if(blocked){
@@ -3196,7 +3301,7 @@ function renderPreench(){
 function preenchInput(inp){
   const m=inp.dataset.m,i=+inp.dataset.i;
   const main=document.querySelector(`#hTblBody input[data-m="${m}"][data-i="${i}"]`);
-  if(main)main.value=inp.value;
+  if(main){main.value=inp.value;onHoraInput(main);}
   updateRealAuto();
   const st=document.getElementById('preenchStatus');
   if(st){st.textContent='⏳ Salvando...';st.style.color='#ffd700';}
