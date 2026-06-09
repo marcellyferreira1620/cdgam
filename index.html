@@ -351,12 +351,24 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
 
 <!-- TAB DASHBOARD -->
 <div class="tab-body act" id="tb-dash">
-  <div class="chart-grid">
-    <div class="chart-box">
+  <div class="chart-grid" id="productionChartsGrid">
+    <div class="chart-box" id="horaCombinedBox">
       <div class="chart-ttl">Produção hora a hora — Correia Med. / Perf. / Vol. Checkout</div>
       <div style="position:relative;height:220px"><canvas id="cHora" role="img" aria-label="Producao por hora"></canvas></div>
     </div>
-    <div class="chart-box">
+    <div class="chart-box" id="horaMedBox" style="display:none">
+      <div class="chart-ttl">Produção hora a hora — Correia Medicamentos</div>
+      <div style="position:relative;height:220px"><canvas id="cHoraMed" role="img" aria-label="Producao da correia medicamentos por hora"></canvas></div>
+    </div>
+    <div class="chart-box" id="horaPerfBox" style="display:none">
+      <div class="chart-ttl">Produção hora a hora — Correia Perfumaria</div>
+      <div style="position:relative;height:220px"><canvas id="cHoraPerf" role="img" aria-label="Producao da correia perfumaria por hora"></canvas></div>
+    </div>
+    <div class="chart-box" id="horaCheckoutBox" style="display:none">
+      <div class="chart-ttl">Produção hora a hora — Checkout</div>
+      <div style="position:relative;height:220px"><canvas id="cHoraCheckout" role="img" aria-label="Producao do checkout por hora"></canvas></div>
+    </div>
+    <div class="chart-box" id="volTipoBox">
       <div class="chart-ttl">
         <span>Volumes por Tipo — Realizado vs Previsão Noturna <small style="font-size:9px;color:#6a9fc0;font-weight:normal">(base 21:30)</small></span>
         <span style="font-size:9px;font-weight:normal"><span style="color:#ff9500">■</span>Correia <span style="color:#9b59b6">■</span>Especial <span style="color:#4a90d9">■</span>Fralda <span style="color:#00e5ff">■</span>Gelad. <span style="color:#00e676">■</span>CK <span style="color:#e94560">■</span>Doca &nbsp;|&nbsp; <span style="color:#ffd700">■</span>atenção <span style="color:#e94560">■</span>crítico <span style="color:rgba(255,255,255,.15)">■</span>pendente</span>
@@ -727,6 +739,7 @@ const MEDIA_HORA_AUTO=[
 const SK='cdgam_v6';
 const PWD='gam2025';
 const NEW_RULES_FROM='2026-06-02';
+const SPLIT_INDICATORS_FROM='2026-06-09';
 const CORREIA_DIRECT_HOUR_METRICS=['Linhas Med.','Linhas Perf.'];
 let db={days:[]};
 let curDate=null;
@@ -980,6 +993,7 @@ function fmtDate(d){return new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{w
 function fmtDateShort(d){return new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});}
 function currentFormDate(){const el=document.getElementById('iData');return el&&el.value?el.value:(curDate||today());}
 function useNewRules(dt){return String(dt||currentFormDate())>=NEW_RULES_FROM;}
+function useSplitIndicators(dt){return String(dt||currentFormDate())>=SPLIT_INDICATORS_FROM;}
 function hourTargetFactor(i){return i===0?0.5:1;}
 function capForHour(metric,cap,i,dt){
   if(!cap)return cap;
@@ -1237,18 +1251,49 @@ function renderDashCharts(day){
   const hd=day.hd||{};
   const lm=dv(hd,'Linhas Med.'),lp=dv(hd,'Linhas Perf.'),vc=dv(hd,'Vol. Checkout');
   const capLM=day.capLM||3500,capLP=day.capLP||3000,capVC=day.capVC||1280;
+  const splitIndicators=useSplitIndicators(day.date);
+  const productionGrid=document.getElementById('productionChartsGrid');
+  const combinedBox=document.getElementById('horaCombinedBox');
+  const medBox=document.getElementById('horaMedBox');
+  const perfBox=document.getElementById('horaPerfBox');
+  const checkoutBox=document.getElementById('horaCheckoutBox');
+  const volTipoBox=document.getElementById('volTipoBox');
+  productionGrid.style.gridTemplateColumns=splitIndicators?'repeat(3,minmax(0,1fr))':'1fr 1fr';
+  combinedBox.style.display=splitIndicators?'none':'block';
+  medBox.style.display=splitIndicators?'block':'none';
+  perfBox.style.display=splitIndicators?'block':'none';
+  checkoutBox.style.display=splitIndicators?'block':'none';
+  volTipoBox.style.gridColumn=splitIndicators?'1 / -1':'auto';
 
-  if(CH.hora)CH.hora.destroy();
-  CH.hora=new Chart(document.getElementById('cHora'),{type:'bar',
-    data:{labels:HOURS,datasets:[
-      {label:'Linhas Med.',data:lm,backgroundColor:lm.map(v=>v===null?'transparent':v>=capLM*.9?'#ff9500':'#c04000'),borderRadius:3},
-      {label:'Linhas Perf.',data:lp,backgroundColor:lp.map(v=>v===null?'transparent':v>=capLP*.9?'#00e5ff':'#006080'),borderRadius:3},
-      {label:'Vol. Checkout',data:vc,backgroundColor:vc.map(v=>v===null?'transparent':v>=capVC*.9?'#00e676':'#004030'),borderRadius:3}
-    ]},
-    options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},
-      scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},
-              y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'}}}}});
+  const hourChartOptions=()=>({responsive:true,maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},
+    scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},
+            y:{beginAtZero:true,ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'}}}});
+  const destroyChart=key=>{if(CH[key]){CH[key].destroy();CH[key]=null;}};
+
+  if(splitIndicators){
+    destroyChart('hora');
+    [
+      ['horaMed','cHoraMed','Linhas Med.',lm,capLM,'#ff9500','#c04000'],
+      ['horaPerf','cHoraPerf','Linhas Perf.',lp,capLP,'#00e5ff','#006080'],
+      ['horaCheckout','cHoraCheckout','Vol. Checkout',vc,capVC,'#00e676','#004030']
+    ].forEach(([key,canvas,label,values,cap,goodColor,lowColor])=>{
+      destroyChart(key);
+      CH[key]=new Chart(document.getElementById(canvas),{type:'bar',
+        data:{labels:HOURS,datasets:[{label,data:values,backgroundColor:values.map(v=>v===null?'transparent':v>=cap*.9?goodColor:lowColor),borderRadius:3}]},
+        options:hourChartOptions()});
+    });
+  }else{
+    destroyChart('horaMed');destroyChart('horaPerf');destroyChart('horaCheckout');
+    destroyChart('hora');
+    CH.hora=new Chart(document.getElementById('cHora'),{type:'bar',
+      data:{labels:HOURS,datasets:[
+        {label:'Linhas Med.',data:lm,backgroundColor:lm.map(v=>v===null?'transparent':v>=capLM*.9?'#ff9500':'#c04000'),borderRadius:3},
+        {label:'Linhas Perf.',data:lp,backgroundColor:lp.map(v=>v===null?'transparent':v>=capLP*.9?'#00e5ff':'#006080'),borderRadius:3},
+        {label:'Vol. Checkout',data:vc,backgroundColor:vc.map(v=>v===null?'transparent':v>=capVC*.9?'#00e676':'#004030'),borderRadius:3}
+      ]},
+      options:hourChartOptions()});
+  }
 
   // Volumes por Tipo — 100% = volumes previstos por tipo preenchidos ate 21:30
   const sumH=m=>sumHoraField(m,hd);
