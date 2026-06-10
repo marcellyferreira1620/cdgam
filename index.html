@@ -56,7 +56,7 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
 .checkout-conf-wrap td{padding:3px 5px;text-align:center;border:1px solid #162a3d;background:#0d1c2e}
 .checkout-conf-wrap .row-lbl{text-align:left!important;min-width:110px}
 .doca-route-chart-scroll{overflow-x:auto;padding-bottom:4px}
-.doca-route-chart-inner{position:relative;height:340px;min-width:1800px}
+.doca-route-chart-inner{position:relative;height:300px;min-width:2100px}
 .doca-routes-hour{margin-top:6px;overflow-x:auto;border-top:1px solid #1a3550;padding-top:6px}
 .doca-routes-hour table{width:100%;min-width:900px;border-collapse:collapse;font-size:9px}
 .doca-routes-hour th,.doca-routes-hour td{border:1px solid #1a3550;padding:3px 5px;text-align:center}
@@ -411,7 +411,7 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
     <div class="chart-box" style="border-color:rgba(0,230,118,.4)">
       <div class="chart-ttl">
         <span>⚖️ Fechamento de Rotas — Volumes da Doca</span>
-        <span style="font-size:9px;font-weight:normal;color:#6a9fc0">Entrada = CK + Especiais + Fraldas &nbsp;|&nbsp; Saída = acumulado hora a hora de cada rota</span>
+        <span style="font-size:9px;font-weight:normal;color:#6a9fc0">Uma barra por rota: azul = dentro do horário | vermelho = atrasada | texto = % que falta</span>
       </div>
       <div class="doca-route-chart-scroll"><div class="doca-route-chart-inner"><canvas id="cDocaBalance" role="img" aria-label="Fechamento de rotas por volume"></canvas></div></div>
       <div class="doca-routes-hour" id="docaRoutesHour"></div>
@@ -1572,7 +1572,22 @@ function renderRouteClosure(day){
   });
   const pendencias=rotas.map((_,i)=>Math.max(totais[i]-expedidos[i],0));
   const percentuais=rotas.map((_,i)=>totais[i]>0?Math.round(expedidos[i]/totais[i]*100):null);
-  const labels=rotas.map(r=>[`${r.cod} — ${r.cidade}`,`Prev. ${r.hPrev}`]);
+  const percentuaisFalta=percentuais.map(p=>p===null?null:Math.max(100-p,0));
+  const statusRotas=rotas.map(r=>calcRotaStatus(day,r));
+  const coresRotas=statusRotas.map(st=>st.stClass==='st-atrasado'?CAPACITY_LOW_COLOR:CAPACITY_OK_COLOR);
+  const wrapRouteName=name=>{
+    const lines=[];
+    String(name||'').split('/').forEach(part=>{
+      const words=part.trim().split(/\s+/);let line='';
+      words.forEach(word=>{
+        if(line&&`${line} ${word}`.length>18){lines.push(line);line=word;}
+        else line=line?`${line} ${word}`:word;
+      });
+      if(line)lines.push(line);
+    });
+    return lines;
+  };
+  const labels=rotas.map(r=>[`Rota ${r.cod}`,...wrapRouteName(r.cidade),`Prev. ${r.hPrev}`]);
   const rotasHora=HOURS.map((_,i)=>{
     const total=rotas.reduce((sum,r)=>{
       const vals=hd[routeMetricKey(r)]||[];
@@ -1591,25 +1606,51 @@ function renderRouteClosure(day){
   const saldoFinal=totalEntrada-totalSaida;
 
   if(CH.docaBal)CH.docaBal.destroy();
+  const routeProgressLabels={
+    id:'routeProgressLabels',
+    afterDatasetsDraw(chart){
+      const meta=chart.getDatasetMeta(0),ctx=chart.ctx;
+      ctx.save();
+      ctx.textAlign='center';
+      ctx.font='bold 10px Arial';
+      meta.data.forEach((bar,i)=>{
+        const falta=percentuaisFalta[i];
+        if(falta===null)return;
+        const text=`${falta}% falta`;
+        const inside=percentuais[i]>=18;
+        ctx.fillStyle=inside?'#ffffff':coresRotas[i];
+        ctx.textBaseline=inside?'top':'bottom';
+        const y=inside?bar.y+6:Math.max(bar.y-5,chart.chartArea.top+12);
+        ctx.fillText(text,bar.x,y);
+      });
+      ctx.restore();
+    }
+  };
   CH.docaBal=new Chart(document.getElementById('cDocaBalance'),{
     type:'bar',
     data:{labels,datasets:[
-      {label:'Volume Total da Rota',data:totais,backgroundColor:'rgba(0,168,255,.4)',borderColor:CAPACITY_OK_COLOR,borderWidth:1,borderRadius:3,order:3},
-      {label:'Volume Expedido',data:expedidos,backgroundColor:'#00c878',borderRadius:3,order:2},
-      {label:'Pendência por Rota',data:pendencias,type:'line',borderColor:'#00e5ff',backgroundColor:'#00e5ff',borderWidth:2,pointRadius:3,fill:false,order:1},
-      {label:'% Expedido',data:percentuais,type:'line',borderColor:CAPACITY_LOW_COLOR,backgroundColor:CAPACITY_LOW_COLOR,borderWidth:2,pointRadius:4,fill:false,order:0,yAxisID:'yPct'}
+      {label:'% Finalizado por Rota',data:percentuais,backgroundColor:coresRotas,borderColor:coresRotas,borderWidth:1,borderRadius:3,borderSkipped:false,maxBarThickness:42,categoryPercentage:.68,barPercentage:.78}
     ]},
+    plugins:[routeProgressLabels],
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{labels:{color:'#89b4d4',font:{size:9}}},
+      layout:{padding:{top:18,right:28,left:8,bottom:6}},
+      plugins:{legend:{display:false},
         tooltip:{callbacks:{
           title:items=>{const r=rotas[items[0].dataIndex];return`${r.cod} — ${r.cidade}`;},
-          label:ctx=>ctx.dataset.yAxisID==='yPct'?` ${ctx.dataset.label}: ${ctx.raw===null?'—':ctx.raw+'%'}`:` ${ctx.dataset.label}: ${(ctx.raw||0).toLocaleString('pt-BR')}`,
-          afterBody:items=>{const r=rotas[items[0].dataIndex];return[`Horário previsto: ${r.hPrev}`,`Horário realizado: ${r.hReal||'Pendente'}`];}
+          label:ctx=>{
+            const i=ctx.dataIndex;
+            return[
+              ` Finalizado: ${percentuais[i]===null?'—':percentuais[i]+'%'}`,
+              ` Falta: ${percentuaisFalta[i]===null?'—':percentuaisFalta[i]+'%'}`,
+              ` Volumes: ${expedidos[i].toLocaleString('pt-BR')} / ${totais[i].toLocaleString('pt-BR')}`,
+              ` Pendente: ${pendencias[i].toLocaleString('pt-BR')}`
+            ];
+          },
+          afterBody:items=>{const i=items[0].dataIndex,r=rotas[i],st=statusRotas[i];return[`Horário previsto: ${r.hPrev}`,`Horário realizado: ${r.hReal||'Pendente'}`,`Status: ${st.stLabel.replace(/^[^A-ZÀ-Ú—]+/,'')}`];}
         }}},
       scales:{
-        x:{ticks:{color:'#6a9fc0',font:{size:8},maxRotation:55,minRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},
-        y:{beginAtZero:true,ticks:{color:'#89b4d4',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'},title:{display:true,text:'Volumes',color:'#6a9fc0',font:{size:9}}},
-        yPct:{beginAtZero:true,max:100,ticks:{color:'#ff7070',font:{size:9},callback:v=>v+'%'},grid:{display:false},position:'right',title:{display:true,text:'% Expedido',color:'#ff7070',font:{size:9}}}
+        x:{ticks:{color:'#89b4d4',font:{size:9,weight:'bold'},maxRotation:0,minRotation:0,autoSkip:false,padding:7},grid:{display:false},offset:true},
+        y:{beginAtZero:true,max:100,ticks:{color:'#89b4d4',font:{size:9},stepSize:20,callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.07)'},title:{display:true,text:'% Finalizado',color:'#6a9fc0',font:{size:9}}}
       }}
   });
 
