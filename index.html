@@ -118,9 +118,9 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
 .hora-tbl-wrap .hora-cell{min-width:86px;padding:4px 5px;vertical-align:top}
 .hora-tbl-wrap .hora-acum-input{width:74px;background:#071525;border:1px solid rgba(106,159,192,.18);border-radius:2px;color:#dcecff;font-size:10px;font-weight:600;height:20px;padding:2px 5px}
 .hora-tbl-wrap .delta-hint{margin-top:3px;background:rgba(0,0,0,.24);border-left:3px solid #00e5ff;border-radius:3px;padding:3px 5px;min-height:25px;line-height:1.05}
-.route-initial-wrap{display:flex;align-items:center;gap:4px;margin-top:3px;color:#6a9fc0;font-size:8px;font-weight:normal}
-.route-initial-input{width:72px!important;height:18px!important;background:#071525!important;border:1px solid #00c878!important;color:#00e676!important;text-align:right}
 .route-pending-input{border-color:rgba(255,215,0,.45)!important;color:#ffd700!important}
+.route-total-hour-input{width:74px!important;background:#071525!important;border:1px solid rgba(0,229,255,.55)!important;color:#00e5ff!important;margin-bottom:3px}
+.route-hour-label{display:block;font-size:7px;text-transform:uppercase;color:#6a9fc0;font-weight:bold;margin-bottom:1px}
 .route-mode-hint{display:block;color:#ffd700;font-size:8px;font-weight:normal;margin-top:2px}
 .hora-tbl-wrap .delta-label{display:block;color:#77b9dc;font-size:7px;text-transform:uppercase;letter-spacing:.4px;font-weight:800}
 .hora-tbl-wrap .delta-val{display:block;color:#fff;font-size:14px;font-weight:900}
@@ -494,7 +494,7 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
   <div style="padding:8px">
     <div style="background:#0a2340;border-radius:6px;padding:8px 14px;margin-bottom:8px;border:1px solid rgba(0,230,118,.3);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span style="font-size:11px;font-weight:bold;color:#00e676">⏱️ PRODUÇÃO HORA A HORA</span>
-      <span style="font-size:10px;color:#6a9fc0">Demais indicadores: preencha o acumulado. Rotas: informe o total inicial e o saldo pendente de cada hora.</span>
+      <span style="font-size:10px;color:#6a9fc0">Demais indicadores: preencha o acumulado. Rotas: informe o total atualizado e o saldo pendente de cada hora.</span>
       <span id="preenchStatus" style="font-size:10px;color:#ffd700;margin-left:auto"></span>
     </div>
     <div style="background:#122033;border-radius:6px;border:1px solid #1a3550;overflow-x:auto">
@@ -1027,15 +1027,20 @@ function currentFormDate(){const el=document.getElementById('iData');return el&&
 function useNewRules(dt){return String(dt||currentFormDate())>=NEW_RULES_FROM;}
 function useSplitIndicators(dt){return String(dt||currentFormDate())>=SPLIT_INDICATORS_FROM;}
 function routeMetricKey(r){return`Rota ${r.cod} — ${r.cidade}`;}
+function routeTotalMetricKey(r){return`Total ${routeMetricKey(r)}`;}
 function routeHourMetrics(){return ROTAS_FIXAS.map(routeMetricKey);}
+function routeTotalHourMetrics(){return ROTAS_FIXAS.map(routeTotalMetricKey);}
 function routeFromMetric(metric){return ROTAS_FIXAS.find(r=>routeMetricKey(r)===metric)||null;}
+function routeFromTotalMetric(metric){return ROTAS_FIXAS.find(r=>routeTotalMetricKey(r)===metric)||null;}
+function routeFromAnyMetric(metric){return routeFromMetric(metric)||routeFromTotalMetric(metric);}
 function isRouteMetric(metric){return !!routeFromMetric(metric);}
+function isRouteTotalMetric(metric){return !!routeFromTotalMetric(metric);}
 function routeInitialTotal(day,metric){
-  const route=routeFromMetric(metric);if(!route)return 0;
+  const route=routeFromAnyMetric(metric);if(!route)return 0;
   const saved=day&&Array.isArray(day.rotas)?day.rotas.find(r=>normalizeRouteCode(r.cod)===normalizeRouteCode(route.cod)):null;
   return saved?+saved.vol||0:0;
 }
-function activeHourMetrics(dt){return useSplitIndicators(dt)?[...MHORA,...routeHourMetrics()]:MHORA.filter(m=>!NEW_CORREIA_DETAIL_METRICS.includes(m));}
+function activeHourMetrics(dt){return useSplitIndicators(dt)?[...MHORA,...routeHourMetrics(),...routeTotalHourMetrics()]:MHORA.filter(m=>!NEW_CORREIA_DETAIL_METRICS.includes(m));}
 function hourTargetFactor(metric,i,dt){
   // Antes de 09/06, preserva a regra já aplicada somente à Correia no primeiro período.
   if(!useSplitIndicators(dt))return useNewRules(dt)&&CORREIA_DIRECT_HOUR_METRICS.includes(metric)&&i===0?0.5:1;
@@ -1070,10 +1075,10 @@ function sumHoraInput(metric){
   const inputs=[...document.querySelectorAll(`#hTblBody input[data-m="${metric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
   if(!inputs.length)return 0;
   if(isRouteMetric(metric)){
-    const initial=routeInitialTotal(getDay(currentFormDate()),metric);
-    let last=initial,hasValue=false;
-    inputs.forEach(inp=>{if(inp.value!==''){last=+inp.value;hasValue=true;}});
-    return hasValue?Math.max(initial-last,0):0;
+    const route=routeFromMetric(metric);
+    const totals=[...document.querySelectorAll(`#hTblBody input[data-m="${routeTotalMetricKey(route)}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i).map(inp=>inp.value!==''?+inp.value:'');
+    const pending=inputs.map(inp=>inp.value!==''?+inp.value:'');
+    return routePendingToDone(pending,totals,routeInitialTotal(getDay(currentFormDate()),metric)).reduce((s,v)=>s+(v===''?0:+v),0);
   }
   if(isDeltaMetric(metric,currentFormDate())){
     // inputs contêm acumulados → o último valor preenchido = total acumulado
@@ -1565,12 +1570,10 @@ function renderRouteClosure(day){
     return total;
   });
   const rotas=buildRotasMerged(day);
-  const totais=rotas.map(r=>+r.vol||0);
-  const expedidos=rotas.map((r,i)=>{
-    const realizado=sumHoraField(routeMetricKey(r),hd);
-    return totais[i]>0?Math.min(realizado,totais[i]):realizado;
-  });
-  const pendencias=rotas.map((_,i)=>Math.max(totais[i]-expedidos[i],0));
+  const routeSnapshots=rotas.map(r=>routeProgressSnapshot(day,r,hd));
+  const totais=routeSnapshots.map(s=>s.total);
+  const expedidos=routeSnapshots.map(s=>s.completed);
+  const pendencias=routeSnapshots.map(s=>s.remaining);
   const percentuais=rotas.map((_,i)=>totais[i]>0?Math.round(expedidos[i]/totais[i]*100):null);
   const percentuaisFalta=percentuais.map(p=>p===null?null:Math.max(100-p,0));
   const statusRotas=rotas.map(r=>calcRotaStatus(day,r));
@@ -1872,9 +1875,12 @@ function renderDashTables(day){
       const isCK=['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.','Vol. Checkout','Linhas Checkout','Unid. Checkout'].includes(m);
       const rawVals=hd[m]||new Array(HOURS.length).fill('');
       const initialTotal=isRoute?routeInitialTotal(day,m):0;
-      const vals=isRoute?routeDoneToPending(rawVals,initialTotal):rawVals;
+      const route=isRoute?routeFromMetric(m):null;
+      const rawTotals=isRoute?(hd[routeTotalMetricKey(route)]||new Array(HOURS.length).fill('')):new Array(HOURS.length).fill('');
+      const carriedTotals=isRoute?routeCarriedTotals(rawTotals,initialTotal):rawTotals;
+      const vals=isRoute?routeDoneToPending(rawVals,rawTotals,initialTotal):rawVals;
       const capLbl=cap?`<span style="font-size:9px;color:#6a9fc0;font-weight:normal;display:block">${isInv?'máx':'meta'}: ${cap.toLocaleString('pt-BR')}/h</span>`:'';
-      const routeLbl=isRoute?`<span style="font-size:9px;color:#00e676;font-weight:normal;display:block">Inicial: ${initialTotal.toLocaleString('pt-BR')} | saldo pendente</span>`:'';
+      const routeLbl=isRoute?`<span style="font-size:9px;color:#00e676;font-weight:normal;display:block">Total atualizado | saldo pendente</span>`:'';
       h2+=`<tr><td class="row-lbl">${m}${capLbl}${routeLbl}</td>`;
       vals.forEach((v,i)=>{
         const dimmed=isCK&&i>=H_CK;
@@ -1890,7 +1896,8 @@ function renderDashTables(day){
         const periodTarget=cap?capForHour(m,cap,i,day.date):null;
         const targetTitle=periodTarget?`${isInv?'Limite':'Meta'} do período: ${periodTarget.toLocaleString('pt-BR')}`:'';
         const routeDone=isRoute&&rawVals[i]!==''?`<span style="display:block;font-size:8px;color:#00e5ff">feito: ${(+rawVals[i]).toLocaleString('pt-BR')}</span>`:'';
-        h2+=`<td style="text-align:center;${bg}" title="${[isExtra?'⚡ Hora extra':'',targetTitle].filter(Boolean).join(' | ')}"><span style="${style}">${v!==''?v:isExtra?'·':'-'}</span>${routeDone}</td>`;
+        const routeTotal=isRoute&&carriedTotals[i]!==''?`<span style="display:block;font-size:8px;color:#00e676">total: ${(+carriedTotals[i]).toLocaleString('pt-BR')}</span>`:'';
+        h2+=`<td style="text-align:center;${bg}" title="${[isExtra?'⚡ Hora extra':'',targetTitle].filter(Boolean).join(' | ')}"><span style="${style}">${v!==''?v:isExtra?'·':'-'}</span>${routeTotal}${routeDone}</td>`;
       });
       h2+='</tr>';
     });
@@ -1984,7 +1991,7 @@ function buildHistContent(day){
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#89b4d4',font:{size:9}},position:'bottom'}},
       scales:{x:{ticks:{color:'#6a9fc0',font:{size:8},maxRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#6a9fc0',font:{size:8}},grid:{color:'rgba(255,255,255,0.07)'}}}}});
   let ht=`<table style="width:100%;border-collapse:collapse;font-size:10px"><thead><tr><th style="background:#0a2340;color:#6a9fc0;padding:2px 4px;text-align:left">Indicador</th>${HOURS.map(x=>`<th style="background:#0a2340;color:#6a9fc0;padding:2px 4px">${x}</th>`).join('')}</tr></thead><tbody>`;
-  activeHourMetrics(day.date).forEach(m=>{
+  activeHourMetrics(day.date).filter(m=>!isRouteTotalMetric(m)).forEach(m=>{
     const vals=hd[m]||new Array(HOURS.length).fill('');
     ht+=`<tr><td style="padding:2px 4px;color:#89b4d4;background:#0a1825;white-space:nowrap;font-weight:bold">${m}</td>${vals.map(v=>`<td style="padding:2px 4px;text-align:center;border:1px solid #162a3d">${v!==''?v:'-'}</td>`).join('')}</tr>`;
   });
@@ -2058,7 +2065,7 @@ function getCapacities(){
 // ── ACUMULADO → DELTA ────────────────────────────────────
 // Métricas que NÃO usam modo acumulado (valores já são por hora discreta)
 const DELTA_SKIP=['Vales','Conf. Planejado','Conf. Ativo'];
-function isDeltaMetric(m,dt){return!isRouteMetric(m)&&!DELTA_SKIP.includes(m)&&!(useNewRules(dt)&&CORREIA_DIRECT_HOUR_METRICS.includes(m));}
+function isDeltaMetric(m,dt){return!isRouteMetric(m)&&!isRouteTotalMetric(m)&&!DELTA_SKIP.includes(m)&&!(useNewRules(dt)&&CORREIA_DIRECT_HOUR_METRICS.includes(m));}
 
 // Dado array de acumulados (alguns podem ser ''), retorna array de deltas por hora
 function acumToDeltas(acums){
@@ -2095,30 +2102,63 @@ function deltasToAcums(deltas){
   return acums;
 }
 
-// Rotas armazenam o realizado por hora, mas o operador preenche o saldo pendente.
-function routeDoneToPending(done,totalInitial){
+// Rotas armazenam o realizado por hora e o total atualizado; o operador preenche total + saldo pendente.
+function routeCarriedTotals(totals,totalInitial){
+  const carried=new Array(totals.length).fill('');
+  let current=Math.max(+totalInitial||0,0),hasTotal=current>0;
+  for(let i=0;i<totals.length;i++){
+    if(totals[i]!==''&&totals[i]!==null&&totals[i]!==undefined){
+      current=Math.max(+totals[i]||0,0);hasTotal=true;
+    }
+    carried[i]=hasTotal?current:'';
+  }
+  return carried;
+}
+
+function routeDoneToPending(done,totals,totalInitial){
   const pending=new Array(done.length).fill('');
-  let remaining=Math.max(+totalInitial||0,0);
+  const carried=routeCarriedTotals(totals,totalInitial);
+  let completed=0;
   for(let i=0;i<done.length;i++){
-    if(done[i]!==''&&done[i]!==null&&done[i]!==undefined){
-      remaining=Math.max(remaining-(+done[i]||0),0);
-      pending[i]=remaining;
+    const hasDone=done[i]!==''&&done[i]!==null&&done[i]!==undefined;
+    const hasTotal=totals[i]!==''&&totals[i]!==null&&totals[i]!==undefined;
+    if(hasDone)completed+=+done[i]||0;
+    if((hasDone||hasTotal)&&carried[i]!==''){
+      pending[i]=Math.max(carried[i]-completed,0);
     }
   }
   return pending;
 }
 
-function routePendingToDone(pending,totalInitial){
+function routePendingToDone(pending,totals,totalInitial){
   const done=new Array(pending.length).fill('');
-  let previous=Math.max(+totalInitial||0,0);
+  const carried=routeCarriedTotals(totals,totalInitial);
+  let previousCompleted=0;
   for(let i=0;i<pending.length;i++){
     if(pending[i]!==''&&pending[i]!==null&&pending[i]!==undefined){
-      const current=Math.max(+pending[i]||0,0);
-      done[i]=Math.max(previous-current,0);
-      previous=current;
+      const currentPending=Math.max(+pending[i]||0,0);
+      const completed=carried[i]===''?previousCompleted:Math.max(carried[i]-currentPending,0);
+      done[i]=Math.max(completed-previousCompleted,0);
+      previousCompleted=completed;
     }
   }
   return done;
+}
+
+function routeProgressSnapshot(day,route,hd){
+  const done=hd[routeMetricKey(route)]||new Array(HOURS.length).fill('');
+  const totals=hd[routeTotalMetricKey(route)]||new Array(HOURS.length).fill('');
+  const fallback=+route.vol||routeInitialTotal(day,routeMetricKey(route));
+  const carried=routeCarriedTotals(totals,fallback);
+  const pending=routeDoneToPending(done,totals,fallback);
+  let total=fallback,remaining=total,hasData=false;
+  for(let i=0;i<HOURS.length;i++){
+    if(carried[i]!=='')total=carried[i];
+    if(pending[i]!==''){remaining=pending[i];hasData=true;}
+    else if(totals[i]!==''&&totals[i]!==null&&totals[i]!==undefined){remaining=Math.max(total-sumHoraField(routeMetricKey(route),hd),0);hasData=true;}
+  }
+  const completed=hasData?Math.max(total-remaining,0):Math.min(sumHoraField(routeMetricKey(route),hd),total||Infinity);
+  return{total,remaining:Math.max(total-completed,0),completed,totals,pending,done};
 }
 
 function deltaHintHtml(delta,label='resultado/hora'){
@@ -2157,12 +2197,13 @@ function buildHoraTable(hd){
       const route=routeFromMetric(m);const initialTotal=isRoute?routeInitialTotal(formDay,m):0;
       const tr=document.createElement('tr');
       const modeHint=isRoute
-        ?`<div class="route-initial-wrap"><span>Total inicial</span><input class="route-initial-input" type="number" min="0" data-route-cod="${route.cod}" data-route-m="${m}" value="${initialTotal||''}" placeholder="0" oninput="onRouteInitialInput(this)"/></div><span class="route-mode-hint">▼ preencher saldo pendente</span>`
+        ?`<span class="route-mode-hint">Preencher total atualizado + pendente</span>`
         :useDelta?`<span style="font-size:8px;color:#4a7a9b;display:block">▲ acumulado</span>`:'';
       let html=`<td class="hlbl">${m}${cap?`<span style="font-size:9px;color:#6a9fc0;font-weight:normal;display:block">${isInv?'máx':'meta'}: ${cap.toLocaleString('pt-BR')}/h</span>`:''} ${modeHint}</td>`;
       // Para modo delta: converter deltas armazenados → acumulados para exibir
       const rawVals=hd&&hd[m]?hd[m]:new Array(HOURS.length).fill('');
-      const displayVals=isRoute?routeDoneToPending(rawVals,initialTotal):useDelta?deltasToAcums(rawVals):rawVals;
+      const rawTotals=isRoute&&hd&&hd[routeTotalMetricKey(route)]?hd[routeTotalMetricKey(route)]:new Array(HOURS.length).fill('');
+      const displayVals=isRoute?routeDoneToPending(rawVals,rawTotals,initialTotal):useDelta?deltasToAcums(rawVals):rawVals;
       // Deltas calculados para colorir célula (baseado no ritmo/hora)
       const deltaVals=useDelta?rawVals:rawVals;
 
@@ -2184,7 +2225,8 @@ function buildHoraTable(hd){
         const deltaHint=(useDelta||isRoute)?`<div class="delta-hint ${vDelta===null?'delta-empty':''}">${deltaHintHtml(vDelta,isRoute?'feito/hora':'resultado/hora')}</div>`:'';
         const periodTarget=cap?capForHour(m,cap,i,formDate):null;
         const targetTitle=periodTarget?`${isInv?'Limite':'Meta'} do período: ${periodTarget.toLocaleString('pt-BR')}`:'';
-        html+=`<td class="hora-cell" style="${bg};${extraStyle}" title="${[isExtra?'⚡ Hora extra':'',targetTitle,isRoute?'Feito na hora = pendente anterior - pendente atual':useDelta?'Resultado da hora = acumulado atual - acumulado anterior':''].filter(Boolean).join(' | ')}">
+        html+=`<td class="hora-cell" style="${bg};${extraStyle}" title="${[isExtra?'⚡ Hora extra':'',targetTitle,isRoute?'Realizado acumulado = total atualizado - pendente':useDelta?'Resultado da hora = acumulado atual - acumulado anterior':''].filter(Boolean).join(' | ')}">
+          ${isRoute?`<span class="route-hour-label">Total atualizado</span><input class="route-total-hour-input" type="number" min="0" data-m="${routeTotalMetricKey(route)}" data-i="${i}" data-route-total="1" value="${rawTotals[i]??''}" placeholder="total" oninput="onHoraInput(this);persistDayNow();liveUpdate()"/><span class="route-hour-label">Pendente</span>`:''}
           <input class="${isRoute?'hora-acum-input route-pending-input':useDelta?'hora-acum-input':''}" type="number" min="0" data-m="${m}" data-i="${i}" data-use-delta="${useDelta?1:0}" data-route-pending="${isRoute?1:0}" value="${vDisplay}" placeholder="${isRoute?'pendente':'-'}"
             oninput="onHoraInput(this);persistDayNow();liveUpdate()"
             style="${isExtra?'opacity:0.75':''}"/>
@@ -2197,15 +2239,17 @@ function buildHoraTable(hd){
 }
 
 function onHoraInput(inp){
-  const m=inp.dataset.m;const isRoute=inp.dataset.routePending==='1';const useDelta=inp.dataset.useDelta==='1';
+  const m=inp.dataset.m;const route=routeFromAnyMetric(m);const isRoute=!!route;const useDelta=inp.dataset.useDelta==='1';
   if(isRoute){
     const row=inp.closest('tr');
-    const inputs=[...row.querySelectorAll(`input[data-m="${m}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
+    const baseMetric=routeMetricKey(route),totalMetric=routeTotalMetricKey(route);
+    const inputs=[...row.querySelectorAll(`input[data-m="${baseMetric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
+    const totalInputs=[...row.querySelectorAll(`input[data-m="${totalMetric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
     const pending=inputs.map(el=>el.value!==''?+el.value:'');
-    const totalInput=[...document.querySelectorAll('input[data-route-m]')].find(el=>el.dataset.routeM===m);
-    const initialTotal=totalInput&&totalInput.value!==''?+totalInput.value:routeInitialTotal(getDay(currentFormDate()),m);
-    const done=routePendingToDone(pending,initialTotal);
-    let previous=initialTotal;
+    const totals=totalInputs.map(el=>el.value!==''?+el.value:'');
+    const initialTotal=routeInitialTotal(getDay(currentFormDate()),baseMetric);
+    const carried=routeCarriedTotals(totals,initialTotal);
+    const done=routePendingToDone(pending,totals,initialTotal);
     inputs.forEach((el,idx)=>{
       const td=el.parentNode;
       let hint=td.querySelector('.delta-hint');
@@ -2213,9 +2257,10 @@ function onHoraInput(inp){
       hint.classList.toggle('delta-empty',done[idx]==='');
       hint.innerHTML=deltaHintHtml(done[idx],'feito/hora');
       const current=pending[idx];
-      td.style.background=current!==''&&current>previous?'rgba(180,20,20,.5)':current===0?'rgba(0,100,50,.45)':'';
-      if(current!=='')previous=current;
+      td.style.background=current!==''&&carried[idx]!==''&&current>carried[idx]?'rgba(180,20,20,.5)':current===0?'rgba(0,100,50,.45)':'';
     });
+    const latestTotal=[...totals].reverse().find(v=>v!=='');
+    if(latestTotal!==undefined)syncRouteCurrentTotal(route.cod,latestTotal);
   } else if(useDelta){
     // Recalcular e atualizar os hints Δ da linha inteira
     const row=inp.closest('tr');
@@ -2237,29 +2282,14 @@ function onHoraInput(inp){
   }
 }
 
-function onRouteInitialInput(inp){
-  const cod=normalizeRouteCode(inp.dataset.routeCod),metric=inp.dataset.routeM;
-  const dt=currentFormDate();
-  let day=getDay(dt);
-  if(!day){
-    day=emptyDay(dt);
-    db.days.push(day);
-    db.days.sort((a,b)=>a.date.localeCompare(b.date));
-    buildDayNav();
-  }
+function syncRouteCurrentTotal(cod,total){
+  const day=getDay(currentFormDate());if(!day)return;
   if(!Array.isArray(day.rotas))day.rotas=[];
+  cod=normalizeRouteCode(cod);
   let route=day.rotas.find(r=>normalizeRouteCode(r.cod)===cod);
   if(!route){route={cod};day.rotas.push(route);}
-  route.vol=inp.value!==''?Math.max(+inp.value||0,0):0;
+  route.vol=Math.max(+total||0,0);
   day._updatedAt=Date.now();
-  document.querySelectorAll('input[data-route-cod]').forEach(el=>{
-    if(el!==inp&&normalizeRouteCode(el.dataset.routeCod)===cod)el.value=inp.value;
-  });
-  const main=[...document.querySelectorAll('#hTblBody input[data-m]')].find(el=>el.dataset.m===metric);
-  if(main)onHoraInput(main);
-  updatePreenchRouteDone(metric);
-  const saved=persistDayNow();
-  if(saved){renderRouteClosure(saved);updateRotasKPIs(saved);}
 }
 
 function colorCellByDelta(inp,m,delta){
@@ -2293,11 +2323,13 @@ function readHoraData(){
     if(!byMetric[m])byMetric[m]=new Array(HOURS.length).fill('');
     byMetric[m][i]=inp.value!==''?+inp.value:'';
   });
-  // Rotas: saldo pendente digitado → realizado por hora. Demais deltas: acumulado → realizado por hora.
+  // Rotas: total atualizado + saldo pendente → realizado por hora. Demais deltas: acumulado → realizado por hora.
   metrics.forEach(m=>{
     const vals=byMetric[m]||new Array(HOURS.length).fill('');
     if(isRouteMetric(m)){
-      hd[m]=routePendingToDone(vals,routeInitialTotal(getDay(dt),m));
+      const route=routeFromMetric(m);
+      const totals=byMetric[routeTotalMetricKey(route)]||new Array(HOURS.length).fill('');
+      hd[m]=routePendingToDone(vals,totals,routeInitialTotal(getDay(dt),m));
     } else if(isDeltaMetric(m,dt)){
       hd[m]=acumToDeltas(vals);
     } else {
@@ -3413,9 +3445,10 @@ function renderPreench(){
     g.metrics.forEach(m=>{
       const isRoute=isRouteMetric(m);const route=routeFromMetric(m);const initialTotal=isRoute?routeInitialTotal(day,m):0;
       const rawVals=day.hd&&day.hd[m]?day.hd[m]:new Array(HOURS.length).fill('');
-      const displayVals=isRoute?routeDoneToPending(rawVals,initialTotal):isDeltaMetric(m,day.date)?deltasToAcums(rawVals):rawVals;
-      const routeInitial=isRoute?`<div class="route-initial-wrap"><span>Total inicial</span><input class="route-initial-input" type="number" min="0" data-route-cod="${route.cod}" data-route-m="${m}" value="${initialTotal||''}" placeholder="0" oninput="onRouteInitialInput(this)"/></div><span class="route-mode-hint">▼ preencher saldo pendente</span>`:'';
-      rows+=`<tr><td style="background:#0a1825;color:#89b4d4;font-size:10px;font-weight:bold;padding:3px 8px;border:1px solid #1a3550;white-space:nowrap">${m}${routeInitial}</td>`;
+      const rawTotals=isRoute&&day.hd&&day.hd[routeTotalMetricKey(route)]?day.hd[routeTotalMetricKey(route)]:new Array(HOURS.length).fill('');
+      const displayVals=isRoute?routeDoneToPending(rawVals,rawTotals,initialTotal):isDeltaMetric(m,day.date)?deltasToAcums(rawVals):rawVals;
+      const routeHint=isRoute?`<span class="route-mode-hint">Total atualizado + pendente</span>`:'';
+      rows+=`<tr><td style="background:#0a1825;color:#89b4d4;font-size:10px;font-weight:bold;padding:3px 8px;border:1px solid #1a3550;white-space:nowrap">${m}${routeHint}</td>`;
       HOURS.forEach((_,i)=>{
         const val=displayVals[i]??'';
         const extra=i>=H_CK;
@@ -3424,6 +3457,7 @@ function renderPreench(){
           rows+=`<td style="background:#060e18;border:1px solid #1a3550"></td>`;
         }else{
           rows+=`<td style="border:1px solid #1a3550;padding:1px 2px;background:${extra?'rgba(255,149,0,.06)':'#0d1c2e'}">
+            ${isRoute?`<span class="route-hour-label">Total atualizado</span><input type="number" min="0" value="${rawTotals[i]??''}" data-m="${routeTotalMetricKey(route)}" data-i="${i}" data-route-total="1" style="width:56px;background:transparent;border:none;color:#00e5ff;padding:2px 4px;font-size:10px;text-align:center;outline:none" placeholder="total" oninput="preenchInput(this)"/><span class="route-hour-label">Pendente</span>`:''}
             <input type="number" min="0" value="${val}" data-m="${m}" data-i="${i}"
               style="width:56px;background:transparent;border:none;color:${isRoute?'#ffd700':'#fff'};padding:2px 4px;font-size:10px;text-align:center;outline:none"
               placeholder="${isRoute?'pend.':''}"
@@ -3440,12 +3474,15 @@ function renderPreench(){
   body.innerHTML=rows;
 }
 function updatePreenchRouteDone(metric){
-  if(!isRouteMetric(metric))return;
-  const inputs=[...document.querySelectorAll(`#preenchBody input[data-m="${metric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
+  const route=routeFromAnyMetric(metric);if(!route)return;
+  const baseMetric=routeMetricKey(route),totalMetric=routeTotalMetricKey(route);
+  const inputs=[...document.querySelectorAll(`#preenchBody input[data-m="${baseMetric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
+  const totalInputs=[...document.querySelectorAll(`#preenchBody input[data-m="${totalMetric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
   const pending=inputs.map(el=>el.value!==''?+el.value:'');
-  const done=routePendingToDone(pending,routeInitialTotal(getDay(currentFormDate()),metric));
+  const totals=totalInputs.map(el=>el.value!==''?+el.value:'');
+  const done=routePendingToDone(pending,totals,routeInitialTotal(getDay(currentFormDate()),baseMetric));
   document.querySelectorAll('[data-route-done-m]').forEach(el=>{
-    if(el.dataset.routeDoneM===metric){
+    if(el.dataset.routeDoneM===baseMetric){
       const value=done[+el.dataset.routeDoneI];
       el.textContent=value===''?'':`feito: ${Number(value).toLocaleString('pt-BR')}`;
     }
@@ -3460,7 +3497,7 @@ function preenchInput(inp){
   const st=document.getElementById('preenchStatus');
   if(st){st.textContent='⏳ Salvando...';st.style.color='#ffd700';}
   const saved=persistDayNow();
-  if(saved&&isRouteMetric(m)){renderRouteClosure(saved);renderDashTables(saved);}
+  if(saved&&routeFromAnyMetric(m)){renderRouteClosure(saved);renderDashTables(saved);}
   if(st&&saved){st.textContent='✅ Salvo';st.style.color='#00e676';}
   setTimeout(()=>{const s=document.getElementById('preenchStatus');if(s)s.textContent='';},3000);
 }
