@@ -621,7 +621,7 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
 
     <!-- TABELA HORA A HORA -->
     <div class="hora-tbl-wrap">
-      <h4>⏱️ PRODUÇÃO HORA A HORA — CORREIA/CHECKOUT: turno normal 17:30→23:00 <span style='color:rgba(255,149,0,.8);font-size:9px'>⚡ colunas laranja = hora extra (preencher se necessário)</span> | EXPEDIÇÃO: até 04:00
+      <h4>⏱️ PRODUÇÃO HORA A HORA — CORREIA/CHECKOUT: turno normal 17:30→23:00 <span style='color:rgba(255,149,0,.8);font-size:9px'>⚡ colunas laranja = hora extra (preencher se necessário)</span> | EXPEDIÇÃO: base até 04:00, extensão até 06:00
         <span style="margin-left:10px;font-size:9px;font-weight:normal">
           <span style="background:rgba(0,180,80,.35);padding:1px 6px;border-radius:2px;color:#00e676">▲ Acima</span>
           <span style="background:rgba(0,120,60,.3);padding:1px 6px;border-radius:2px;color:#7ddc9f;margin-left:3px">✔ Meta</span>
@@ -688,13 +688,13 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
 
 <script>
 // ── CONSTANTES ────────────────────────────────────────────
-// 11 períodos: 17:30-18:00, 18:00-19:00, 19:00-20:00, 20:00-21:00, 21:00-22:00, 22:00-23:00, 23:00-00:00, 00:00-01:00, 01:00-02:00, 02:00-03:00, 03:00-04:00
-const HOURS=['17:30→18h','18→19h','19→20h','20→21h','21→22h','22→23h','23→00h','00→01h','01→02h','02→03h','03→04h'];
-const HOURS_LABEL=['17:30','18:00','19:00','20:00','21:00','22:00','23:00','00:00','01:00','02:00','03:00','04:00']; // início de cada slot
+// 13 períodos: turno base até 04:00 e duas colunas opcionais de extensão até 06:00
+const HOURS=['17:30→18h','18→19h','19→20h','20→21h','21→22h','22→23h','23→00h','00→01h','01→02h','02→03h','03→04h','04→05h','05→06h'];
+const HOURS_LABEL=['17:30','18:00','19:00','20:00','21:00','22:00','23:00','00:00','01:00','02:00','03:00','04:00','05:00','06:00']; // início e fim dos slots
 const SHIFT_START_DEC=17.5;
 const SHIFT_END_DEC=28;
 const H_CK=7;  // correia/checkout: turno normal até 23:00 (slots 0-6); slots ≥7 = hora extra (laranja)
-const H_EX=HOURS.length; // expedição: todos os 11 slots
+const H_EX=11; // capacidade-base da expedição: até 04:00; slots seguintes são extensão opcional
 
 // MÉTRICAS hora a hora — 3 estágios do fluxo
 const MHORA=[
@@ -703,7 +703,7 @@ const MHORA=[
   'Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.',
   // CHECKOUT (conferência) — encerra ~23:00 — apenas os 3 volumes principais
   'Vol. Checkout','Linhas Checkout','Unid. Checkout',
-  // EXPEDIÇÃO (DOCA) — vai até 04:00 — todos os tipos de volume
+  // EXPEDIÇÃO (DOCA) — base até 04:00, com extensão opcional até 06:00
   'Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.',
   'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.',
   'Vol. Doca',
@@ -1542,7 +1542,7 @@ function renderDashCharts(day){
   }else{alertEl.style.display='none';}
 
   // Meta acumulada
-  const meta=HOURS.map((_,i)=>day.meta?Math.round(day.meta*(i+1)/HOURS.length):null);
+  const meta=HOURS.map((_,i)=>day.meta?Math.round(day.meta*Math.min(i+1,H_EX)/H_EX):null);
   const prodA=[];let run=0;
   lm.forEach(v=>{if(v!==null){run+=v;prodA.push(run);}else prodA.push(run>0?run:null);});
   if(CH.acum)CH.acum.destroy();
@@ -1893,7 +1893,7 @@ function renderDashTables(day){
      metrics:correiaMetrics},
     {title:'🔵 CHECKOUT — Conferência', bg:'rgba(0,229,255,.08)',
      metrics:['Vol. Checkout','Linhas Checkout','Unid. Checkout']},
-    {title:'🟢 EXPEDIÇÃO — DOCA (vai até 04:00)', bg:'rgba(0,230,118,.1)',
+    {title:'🟢 EXPEDIÇÃO — DOCA (base até 04:00 | extensão até 06:00)', bg:'rgba(0,230,118,.1)',
      metrics:expedicaoMetrics},
     {title:'📋 CONTROLE',               bg:'rgba(100,100,180,.08)',
      metrics:['Vales','Conf. Planejado','Conf. Ativo']},
@@ -1923,7 +1923,7 @@ function renderDashTables(day){
           if(isInv){bg=n>capH?'background:rgba(200,20,20,.5)':n>capH*.8?'background:rgba(180,130,0,.25)':'background:rgba(0,120,60,.25)';style=n>capH?'color:#ff4c4c;font-weight:bold':n>capH*.8?'color:#ffd700':'color:#00e676';}
           else{const p=n/capH;bg=p>=1.05?'background:rgba(0,180,80,.3)':p>=.9?'background:rgba(0,120,60,.2)':p>=.7?'background:rgba(180,130,0,.2)':'background:rgba(180,30,30,.3)';style=p>=1.05?'color:#00e676;font-weight:bold':p>=.9?'color:#7ddc9f':p>=.7?'color:#ffd700':'color:#ff7070';}
         }
-        const isExtra=isCK&&i>=H_CK;
+        const isExtra=(isCK&&i>=H_CK)||i>=H_EX;
         const periodTarget=cap?capForHour(m,cap,i,day.date):null;
         const targetTitle=periodTarget?`${isInv?'Limite':'Meta'} do período: ${periodTarget.toLocaleString('pt-BR')}`:'';
         const routeDone=isRoute&&rawVals[i]!==''?`<span style="display:block;font-size:8px;color:#00e5ff">feito: ${(+rawVals[i]).toLocaleString('pt-BR')}</span>`:'';
@@ -2214,7 +2214,7 @@ function buildHoraTable(hd){
      metrics:correiaMetrics},
     {title:'🔵 CHECKOUT — Conferência', color:'rgba(0,229,255,.1)',
      metrics:['Vol. Checkout','Linhas Checkout','Unid. Checkout']},
-    {title:'🟢 EXPEDIÇÃO — DOCA (vai até 04:00)', color:'rgba(0,230,118,.12)',
+    {title:'🟢 EXPEDIÇÃO — DOCA (base até 04:00 | extensão até 06:00)', color:'rgba(0,230,118,.12)',
      metrics:expedicaoMetrics},
     {title:'📋 CONTROLE', color:'rgba(100,100,180,.1)',
      metrics:['Vales','Conf. Planejado','Conf. Ativo']},
@@ -2251,7 +2251,7 @@ function buildHoraTable(hd){
           else{const p=n/capH;bg=p>=1.05?'background:rgba(0,180,80,.45)':p>=.9?'background:rgba(0,120,60,.35)':p>=.7?'background:rgba(180,130,0,.4)':'background:rgba(180,20,20,.5)';}
         }
         const isCKMetric=['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.','Vol. Checkout','Linhas Checkout','Unid. Checkout'].includes(m);
-        const isExtra=isCKMetric&&i>=H_CK;
+        const isExtra=(isCKMetric&&i>=H_CK)||i>=H_EX;
         const extraStyle=isExtra&&!bg?'background:rgba(255,149,0,.06);border-left:2px solid rgba(255,149,0,.2)':'';
         const deltaHint=(useDelta||isRoute)?`<div class="delta-hint ${vDelta===null?'delta-empty':''}">${deltaHintHtml(vDelta,isRoute?'feito/hora':'resultado/hora')}</div>`:'';
         const periodTarget=cap?capForHour(m,cap,i,formDate):null;
