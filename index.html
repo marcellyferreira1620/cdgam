@@ -1887,7 +1887,7 @@ function renderDashTables(day){
     ?['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.']
     :['Linhas Med.','Linhas Perf.','Erros Sep. Med.'];
   const expedicaoMetrics=['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.',
-    'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca',...(useSplitIndicators(day.date)?routeHourMetrics():[])];
+    'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca'];
   const DASH_GROUPS=[
     {title:'🔴 CORREIA — Separação',    bg:'rgba(255,149,0,.12)',
      metrics:correiaMetrics},
@@ -3462,7 +3462,7 @@ function renderPreench(){
     ?['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.']
     :['Linhas Med.','Linhas Perf.','Erros Sep. Med.'];
   const expedicaoMetrics=['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.',
-    'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca',...(useSplitIndicators(day.date)?routeHourMetrics():[])];
+    'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca'];
   const grupos=[
     {lbl:'CORREIA',cor:'rgba(255,149,0,.7)',metrics:correiaMetrics},
     {lbl:'CHECKOUT',cor:'rgba(0,229,255,.7)',metrics:['Vol. Checkout','Linhas Checkout','Unid. Checkout']},
