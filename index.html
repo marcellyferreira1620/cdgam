@@ -373,11 +373,11 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
     </div>
     <div class="chart-box" id="horaMedBox" style="display:none">
       <div class="chart-ttl"><span>Produção hora a hora — Correia Medicamentos</span><span style="font-size:9px;font-weight:normal">Intervalo 21:30→22:00</span></div>
-      <div style="position:relative;height:220px"><canvas id="cHoraMed" role="img" aria-label="Producao da correia medicamentos por hora"></canvas></div>
+      <div style="position:relative;height:250px"><canvas id="cHoraMed" role="img" aria-label="Producao da correia medicamentos por hora"></canvas></div>
     </div>
     <div class="chart-box" id="horaPerfBox" style="display:none">
       <div class="chart-ttl"><span>Produção hora a hora — Correia Perfumaria</span><span style="font-size:9px;font-weight:normal">Intervalo 22:00→22:30</span></div>
-      <div style="position:relative;height:220px"><canvas id="cHoraPerf" role="img" aria-label="Producao da correia perfumaria por hora"></canvas></div>
+      <div style="position:relative;height:250px"><canvas id="cHoraPerf" role="img" aria-label="Producao da correia perfumaria por hora"></canvas></div>
     </div>
     <div class="chart-box" id="horaCheckoutBox" style="display:none">
       <div class="chart-ttl"><span>Produção hora a hora — Checkout | Conferentes em linha</span><span style="font-size:9px;font-weight:normal">Intervalos alternados 21:30→22:30</span></div>
@@ -1345,6 +1345,11 @@ function renderDashCharts(day){
     backgroundColor:values.map((v,i)=>v===null?'transparent':v>=capForHour(metric,cap,i,day.date)?CAPACITY_OK_COLOR:CAPACITY_LOW_COLOR),
     borderRadius:3
   });
+  const capacityDataset=(label,cap,metric,yAxisID,color)=>({
+    label,data:HOURS.map((_,i)=>capForHour(metric,cap,i,day.date)),type:'line',yAxisID,
+    borderColor:color,backgroundColor:color,borderDash:[6,3],borderWidth:2,
+    pointRadius:2,pointHoverRadius:4,fill:false,tension:0
+  });
 
   if(splitIndicators){
     destroyChart('hora');
@@ -1353,14 +1358,20 @@ function renderDashCharts(day){
       data:{labels:HOURS,datasets:[
         hourDataset('Linhas Med.',lm,capLM),
         hourDataset('Volume Med.',vMed,capVMed,'y','Vol. Med.'),
-        hourDataset('Unidade Med.',uMed,capUMed,'yUnits','Unid. Med.')
+        hourDataset('Unidade Med.',uMed,capUMed,'yUnits','Unid. Med.'),
+        capacityDataset('Meta Linhas Med./h',capLM,'Linhas Med.','y','#ffd700'),
+        capacityDataset('Meta Volume Med./h',capVMed,'Vol. Med.','y','#00e5ff'),
+        capacityDataset('Meta Unidade Med./h',capUMed,'Unid. Med.','yUnits','#c39bd3')
       ]},options:hourChartOptions(true)});
     destroyChart('horaPerf');
     CH.horaPerf=new Chart(document.getElementById('cHoraPerf'),{type:'bar',
       data:{labels:HOURS,datasets:[
         hourDataset('Linhas Perf.',lp,capLP),
         hourDataset('Volume Perf.',vPerf,capVPerf,'y','Vol. Perf.'),
-        hourDataset('Unidade Perf.',uPerf,capUPerf,'yUnits','Unid. Perf.')
+        hourDataset('Unidade Perf.',uPerf,capUPerf,'yUnits','Unid. Perf.'),
+        capacityDataset('Meta Linhas Perf./h',capLP,'Linhas Perf.','y','#ffd700'),
+        capacityDataset('Meta Volume Perf./h',capVPerf,'Vol. Perf.','y','#00e5ff'),
+        capacityDataset('Meta Unidade Perf./h',capUPerf,'Unid. Perf.','yUnits','#c39bd3')
       ]},options:hourChartOptions(true)});
     destroyChart('horaCheckout');
     CH.horaCheckout=new Chart(document.getElementById('cHoraCheckout'),{type:'bar',
