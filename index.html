@@ -1380,10 +1380,10 @@ function renderDashCharts(day){
         hourDataset('Unid. Checkout',uc,capUC,'yUnits','Unid. Checkout'),
         capacityDataset('Meta Volume Checkout/h',capVC,'Vol. Checkout','y','#00e5ff'),
         capacityDataset('Meta Unidade Checkout/h',capUC,'Unid. Checkout','yUnits','#c39bd3'),
-        {label:'Conferentes Planejado',data:cp,type:'line',yAxisID:'yConf',borderColor:CAPACITY_OK_COLOR,borderDash:[5,3],borderWidth:2,pointRadius:3,pointBackgroundColor:CAPACITY_OK_COLOR,fill:false,tension:.25},
-        {label:'Conferentes Ativo',data:ca,type:'line',yAxisID:'yConf',borderColor:CAPACITY_OK_COLOR,borderWidth:2,pointRadius:3,
-         pointBackgroundColor:ca.map((v,i)=>v===null?'transparent':cp[i]!==null&&v>=cp[i]?CAPACITY_OK_COLOR:CAPACITY_LOW_COLOR),
-         segment:{borderColor:ctx=>{const i=ctx.p1DataIndex,v=ca[i],p=cp[i];return v!==null&&p!==null&&v>=p?CAPACITY_OK_COLOR:CAPACITY_LOW_COLOR;}},
+        {label:'Conferentes Ativo',data:ca,type:'line',yAxisID:'yConf',order:-10,borderColor:'#ffd700',borderWidth:3,pointRadius:5,pointHoverRadius:7,
+         pointBackgroundColor:ca.map((v,i)=>v===null?'transparent':cp[i]!==null&&v>=cp[i]?'#ffd700':CAPACITY_LOW_COLOR),
+         pointBorderColor:'#071525',pointBorderWidth:2,
+         segment:{borderColor:ctx=>{const i=ctx.p1DataIndex,v=ca[i],p=cp[i];return v!==null&&p!==null&&v>=p?'#ffd700':CAPACITY_LOW_COLOR;}},
          fill:false,tension:.25}
       ]},
       options:{...hourChartOptions(true),scales:{
