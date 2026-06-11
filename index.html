@@ -411,7 +411,7 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
     <div class="chart-box" style="border-color:rgba(0,230,118,.4)">
       <div class="chart-ttl">
         <span>⚖️ Fechamento de Rotas — Volumes da Doca</span>
-        <span style="font-size:9px;font-weight:normal;color:#6a9fc0">Uma barra por rota: azul = dentro do horário | vermelho = atrasada | texto = % que falta</span>
+        <span style="font-size:9px;font-weight:normal;color:#6a9fc0">Uma barra por rota: começa vermelha e fica azul conforme o fechamento | saída registrada = azul 100%</span>
       </div>
       <div class="doca-route-chart-scroll"><div class="doca-route-chart-inner"><canvas id="cDocaBalance" role="img" aria-label="Fechamento de rotas por volume"></canvas></div></div>
       <div class="doca-routes-hour" id="docaRoutesHour"></div>
@@ -1588,10 +1588,11 @@ function renderRouteClosure(day){
   const totais=routeSnapshots.map(s=>s.total);
   const expedidos=routeSnapshots.map(s=>s.completed);
   const pendencias=routeSnapshots.map(s=>s.remaining);
-  const percentuais=rotas.map((_,i)=>totais[i]>0?Math.round(expedidos[i]/totais[i]*100):null);
-  const percentuaisFalta=percentuais.map(p=>p===null?null:Math.max(100-p,0));
+  const percentuais=rotas.map((_,i)=>totais[i]>0?Math.min(Math.round(expedidos[i]/totais[i]*100),100):null);
+  const percentuaisFechamento=rotas.map((r,i)=>r.hReal?100:percentuais[i]);
+  const percentuaisFaltaFechamento=percentuaisFechamento.map(p=>p===null?null:Math.max(100-p,0));
+  const barrasFechamento=percentuaisFechamento.map(p=>p===null?null:100);
   const statusRotas=rotas.map(r=>calcRotaStatus(day,r));
-  const coresRotas=statusRotas.map(st=>st.stClass==='st-atrasado'?CAPACITY_LOW_COLOR:CAPACITY_OK_COLOR);
   const wrapRouteName=name=>{
     const lines=[];
     String(name||'').split('/').forEach(part=>{
@@ -1617,8 +1618,8 @@ function renderRouteClosure(day){
   const totalSaida=expedidos.reduce((s,v)=>s+v,0);
   const totalDocaHora=sumHoraField('Vol. Doca',hd);
   const totalRotasHora=rotasHora.reduce((s,v)=>s+(v||0),0);
-  const rotasFinalizadas=rotas.filter((_,i)=>totais[i]>0&&expedidos[i]>=totais[i]).length;
-  const rotasPendentes=rotas.filter((_,i)=>totais[i]===0||expedidos[i]<totais[i]).length;
+  const rotasFinalizadas=rotas.filter((r,i)=>!!r.hReal||(totais[i]>0&&expedidos[i]>=totais[i])).length;
+  const rotasPendentes=rotas.length-rotasFinalizadas;
   const volumePendente=totalRotas-totalSaida;
   const saldoFinal=totalEntrada-totalSaida;
 
@@ -1629,24 +1630,39 @@ function renderRouteClosure(day){
       const meta=chart.getDatasetMeta(0),ctx=chart.ctx;
       ctx.save();
       ctx.textAlign='center';
-      ctx.font='bold 10px Arial';
+      ctx.textBaseline='middle';
+      ctx.fillStyle='#ffffff';
+      ctx.font='bold 9px Arial';
       meta.data.forEach((bar,i)=>{
-        const falta=percentuaisFalta[i];
-        if(falta===null)return;
-        const text=`${falta}% falta`;
-        const inside=percentuais[i]>=18;
-        ctx.fillStyle=inside?'#ffffff':coresRotas[i];
-        ctx.textBaseline=inside?'top':'bottom';
-        const y=inside?bar.y+6:Math.max(bar.y-5,chart.chartArea.top+12);
-        ctx.fillText(text,bar.x,y);
+        const feito=percentuaisFechamento[i],falta=percentuaisFaltaFechamento[i];
+        if(feito===null)return;
+        const altura=bar.base-bar.y;
+        const divisao=bar.base-(altura*feito/100);
+        if(feito>0&&bar.base-divisao>=14)ctx.fillText(`${feito}% feito`,bar.x,(divisao+bar.base)/2);
+        if(falta>0&&divisao-bar.y>=14)ctx.fillText(`${falta}% falta`,bar.x,(bar.y+divisao)/2);
       });
       ctx.restore();
     }
   };
+  const routeProgressColor=ctx=>{
+    const area=ctx.chart.chartArea,p=percentuaisFechamento[ctx.dataIndex];
+    if(!area||p===null)return CAPACITY_LOW_COLOR;
+    const ratio=Math.max(0,Math.min(p,100))/100;
+    const gradient=ctx.chart.ctx.createLinearGradient(0,area.bottom,0,area.top);
+    if(ratio<=0){
+      gradient.addColorStop(0,CAPACITY_LOW_COLOR);gradient.addColorStop(1,CAPACITY_LOW_COLOR);
+    }else if(ratio>=1){
+      gradient.addColorStop(0,CAPACITY_OK_COLOR);gradient.addColorStop(1,CAPACITY_OK_COLOR);
+    }else{
+      gradient.addColorStop(0,CAPACITY_OK_COLOR);gradient.addColorStop(ratio,CAPACITY_OK_COLOR);
+      gradient.addColorStop(ratio,CAPACITY_LOW_COLOR);gradient.addColorStop(1,CAPACITY_LOW_COLOR);
+    }
+    return gradient;
+  };
   CH.docaBal=new Chart(document.getElementById('cDocaBalance'),{
     type:'bar',
     data:{labels,datasets:[
-      {label:'% Finalizado por Rota',data:percentuais,backgroundColor:coresRotas,borderColor:coresRotas,borderWidth:1,borderRadius:3,borderSkipped:false,maxBarThickness:42,categoryPercentage:.68,barPercentage:.78}
+      {label:'Fechamento da rota',data:barrasFechamento,backgroundColor:routeProgressColor,borderColor:'#1c4f70',borderWidth:1,borderRadius:3,borderSkipped:false,maxBarThickness:42,categoryPercentage:.68,barPercentage:.78}
     ]},
     plugins:[routeProgressLabels],
     options:{responsive:true,maintainAspectRatio:false,
@@ -1657,8 +1673,9 @@ function renderRouteClosure(day){
           label:ctx=>{
             const i=ctx.dataIndex;
             return[
-              ` Finalizado: ${percentuais[i]===null?'—':percentuais[i]+'%'}`,
-              ` Falta: ${percentuaisFalta[i]===null?'—':percentuaisFalta[i]+'%'}`,
+              ` Fechamento: ${percentuaisFechamento[i]===null?'—':percentuaisFechamento[i]+'%'}`,
+              ` Falta visual: ${percentuaisFaltaFechamento[i]===null?'—':percentuaisFaltaFechamento[i]+'%'}`,
+              ` Realizado H/H: ${percentuais[i]===null?'—':percentuais[i]+'%'}`,
               ` Volumes: ${expedidos[i].toLocaleString('pt-BR')} / ${totais[i].toLocaleString('pt-BR')}`,
               ` Pendente: ${pendencias[i].toLocaleString('pt-BR')}`
             ];
@@ -1667,7 +1684,7 @@ function renderRouteClosure(day){
         }}},
       scales:{
         x:{ticks:{color:'#89b4d4',font:{size:9,weight:'bold'},maxRotation:0,minRotation:0,autoSkip:false,padding:7},grid:{display:false},offset:true},
-        y:{beginAtZero:true,max:100,ticks:{color:'#89b4d4',font:{size:9},stepSize:20,callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.07)'},title:{display:true,text:'% Finalizado',color:'#6a9fc0',font:{size:9}}}
+        y:{beginAtZero:true,max:100,ticks:{color:'#89b4d4',font:{size:9},stepSize:20,callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.07)'},title:{display:true,text:'% Fechamento',color:'#6a9fc0',font:{size:9}}}
       }}
   });
 
