@@ -381,7 +381,7 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
     </div>
     <div class="chart-box" id="horaCheckoutBox" style="display:none">
       <div class="chart-ttl"><span>Produção hora a hora — Checkout | Conferentes em linha</span><span style="font-size:9px;font-weight:normal">Intervalos alternados 21:30→22:30</span></div>
-      <div style="position:relative;height:220px"><canvas id="cHoraCheckout" role="img" aria-label="Producao do checkout por hora"></canvas></div>
+      <div style="position:relative;height:250px"><canvas id="cHoraCheckout" role="img" aria-label="Producao do checkout por hora"></canvas></div>
       <div class="checkout-conf-wrap" id="confTbl"></div>
     </div>
     <div class="chart-box" id="volTipoBox">
@@ -1314,11 +1314,11 @@ function renderDashCharts(day){
   const hd=day.hd||{};
   const lm=dv(hd,'Linhas Med.'),vMed=dv(hd,'Vol. Med.'),uMed=dv(hd,'Unid. Med.');
   const lp=dv(hd,'Linhas Perf.'),vPerf=dv(hd,'Vol. Perf.'),uPerf=dv(hd,'Unid. Perf.');
-  const vc=dv(hd,'Vol. Checkout');
+  const vc=dv(hd,'Vol. Checkout'),uc=dv(hd,'Unid. Checkout');
   const cp=dv(hd,'Conf. Planejado'),ca=dv(hd,'Conf. Ativo');
   const capLM=day.capLM||3500,capVMed=day.capVMed||575,capUMed=day.capUMed||10000;
   const capLP=day.capLP||3000,capVPerf=day.capVPerf||425,capUPerf=day.capUPerf||6666;
-  const capVC=day.capVC||1280;
+  const capVC=day.capVC||1280,capUC=day.capUC||20800;
   const splitIndicators=useSplitIndicators(day.date);
   const productionGrid=document.getElementById('productionChartsGrid');
   const combinedBox=document.getElementById('horaCombinedBox');
@@ -1377,15 +1377,18 @@ function renderDashCharts(day){
     CH.horaCheckout=new Chart(document.getElementById('cHoraCheckout'),{type:'bar',
       data:{labels:HOURS,datasets:[
         hourDataset('Vol. Checkout',vc,capVC),
+        hourDataset('Unid. Checkout',uc,capUC,'yUnits','Unid. Checkout'),
+        capacityDataset('Meta Volume Checkout/h',capVC,'Vol. Checkout','y','#00e5ff'),
+        capacityDataset('Meta Unidade Checkout/h',capUC,'Unid. Checkout','yUnits','#c39bd3'),
         {label:'Conferentes Planejado',data:cp,type:'line',yAxisID:'yConf',borderColor:CAPACITY_OK_COLOR,borderDash:[5,3],borderWidth:2,pointRadius:3,pointBackgroundColor:CAPACITY_OK_COLOR,fill:false,tension:.25},
         {label:'Conferentes Ativo',data:ca,type:'line',yAxisID:'yConf',borderColor:CAPACITY_OK_COLOR,borderWidth:2,pointRadius:3,
          pointBackgroundColor:ca.map((v,i)=>v===null?'transparent':cp[i]!==null&&v>=cp[i]?CAPACITY_OK_COLOR:CAPACITY_LOW_COLOR),
          segment:{borderColor:ctx=>{const i=ctx.p1DataIndex,v=ca[i],p=cp[i];return v!==null&&p!==null&&v>=p?CAPACITY_OK_COLOR:CAPACITY_LOW_COLOR;}},
          fill:false,tension:.25}
       ]},
-      options:{...hourChartOptions(),scales:{
-        ...hourChartOptions().scales,
-        yConf:{beginAtZero:true,position:'right',ticks:{color:'#ffd700',font:{size:9},precision:0},grid:{display:false},title:{display:true,text:'Conferentes',color:'#ffd700',font:{size:9}}}
+      options:{...hourChartOptions(true),scales:{
+        ...hourChartOptions(true).scales,
+        yConf:{beginAtZero:true,position:'right',offset:true,ticks:{color:'#ffd700',font:{size:9},precision:0},grid:{display:false},title:{display:true,text:'Conferentes',color:'#ffd700',font:{size:9}}}
       }}});
   }else{
     destroyChart('horaMed');destroyChart('horaPerf');destroyChart('horaCheckout');
