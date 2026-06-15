@@ -545,13 +545,13 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
       <!-- COL 1: RESUMO OPERACIONAL -->
       <div class="adm-group adm-restricted">
         <h4>📋 Resumo Operacional</h4>
-        <div class="adm-row"><label>Acumulado produzido</label><input type="number" id="iAcum" placeholder="0" oninput="liveUpdate()"/></div>
-        <div class="adm-row"><label>Meta Proj. Unid. (acum.)</label><input type="number" id="iMeta" placeholder="0" oninput="liveUpdate()"/></div>
-        <div class="adm-row"><label>O.S. Impressas</label><input type="number" id="iOsImp" placeholder="0" oninput="liveUpdate()"/></div>
-        <div class="adm-row"><label>O.S. Finalizadas</label><input type="number" id="iOsFin" placeholder="0" oninput="liveUpdate()"/></div>
-        <div class="adm-row"><label>O.S. À Produzir</label><input type="number" id="iOsProd" placeholder="0" oninput="liveUpdate()"/></div>
-        <div class="adm-row"><label>Média Itens/O.S.</label><input type="number" id="iMedIt" step="0.1" placeholder="0.0" oninput="liveUpdate()"/></div>
-        <div class="adm-row"><label>Faltas no dia</label><input type="number" id="iFaltas" placeholder="0" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Acumulado Produzido (Linhas)</label><input type="number" id="iAcum" placeholder="0" oninput="liveUpdate()"/></div>
+        <input type="hidden" id="iMeta"/>
+        <div class="adm-row"><label>O.S. Impressas (Linhas)</label><input type="number" id="iOsImp" placeholder="0" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>O.S. Finalizadas (Linhas)</label><input type="number" id="iOsFin" placeholder="0" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>O.S. A Produzir (Linhas)</label><input type="number" id="iOsProd" placeholder="0" oninput="liveUpdate()"/></div>
+        <input type="hidden" id="iMedIt"/>
+        <div class="adm-row"><label>Faltas no Dia - Setor (Correia/Checkout/Expedição)</label><input type="number" id="iFaltas" placeholder="0" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>Observações</label></div>
         <textarea id="iObs" style="width:100%;background:#0d1c2e;border:1px solid #1e4a72;color:#fff;border-radius:3px;padding:5px;font-size:11px;resize:vertical;min-height:50px" oninput="liveUpdate()"></textarea>
         <h4 style="margin-top:12px">Horários de Finalização dos Processos</h4>
