@@ -548,8 +548,9 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
         <div class="adm-row"><label>Acumulado Produzido (Linhas)</label><input type="number" id="iAcum" placeholder="0" oninput="liveUpdate()"/></div>
         <input type="hidden" id="iMeta"/>
         <div class="adm-row"><label>O.S. Impressas (Linhas)</label><input type="number" id="iOsImp" placeholder="0" oninput="liveUpdate()"/></div>
-        <div class="adm-row"><label>O.S. Finalizadas (Linhas)</label><input type="number" id="iOsFin" placeholder="0" oninput="liveUpdate()"/></div>
-        <div class="adm-row"><label>O.S. A Produzir (Linhas)</label><input type="number" id="iOsProd" placeholder="0" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>O.S. Finalizadas (Linhas)</label><input type="number" id="iOsFin" placeholder="0" oninput="syncOsProdSaldo();liveUpdate()"/></div>
+        <div class="adm-row"><label>O.S. A Produzir - Total Atualizado (Linhas)</label><input type="number" id="iOsProdBase" placeholder="0" oninput="syncOsProdSaldo();liveUpdate()"/></div>
+        <div class="adm-row"><label>O.S. A Produzir - Resultado (Linhas)</label><input type="number" id="iOsProd" placeholder="0" title="Total atualizado - O.S. Finalizadas" readonly/></div>
         <input type="hidden" id="iMedIt"/>
         <div class="adm-row"><label>Faltas no Dia - Setor (Correia/Checkout/Expedição)</label><input type="number" id="iFaltas" placeholder="0" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>Observações</label></div>
@@ -1009,7 +1010,7 @@ function emptyDay(dt){
     pnVol:0,pnUnid:0,
     pnCorreia:0,pnPsico:0,pnEspecial:0,pnEspFrac:0,pnEspMed:0,pnEspPerf:0,
     pnFralda:0,pnFraldaF:0,pnGel:0,pnOnco:0,pnOncoT:0,pnJuncao:0,pnDoca:0,
-    acum:0,meta:0,osImp:0,osFin:0,osProd:0,medIt:0,faltas:0,obs:'',
+    acum:0,meta:0,osImp:0,osFin:0,osProdBase:0,osProd:0,medIt:0,faltas:0,obs:'',
     cPer:'',cMed:'',ckOut:'',esp:'',frF:'',frFc:'',exp:'',
     cPerFim:'',cMedFim:'',ckOutFim:'',espFim:'',frFFim:'',frFcFim:'',expFim:'',
     capLM:3500,capVMed:575,capUMed:10000,capLP:3000,capVPerf:425,capUPerf:6666,
@@ -1056,6 +1057,24 @@ function hourTargetFactor(metric,i,dt){
 function capForHour(metric,cap,i,dt){
   if(!cap)return cap;
   return cap*hourTargetFactor(metric,i,dt);
+}
+function calcOsProdSaldo(base,finalizadas){
+  return Math.max((+base||0)-(+finalizadas||0),0);
+}
+function osProdBaseFromDay(day){
+  if(!day)return 0;
+  return day.osProdBase!==undefined&&day.osProdBase!==null?+day.osProdBase||0:+day.osProd||0;
+}
+function osProdSaldoFromDay(day){
+  if(!day)return 0;
+  return calcOsProdSaldo(osProdBaseFromDay(day),day.osFin||0);
+}
+function syncOsProdSaldo(){
+  const baseEl=document.getElementById('iOsProdBase');
+  const finEl=document.getElementById('iOsFin');
+  const outEl=document.getElementById('iOsProd');
+  if(!baseEl||!finEl||!outEl)return;
+  outEl.value=calcOsProdSaldo(baseEl.value,finEl.value);
 }
 function getDay(dt){return db.days.find(d=>d.date===dt)||null;}
 function sortedDays(){return [...db.days].sort((a,b)=>a.date.localeCompare(b.date));}
@@ -1239,7 +1258,7 @@ function renderKPIs(day){
   document.getElementById('kMeta').textContent=(day.meta||0).toLocaleString('pt-BR');
   document.getElementById('kOsImp').textContent=(day.osImp||0).toLocaleString('pt-BR');
   document.getElementById('kOsFin').textContent=(day.osFin||0).toLocaleString('pt-BR');
-  document.getElementById('kOsProd').textContent=(day.osProd||0).toLocaleString('pt-BR');
+  document.getElementById('kOsProd').textContent=osProdSaldoFromDay(day).toLocaleString('pt-BR');
   document.getElementById('kPerc').textContent=perc+'%';
   document.getElementById('kPercBar').style.width=Math.min(perc,100)+'%';
   document.getElementById('kPercBar').style.background=perc>=90?'#00e676':perc>=70?'#ff9500':'#ff4c4c';
@@ -2374,6 +2393,9 @@ function readFormAsDay(){
   const existing=getDay(dt);
   const savedRotas=existing&&Array.isArray(existing.rotas)?JSON.parse(JSON.stringify(existing.rotas)):null;
   const newRules=useNewRules(dt);
+  const osFin=+document.getElementById('iOsFin').value||0;
+  const osProdBase=+document.getElementById('iOsProdBase').value||0;
+  const osProd=calcOsProdSaldo(osProdBase,osFin);
   return{
     date:dt,
     _updatedAt:Date.now(),
@@ -2396,8 +2418,9 @@ function readFormAsDay(){
     acum:+document.getElementById('iAcum').value||0,
     meta:+document.getElementById('iMeta').value||0,
     osImp:+document.getElementById('iOsImp').value||0,
-    osFin:+document.getElementById('iOsFin').value||0,
-    osProd:+document.getElementById('iOsProd').value||0,
+    osFin,
+    osProdBase,
+    osProd,
     medIt:+document.getElementById('iMedIt').value||0,
     faltas:+document.getElementById('iFaltas').value||0,
     obs:document.getElementById('iObs').value,
@@ -2444,7 +2467,7 @@ function loadFormFrom(day){
   s('iPNOncoT',day.pnOncoT||'');s('iPNJuncao',day.pnJuncao||'');
   s('iPNDoca',day.pnDoca||'');
   s('iAcum',day.acum||'');s('iMeta',day.meta||'');
-  s('iOsImp',day.osImp||'');s('iOsFin',day.osFin||'');s('iOsProd',day.osProd||'');
+  s('iOsImp',day.osImp||'');s('iOsFin',day.osFin||'');s('iOsProdBase',osProdBaseFromDay(day)||'');syncOsProdSaldo();
   s('iMedIt',day.medIt||'');s('iFaltas',day.faltas||'');
   document.getElementById('iObs').value=day.obs||'';
   s('iCPer',day.cPer||'');s('iCMed',day.cMed||'');s('iCkOut',day.ckOut||'');
