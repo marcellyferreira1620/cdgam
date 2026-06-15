@@ -549,7 +549,7 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
         <input type="hidden" id="iMeta"/>
         <div class="adm-row"><label>O.S. Impressas (Linhas)</label><input type="number" id="iOsImp" placeholder="0" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>O.S. Finalizadas (Linhas)</label><input type="number" id="iOsFin" placeholder="0" oninput="syncOsProdSaldo();liveUpdate()"/></div>
-        <div class="adm-row"><label>O.S. A Produzir - Total Atualizado (Linhas)</label><input type="number" id="iOsProdBase" placeholder="0" oninput="syncOsProdSaldo();liveUpdate()"/></div>
+        <div class="adm-row"><label>O.S. A Produzir - Total Atualizado (Linhas)</label><input type="text" inputmode="numeric" id="iOsProdBase" placeholder="0 ou 1000+2000" title="Digite um total ou uma soma. Ex.: 1000+2000+2049" oninput="syncOsProdSaldo();liveUpdate()" onkeydown="if(event.key==='Enter'){event.preventDefault();commitOsProdBaseSum();liveUpdate()}" onblur="commitOsProdBaseSum();liveUpdate()"/></div>
         <div class="adm-row"><label>O.S. A Produzir - Resultado (Linhas)</label><input type="number" id="iOsProd" placeholder="0" title="Total atualizado - O.S. Finalizadas" readonly/></div>
         <input type="hidden" id="iMedIt"/>
         <div class="adm-row"><label>Faltas no Dia - Setor (Correia/Checkout/Expedição)</label><input type="number" id="iFaltas" placeholder="0" oninput="liveUpdate()"/></div>
@@ -1058,8 +1058,25 @@ function capForHour(metric,cap,i,dt){
   if(!cap)return cap;
   return cap*hourTargetFactor(metric,i,dt);
 }
+function parseSumNumber(value){
+  const text=String(value??'').trim();
+  if(!text)return 0;
+  const tokens=text.split('+').map(t=>t.trim()).filter(Boolean);
+  if(!tokens.length)return 0;
+  const total=tokens.reduce((sum,token)=>{
+    const clean=token.replace(/\s/g,'');
+    if(!/^[0-9.,]+$/.test(clean))return sum;
+    const dots=(clean.match(/\./g)||[]).length;
+    const normalized=clean.includes(',')
+      ?clean.replace(/\./g,'').replace(',','.')
+      :(dots>1||(dots===1&&/\.\d{3}$/.test(clean))?clean.replace(/\./g,''):clean);
+    const n=Number(normalized);
+    return Number.isFinite(n)?sum+n:sum;
+  },0);
+  return Math.round(total);
+}
 function calcOsProdSaldo(base,finalizadas){
-  return Math.max((+base||0)-(+finalizadas||0),0);
+  return Math.max(parseSumNumber(base)-parseSumNumber(finalizadas),0);
 }
 function osProdBaseFromDay(day){
   if(!day)return 0;
@@ -1075,6 +1092,12 @@ function syncOsProdSaldo(){
   const outEl=document.getElementById('iOsProd');
   if(!baseEl||!finEl||!outEl)return;
   outEl.value=calcOsProdSaldo(baseEl.value,finEl.value);
+}
+function commitOsProdBaseSum(){
+  const baseEl=document.getElementById('iOsProdBase');
+  if(!baseEl)return;
+  baseEl.value=parseSumNumber(baseEl.value);
+  syncOsProdSaldo();
 }
 function getDay(dt){return db.days.find(d=>d.date===dt)||null;}
 function sortedDays(){return [...db.days].sort((a,b)=>a.date.localeCompare(b.date));}
@@ -2394,7 +2417,7 @@ function readFormAsDay(){
   const savedRotas=existing&&Array.isArray(existing.rotas)?JSON.parse(JSON.stringify(existing.rotas)):null;
   const newRules=useNewRules(dt);
   const osFin=+document.getElementById('iOsFin').value||0;
-  const osProdBase=+document.getElementById('iOsProdBase').value||0;
+  const osProdBase=parseSumNumber(document.getElementById('iOsProdBase').value);
   const osProd=calcOsProdSaldo(osProdBase,osFin);
   return{
     date:dt,
