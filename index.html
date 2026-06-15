@@ -545,12 +545,22 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
       <!-- COL 1: RESUMO OPERACIONAL -->
       <div class="adm-group adm-restricted">
         <h4>📋 Resumo Operacional</h4>
-        <div class="adm-row"><label>Acumulado Produzido (Linhas)</label><input type="number" id="iAcum" placeholder="0" oninput="liveUpdate()"/></div>
         <input type="hidden" id="iMeta"/>
-        <div class="adm-row"><label>O.S. Impressas (Linhas)</label><input type="number" id="iOsImp" placeholder="0" oninput="liveUpdate()"/></div>
-        <div class="adm-row"><label>O.S. Finalizadas (Linhas)</label><input type="number" id="iOsFin" placeholder="0" oninput="syncOsProdSaldo();liveUpdate()"/></div>
-        <div class="adm-row"><label>O.S. A Produzir - Total Atualizado (Linhas)</label><input type="text" inputmode="numeric" id="iOsProdBase" placeholder="0 ou 1000+2000" title="Digite um total ou uma soma. Ex.: 1000+2000+2049" oninput="syncOsProdSaldo();liveUpdate()" onkeydown="if(event.key==='Enter'){event.preventDefault();commitOsProdBaseSum();liveUpdate()}" onblur="commitOsProdBaseSum();liveUpdate()"/></div>
-        <div class="adm-row"><label>O.S. A Produzir - Resultado (Linhas)</label><input type="number" id="iOsProd" placeholder="0" title="Total atualizado - O.S. Finalizadas" readonly/></div>
+        <h4 style="margin-top:8px;font-size:10px;color:#00e5ff">Medicamento</h4>
+        <div class="adm-row"><label>Acumulado Produzido Medicamento (Linhas)</label><input type="number" id="iAcumMed" placeholder="0" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>O.S. Impressas Medicamento (Linhas)</label><input type="number" id="iOsImpMed" placeholder="0" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>O.S. Finalizadas Medicamento (Linhas)</label><input type="number" id="iOsFinMed" placeholder="0" oninput="syncOsProdSaldo();liveUpdate()"/></div>
+        <div class="adm-row"><label>O.S. A Produzir Medicamento Total Atualizado (Linhas)</label><input type="text" inputmode="numeric" id="iOsProdMedBase" placeholder="0 ou 1000+2000" title="Digite um total ou uma soma. Ex.: 1000+2000+2049" oninput="syncOsProdSaldo();liveUpdate()" onkeydown="if(event.key==='Enter'){event.preventDefault();commitOsProdBaseSum('Med');liveUpdate()}" onblur="commitOsProdBaseSum('Med');liveUpdate()"/></div>
+        <div class="adm-row"><label>O.S. A Produzir Medicamento Resultado (Linhas)</label><input type="number" id="iOsProdMed" placeholder="0" title="Total atualizado - O.S. Finalizadas Medicamento" readonly/></div>
+
+        <h4 style="margin-top:10px;font-size:10px;color:#ffd700">Perfumaria</h4>
+        <div class="adm-row"><label>Acumulado Produzido Perfumaria (Linhas)</label><input type="number" id="iAcumPerf" placeholder="0" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>O.S. Impressas Perfumaria (Linhas)</label><input type="number" id="iOsImpPerf" placeholder="0" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>O.S. Finalizadas Perfumaria (Linhas)</label><input type="number" id="iOsFinPerf" placeholder="0" oninput="syncOsProdSaldo();liveUpdate()"/></div>
+        <div class="adm-row"><label>O.S. A Produzir Perfumaria Total Atualizado (Linhas)</label><input type="text" inputmode="numeric" id="iOsProdPerfBase" placeholder="0 ou 1000+2000" title="Digite um total ou uma soma. Ex.: 1000+2000+2049" oninput="syncOsProdSaldo();liveUpdate()" onkeydown="if(event.key==='Enter'){event.preventDefault();commitOsProdBaseSum('Perf');liveUpdate()}" onblur="commitOsProdBaseSum('Perf');liveUpdate()"/></div>
+        <div class="adm-row"><label>O.S. A Produzir Perfumaria Resultado (Linhas)</label><input type="number" id="iOsProdPerf" placeholder="0" title="Total atualizado - O.S. Finalizadas Perfumaria" readonly/></div>
+
+        <div class="adm-row"><label>O.S. Total (Medicamento + Perfumaria) (Linhas)</label><input type="number" id="iOsTotal" placeholder="0" readonly/></div>
         <input type="hidden" id="iMedIt"/>
         <div class="adm-row"><label>Faltas no Dia - Setor (Correia/Checkout/Expedição)</label><input type="number" id="iFaltas" placeholder="0" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>Observações</label></div>
@@ -1010,7 +1020,10 @@ function emptyDay(dt){
     pnVol:0,pnUnid:0,
     pnCorreia:0,pnPsico:0,pnEspecial:0,pnEspFrac:0,pnEspMed:0,pnEspPerf:0,
     pnFralda:0,pnFraldaF:0,pnGel:0,pnOnco:0,pnOncoT:0,pnJuncao:0,pnDoca:0,
-    acum:0,meta:0,osImp:0,osFin:0,osProdBase:0,osProd:0,medIt:0,faltas:0,obs:'',
+    acum:0,acumMed:0,acumPerf:0,meta:0,
+    osImp:0,osImpMed:0,osImpPerf:0,osFin:0,osFinMed:0,osFinPerf:0,
+    osProdBase:0,osProdMedBase:0,osProdPerfBase:0,osProd:0,osProdMed:0,osProdPerf:0,osTotal:0,
+    medIt:0,faltas:0,obs:'',
     cPer:'',cMed:'',ckOut:'',esp:'',frF:'',frFc:'',exp:'',
     cPerFim:'',cMedFim:'',ckOutFim:'',espFim:'',frFFim:'',frFcFim:'',expFim:'',
     capLM:3500,capVMed:575,capUMed:10000,capLP:3000,capVPerf:425,capUPerf:6666,
@@ -1078,23 +1091,43 @@ function parseSumNumber(value){
 function calcOsProdSaldo(base,finalizadas){
   return Math.max(parseSumNumber(base)-parseSumNumber(finalizadas),0);
 }
+function hasSplitOperational(day){
+  if(!day)return false;
+  return ['acumMed','acumPerf','osImpMed','osImpPerf','osFinMed','osFinPerf','osProdMedBase','osProdPerfBase']
+    .some(k=>day[k]!==undefined&&day[k]!==null);
+}
+function operationalTotal(day,medKey,perfKey,fallbackKey){
+  if(!day)return 0;
+  if(hasSplitOperational(day))return (+day[medKey]||0)+(+day[perfKey]||0);
+  return +day[fallbackKey]||0;
+}
 function osProdBaseFromDay(day){
   if(!day)return 0;
+  if(hasSplitOperational(day))return (+day.osProdMedBase||0)+(+day.osProdPerfBase||0);
   return day.osProdBase!==undefined&&day.osProdBase!==null?+day.osProdBase||0:+day.osProd||0;
 }
 function osProdSaldoFromDay(day){
   if(!day)return 0;
+  if(hasSplitOperational(day)){
+    return calcOsProdSaldo(day.osProdMedBase||0,day.osFinMed||0)+calcOsProdSaldo(day.osProdPerfBase||0,day.osFinPerf||0);
+  }
   return calcOsProdSaldo(osProdBaseFromDay(day),day.osFin||0);
 }
+function osProdBaseInputId(scope){return scope==='Perf'?'iOsProdPerfBase':'iOsProdMedBase';}
 function syncOsProdSaldo(){
-  const baseEl=document.getElementById('iOsProdBase');
-  const finEl=document.getElementById('iOsFin');
-  const outEl=document.getElementById('iOsProd');
-  if(!baseEl||!finEl||!outEl)return;
-  outEl.value=calcOsProdSaldo(baseEl.value,finEl.value);
+  const medBase=document.getElementById('iOsProdMedBase');
+  const medFin=document.getElementById('iOsFinMed');
+  const medOut=document.getElementById('iOsProdMed');
+  const perfBase=document.getElementById('iOsProdPerfBase');
+  const perfFin=document.getElementById('iOsFinPerf');
+  const perfOut=document.getElementById('iOsProdPerf');
+  const totalOut=document.getElementById('iOsTotal');
+  if(medBase&&medFin&&medOut)medOut.value=calcOsProdSaldo(medBase.value,medFin.value);
+  if(perfBase&&perfFin&&perfOut)perfOut.value=calcOsProdSaldo(perfBase.value,perfFin.value);
+  if(totalOut)totalOut.value=parseSumNumber(medBase?medBase.value:0)+parseSumNumber(perfBase?perfBase.value:0);
 }
-function commitOsProdBaseSum(){
-  const baseEl=document.getElementById('iOsProdBase');
+function commitOsProdBaseSum(scope){
+  const baseEl=document.getElementById(osProdBaseInputId(scope));
   if(!baseEl)return;
   baseEl.value=parseSumNumber(baseEl.value);
   syncOsProdSaldo();
@@ -1269,18 +1302,21 @@ function refreshFromDb(){
 
 // ── KPIs ──────────────────────────────────────────────────
 function renderKPIs(day){
-  const perc=day.meta>0?Math.round(day.acum/day.meta*100):0;
+  const acumTotal=operationalTotal(day,'acumMed','acumPerf','acum');
+  const osImpTotal=operationalTotal(day,'osImpMed','osImpPerf','osImp');
+  const osFinTotal=operationalTotal(day,'osFinMed','osFinPerf','osFin');
+  const perc=day.meta>0?Math.round(acumTotal/day.meta*100):0;
   document.getElementById('hdrDate').textContent=fmtDate(day.date||today());
   document.getElementById('kPN').textContent=(day.pnVol||0).toLocaleString('pt-BR');
   document.getElementById('kPNU').textContent=(day.pnUnid||0).toLocaleString('pt-BR');
   document.getElementById('kVenda').textContent=(day.pnUnid||0).toLocaleString('pt-BR');
-  document.getElementById('kAcum').textContent=(day.acum||0).toLocaleString('pt-BR');
+  document.getElementById('kAcum').textContent=acumTotal.toLocaleString('pt-BR');
   // À Processar = Previsto Doca - já expedido (vol)
   const aProcessarVol=Math.max((day.pnDoca||day.pnVol||0)-sumHoraField('Vol. Doca',day.hd||{}),0);
   document.getElementById('kProc').textContent=aProcessarVol.toLocaleString('pt-BR');
   document.getElementById('kMeta').textContent=(day.meta||0).toLocaleString('pt-BR');
-  document.getElementById('kOsImp').textContent=(day.osImp||0).toLocaleString('pt-BR');
-  document.getElementById('kOsFin').textContent=(day.osFin||0).toLocaleString('pt-BR');
+  document.getElementById('kOsImp').textContent=osImpTotal.toLocaleString('pt-BR');
+  document.getElementById('kOsFin').textContent=osFinTotal.toLocaleString('pt-BR');
   document.getElementById('kOsProd').textContent=osProdSaldoFromDay(day).toLocaleString('pt-BR');
   document.getElementById('kPerc').textContent=perc+'%';
   document.getElementById('kPercBar').style.width=Math.min(perc,100)+'%';
@@ -2416,9 +2452,17 @@ function readFormAsDay(){
   const existing=getDay(dt);
   const savedRotas=existing&&Array.isArray(existing.rotas)?JSON.parse(JSON.stringify(existing.rotas)):null;
   const newRules=useNewRules(dt);
-  const osFin=+document.getElementById('iOsFin').value||0;
-  const osProdBase=parseSumNumber(document.getElementById('iOsProdBase').value);
-  const osProd=calcOsProdSaldo(osProdBase,osFin);
+  const acumMed=+document.getElementById('iAcumMed').value||0;
+  const acumPerf=+document.getElementById('iAcumPerf').value||0;
+  const osImpMed=+document.getElementById('iOsImpMed').value||0;
+  const osImpPerf=+document.getElementById('iOsImpPerf').value||0;
+  const osFinMed=+document.getElementById('iOsFinMed').value||0;
+  const osFinPerf=+document.getElementById('iOsFinPerf').value||0;
+  const osProdMedBase=parseSumNumber(document.getElementById('iOsProdMedBase').value);
+  const osProdPerfBase=parseSumNumber(document.getElementById('iOsProdPerfBase').value);
+  const osProdMed=calcOsProdSaldo(osProdMedBase,osFinMed);
+  const osProdPerf=calcOsProdSaldo(osProdPerfBase,osFinPerf);
+  const osTotal=osProdMedBase+osProdPerfBase;
   return{
     date:dt,
     _updatedAt:Date.now(),
@@ -2438,12 +2482,18 @@ function readFormAsDay(){
     pnOncoT:+document.getElementById('iPNOncoT').value||0,
     pnJuncao:+document.getElementById('iPNJuncao').value||0,
     pnDoca:+document.getElementById('iPNDoca').value||0,
-    acum:+document.getElementById('iAcum').value||0,
+    acum:acumMed+acumPerf,
+    acumMed,acumPerf,
     meta:+document.getElementById('iMeta').value||0,
-    osImp:+document.getElementById('iOsImp').value||0,
-    osFin,
-    osProdBase,
-    osProd,
+    osImp:osImpMed+osImpPerf,
+    osImpMed,osImpPerf,
+    osFin:osFinMed+osFinPerf,
+    osFinMed,osFinPerf,
+    osProdBase:osTotal,
+    osProdMedBase,osProdPerfBase,
+    osProd:osProdMed+osProdPerf,
+    osProdMed,osProdPerf,
+    osTotal,
     medIt:+document.getElementById('iMedIt').value||0,
     faltas:+document.getElementById('iFaltas').value||0,
     obs:document.getElementById('iObs').value,
@@ -2489,8 +2539,11 @@ function loadFormFrom(day){
   s('iPNGel',day.pnGel||'');s('iPNOnco',day.pnOnco||'');
   s('iPNOncoT',day.pnOncoT||'');s('iPNJuncao',day.pnJuncao||'');
   s('iPNDoca',day.pnDoca||'');
-  s('iAcum',day.acum||'');s('iMeta',day.meta||'');
-  s('iOsImp',day.osImp||'');s('iOsFin',day.osFin||'');s('iOsProdBase',osProdBaseFromDay(day)||'');syncOsProdSaldo();
+  const splitOp=hasSplitOperational(day);
+  s('iAcumMed',splitOp?day.acumMed||'':day.acum||'');s('iAcumPerf',splitOp?day.acumPerf||'':'');s('iMeta',day.meta||'');
+  s('iOsImpMed',splitOp?day.osImpMed||'':day.osImp||'');s('iOsImpPerf',splitOp?day.osImpPerf||'':'');
+  s('iOsFinMed',splitOp?day.osFinMed||'':day.osFin||'');s('iOsFinPerf',splitOp?day.osFinPerf||'':'');
+  s('iOsProdMedBase',splitOp?day.osProdMedBase||'':osProdBaseFromDay(day)||'');s('iOsProdPerfBase',splitOp?day.osProdPerfBase||'':'');syncOsProdSaldo();
   s('iMedIt',day.medIt||'');s('iFaltas',day.faltas||'');
   document.getElementById('iObs').value=day.obs||'';
   s('iCPer',day.cPer||'');s('iCMed',day.cMed||'');s('iCkOut',day.ckOut||'');
