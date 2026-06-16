@@ -3610,7 +3610,7 @@ function calcPrevisaoEncerramento(dayOverride,options){
     const bgCard=concluido?'rgba(0,180,80,.15)':critico?'rgba(180,20,20,.2)':urgente?'rgba(180,130,0,.15)':'rgba(0,100,180,.12)';
     const corTermino=concluido?'#00e676':critico?'#ff4c4c':urgente?'#ffd700':'#00e5ff';
     return`<div style="background:${bgCard};padding:8px 12px;border-right:1px solid rgba(155,89,182,.1);border-bottom:1px solid rgba(155,89,182,.1)">
-      <div style="font-size:10px;font-weight:bold;color:#c39bd3;margin-bottom:4px">${s.icone} ${s.nome}</div>
+      <div style="font-size:10px;font-weight:bold;color:#c39bd3;margin-bottom:4px">${s.nome}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;font-size:10px;margin-bottom:5px">
         <div><span style="color:#6a9fc0">Previsto:</span> <span style="color:#fff">${s.prev.toLocaleString('pt-BR')}</span></div>
         <div><span style="color:#6a9fc0">Realizado:</span> <span style="color:#00e676">${s.real.toLocaleString('pt-BR')}</span></div>
