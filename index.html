@@ -389,6 +389,11 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
       <div style="position:relative;height:250px"><canvas id="cHoraCheckout" role="img" aria-label="Producao do checkout por hora"></canvas></div>
       <div class="checkout-conf-wrap" id="confTbl"></div>
     </div>
+    <div class="chart-box" id="horaCheckoutPsicoBox" style="display:none">
+      <div class="chart-ttl"><span>Producao hora a hora - Checkout Psico | Conferentes em linha</span><span style="font-size:9px;font-weight:normal">Intervalos alternados 21:30-22:30</span></div>
+      <div style="position:relative;height:250px"><canvas id="cHoraCheckoutPsico" role="img" aria-label="Producao do checkout psico por hora"></canvas></div>
+      <div class="checkout-conf-wrap" id="confTblPsico"></div>
+    </div>
     <div class="chart-box" id="volTipoBox">
       <div class="chart-ttl">
         <span>Volumes por Tipo — Realizado vs Previsão Noturna <small style="font-size:9px;color:#6a9fc0;font-weight:normal">(base 21:30)</small></span>
@@ -604,6 +609,9 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
         <div class="adm-row"><label>EPM máx /h <span style="color:#ff4c4c;font-size:9px">(máximo)</span></label><input type="number" id="iCapErros" value="2500" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>Vol. Checkout /h</label><input type="number" id="iCapVC" value="1280" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>Linhas Checkout /h</label><input type="number" id="iCapLC" value="6500" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Vol. Checkout Psico /h</label><input type="number" id="iCapVCPsi" value="1280" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Linhas Checkout Psico /h</label><input type="number" id="iCapLCPsi" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Unid. Checkout Psico /h</label><input type="number" id="iCapUCPsi" value="20800" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>Unid. Checkout /h</label><input type="number" id="iCapUC" value="20800" oninput="liveUpdate()"/></div>
 
         <div class="adm-row"><label>Vales máx /h <span style="color:#ff4c4c;font-size:9px">(máximo)</span></label><input type="number" id="iCapVales" value="1" oninput="liveUpdate()"/></div>
@@ -722,13 +730,15 @@ const MHORA=[
   'Linhas Med.','Vol. Med.','Unid. Med.',
   'Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.',
   // CHECKOUT (conferência) — encerra ~23:00 — apenas os 3 volumes principais
-  'Vol. Checkout','Linhas Checkout','Unid. Checkout',
+  'Vol. Checkout','Linhas Checkout',
+  'Vol. Checkout Psico','Linhas Checkout Psico','Unid. Checkout Psico',
+  'Unid. Checkout',
   // EXPEDIÇÃO (DOCA) — base até 04:00, com extensão opcional até 06:00
   'Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.',
   'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.',
   'Vol. Doca',
   // CONTROLE
-  'Vales','Conf. Planejado','Conf. Ativo'
+  'Vales','Conf. Planejado','Conf. Ativo','Conf. Planejado Psico','Conf. Ativo Psico'
 ];
 const MHORA_INV=['Erros Sep. Med.','Vales'];
 const NEW_CORREIA_DETAIL_METRICS=['Vol. Med.','Unid. Med.','Vol. Perf.','Unid. Perf.'];
@@ -736,6 +746,7 @@ const CAP_MAP={
   'Linhas Med.':'iCapLM','Vol. Med.':'iCapVMed','Unid. Med.':'iCapUMed',
   'Linhas Perf.':'iCapLP','Vol. Perf.':'iCapVPerf','Unid. Perf.':'iCapUPerf','Erros Sep. Med.':'iCapErros',
   'Vol. Checkout':'iCapVC','Linhas Checkout':'iCapLC','Unid. Checkout':'iCapUC',
+  'Vol. Checkout Psico':'iCapVCPsi','Linhas Checkout Psico':'iCapLCPsi','Unid. Checkout Psico':'iCapUCPsi',
   'Vol. Especial':'iCapEsp','Vol. Esp. Frac.':'iCapEspFrac',
   'Vol. Esp. Med.':'iCapEspMed','Vol. Esp. Perf.':'iCapEspPerf',
   'Vol. Fraldas Cx Fech.':'iCapFrF','Vol. Fraldas Frac.':'iCapFrFc',
@@ -787,12 +798,16 @@ const PWD='gam2025';
 const NEW_RULES_FROM='2026-06-02';
 const SIMPLE_OPERATIONAL_FROM='2026-06-16';
 const SPLIT_INDICATORS_FROM='2026-06-09';
+const CHECKOUT_PSICO_FROM='2026-06-16';
 const CAPACITY_OK_COLOR='#00a8ff';
 const CAPACITY_LOW_COLOR='#ff4c4c';
 const CORREIA_DIRECT_HOUR_METRICS=['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.'];
 const MED_BREAK_METRICS=['Linhas Med.','Vol. Med.','Unid. Med.'];
 const PERF_BREAK_METRICS=['Linhas Perf.','Vol. Perf.','Unid. Perf.'];
-const CHECKOUT_BREAK_METRICS=['Vol. Checkout','Linhas Checkout','Unid. Checkout'];
+const CHECKOUT_PSICO_METRICS=['Vol. Checkout Psico','Linhas Checkout Psico','Unid. Checkout Psico'];
+const CHECKOUT_PSICO_CONTROL_METRICS=['Conf. Planejado Psico','Conf. Ativo Psico'];
+const CHECKOUT_PSICO_ALL=[...CHECKOUT_PSICO_METRICS,...CHECKOUT_PSICO_CONTROL_METRICS];
+const CHECKOUT_BREAK_METRICS=['Vol. Checkout','Linhas Checkout','Unid. Checkout',...CHECKOUT_PSICO_METRICS];
 let db={days:[]};
 let curDate=null;
 let adminOk=false;
@@ -1038,7 +1053,7 @@ function emptyDay(dt){
     cPer:'',cMed:'',ckOut:'',esp:'',frF:'',frFc:'',exp:'',
     cPerFim:'',cMedFim:'',ckOutFim:'',espFim:'',frFFim:'',frFcFim:'',expFim:'',
     capLM:3500,capVMed:575,capUMed:10000,capLP:3000,capVPerf:425,capUPerf:6666,
-    capErros:2500,capVC:1280,capLC:6500,capUC:20800,
+    capErros:2500,capVC:1280,capLC:6500,capVCPsi:1280,capLCPsi:'',capUCPsi:20800,capUC:20800,
     capVales:1,
     capEsp:340,capEspFrac:0,capEspMed:newRules?100:0,capEspPerf:0,capFrF:newRules?100:114,capFrFc:89,capVE:1303,
     rPsico:0,rGel:0,rOnco:0,rOncoT:0,rJuncao:0,rDoc:0,
@@ -1052,6 +1067,7 @@ function currentFormDate(){const el=document.getElementById('iData');return el&&
 function useNewRules(dt){return String(dt||currentFormDate())>=NEW_RULES_FROM;}
 function useSimpleOperational(dt){return String(dt||currentFormDate())>=SIMPLE_OPERATIONAL_FROM;}
 function useSplitIndicators(dt){return String(dt||currentFormDate())>=SPLIT_INDICATORS_FROM;}
+function useCheckoutPsico(dt){return String(dt||currentFormDate())>=CHECKOUT_PSICO_FROM;}
 function routeMetricKey(r){return`Rota ${r.cod} — ${r.cidade}`;}
 function routeTotalMetricKey(r){return`Total ${routeMetricKey(r)}`;}
 function routeHourMetrics(){return ROTAS_FIXAS.map(routeMetricKey);}
@@ -1066,7 +1082,10 @@ function routeInitialTotal(day,metric){
   const saved=day&&Array.isArray(day.rotas)?day.rotas.find(r=>normalizeRouteCode(r.cod)===normalizeRouteCode(route.cod)):null;
   return saved?+saved.vol||0:0;
 }
-function activeHourMetrics(dt){return useSplitIndicators(dt)?[...MHORA,...routeHourMetrics(),...routeTotalHourMetrics()]:MHORA.filter(m=>!NEW_CORREIA_DETAIL_METRICS.includes(m));}
+function activeHourMetrics(dt){
+  const base=useSplitIndicators(dt)?[...MHORA,...routeHourMetrics(),...routeTotalHourMetrics()]:MHORA.filter(m=>!NEW_CORREIA_DETAIL_METRICS.includes(m));
+  return useCheckoutPsico(dt)?base:base.filter(m=>!CHECKOUT_PSICO_ALL.includes(m));
+}
 function hourTargetFactor(metric,i,dt){
   // Antes de 09/06, preserva a regra já aplicada somente à Correia no primeiro período.
   if(!useSplitIndicators(dt))return useNewRules(dt)&&CORREIA_DIRECT_HOUR_METRICS.includes(metric)&&i===0?0.5:1;
@@ -1465,23 +1484,30 @@ function renderDashCharts(day){
   const lm=dv(hd,'Linhas Med.'),vMed=dv(hd,'Vol. Med.'),uMed=dv(hd,'Unid. Med.');
   const lp=dv(hd,'Linhas Perf.'),vPerf=dv(hd,'Vol. Perf.'),uPerf=dv(hd,'Unid. Perf.');
   const vc=dv(hd,'Vol. Checkout'),uc=dv(hd,'Unid. Checkout');
+  const vcPsi=dv(hd,'Vol. Checkout Psico'),ucPsi=dv(hd,'Unid. Checkout Psico');
   const cp=dv(hd,'Conf. Planejado'),ca=dv(hd,'Conf. Ativo');
+  const cpPsi=dv(hd,'Conf. Planejado Psico'),caPsi=dv(hd,'Conf. Ativo Psico');
   const capLM=day.capLM||3500,capVMed=day.capVMed||575,capUMed=day.capUMed||10000;
   const capLP=day.capLP||3000,capVPerf=day.capVPerf||425,capUPerf=day.capUPerf||6666;
   const capVC=day.capVC||1280,capUC=day.capUC||20800;
+  const capVCPsi=day.capVCPsi||1280,capUCPsi=day.capUCPsi||20800;
   const splitIndicators=useSplitIndicators(day.date);
+  const checkoutPsicoEnabled=splitIndicators&&useCheckoutPsico(day.date);
   const productionGrid=document.getElementById('productionChartsGrid');
   const combinedBox=document.getElementById('horaCombinedBox');
   const medBox=document.getElementById('horaMedBox');
   const perfBox=document.getElementById('horaPerfBox');
   const checkoutBox=document.getElementById('horaCheckoutBox');
+  const checkoutPsicoBox=document.getElementById('horaCheckoutPsicoBox');
   const volTipoBox=document.getElementById('volTipoBox');
   productionGrid.style.gridTemplateColumns='1fr 1fr';
   combinedBox.style.display=splitIndicators?'none':'block';
   medBox.style.display=splitIndicators?'block':'none';
   perfBox.style.display=splitIndicators?'block':'none';
   checkoutBox.style.display=splitIndicators?'block':'none';
+  checkoutPsicoBox.style.display=checkoutPsicoEnabled?'block':'none';
   checkoutBox.style.gridColumn=splitIndicators?'1 / -1':'auto';
+  checkoutPsicoBox.style.gridColumn=checkoutPsicoEnabled?'1 / -1':'auto';
   volTipoBox.style.gridColumn=splitIndicators?'1 / -1':'auto';
 
   const hourChartOptions=(dualUnits=false)=>({responsive:true,maintainAspectRatio:false,
@@ -1540,8 +1566,27 @@ function renderDashCharts(day){
         ...hourChartOptions(true).scales,
         yConf:{beginAtZero:true,position:'right',offset:true,ticks:{color:'#ffd700',font:{size:9},precision:0},grid:{display:false},title:{display:true,text:'Conferentes',color:'#ffd700',font:{size:9}}}
       }}});
+    destroyChart('horaCheckoutPsico');
+    if(checkoutPsicoEnabled){
+      CH.horaCheckoutPsico=new Chart(document.getElementById('cHoraCheckoutPsico'),{type:'bar',
+        data:{labels:HOURS,datasets:[
+          hourDataset('Vol. Checkout Psico',vcPsi,capVCPsi),
+          hourDataset('Unid. Checkout Psico',ucPsi,capUCPsi,'yUnits','Unid. Checkout Psico'),
+          capacityDataset('Meta Volume Checkout Psico/h',capVCPsi,'Vol. Checkout Psico','y','#00e5ff'),
+          capacityDataset('Meta Unidade Checkout Psico/h',capUCPsi,'Unid. Checkout Psico','yUnits','#c39bd3'),
+          {label:'Conferentes Ativo Psico',data:caPsi,type:'line',yAxisID:'yConf',order:-10,borderColor:'#ffd700',borderWidth:3,pointRadius:5,pointHoverRadius:7,
+           pointBackgroundColor:caPsi.map((v,i)=>v===null?'transparent':cpPsi[i]!==null&&v>=cpPsi[i]?'#ffd700':CAPACITY_LOW_COLOR),
+           pointBorderColor:'#071525',pointBorderWidth:2,
+           segment:{borderColor:ctx=>{const i=ctx.p1DataIndex,v=caPsi[i],p=cpPsi[i];return v!==null&&p!==null&&v>=p?'#ffd700':CAPACITY_LOW_COLOR;}},
+           fill:false,tension:.25}
+        ]},
+        options:{...hourChartOptions(true),scales:{
+          ...hourChartOptions(true).scales,
+          yConf:{beginAtZero:true,position:'right',offset:true,ticks:{color:'#ffd700',font:{size:9},precision:0},grid:{display:false},title:{display:true,text:'Conferentes',color:'#ffd700',font:{size:9}}}
+        }}});
+    }
   }else{
-    destroyChart('horaMed');destroyChart('horaPerf');destroyChart('horaCheckout');
+    destroyChart('horaMed');destroyChart('horaPerf');destroyChart('horaCheckout');destroyChart('horaCheckoutPsico');
     destroyChart('hora');
     CH.hora=new Chart(document.getElementById('cHora'),{type:'bar',
       data:{labels:HOURS,datasets:[
@@ -2019,19 +2064,24 @@ function renderDashTables(day){
   const CAP_VALS={'Linhas Med.':day.capLM,'Vol. Med.':day.capVMed||575,'Unid. Med.':day.capUMed||10000,
     'Linhas Perf.':day.capLP,'Vol. Perf.':day.capVPerf||425,'Unid. Perf.':day.capUPerf||6666,'Erros Sep. Med.':day.capErros,
     'Vol. Checkout':day.capVC,'Linhas Checkout':day.capLC,'Unid. Checkout':day.capUC,
+    'Vol. Checkout Psico':day.capVCPsi||1280,'Linhas Checkout Psico':day.capLCPsi||null,'Unid. Checkout Psico':day.capUCPsi||20800,
     'Vol. Psico CK':day.capVPsi,'Unid. Psico CK':day.capUPsi,'Vol. Gel. CK':day.capVGel,
     'Vales':day.capVales,'Vol. Expedição':day.capVE,'Vol. Especial':day.capEsp,
     'Vol. Fralda Frac.':day.capFrFc,'Vol. Fralda Fech.':day.capFrF};
-  const cp=hd['Conf. Planejado']||new Array(HOURS.length).fill('');
-  const ca=hd['Conf. Ativo']||new Array(HOURS.length).fill('');
-  let h=`<table><thead><tr><th style="text-align:left">Conferentes</th>${HOURS.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>`;
-  h+=`<tr><td class="row-lbl">Planejado</td>${cp.map(v=>`<td>${v!==''?v:'-'}</td>`).join('')}</tr>`;
-  h+=`<tr><td class="row-lbl">Ativo</td>${ca.map((v,i)=>{
-    const pl=cp[i]!==''?+cp[i]:null,re=v!==''?+v:null;
-    let col='#fff';if(re!==null&&pl!==null){col=re>=pl?'#00e676':re>=pl*.8?'#ffd700':'#ff4c4c';}
-    return`<td style="color:${col};font-weight:bold">${v!==''?v:'-'}</td>`;
-  }).join('')}</tr></tbody></table>`;
-  document.getElementById('confTbl').innerHTML=h;
+  const renderConfTbl=(id,plannedMetric,activeMetric)=>{
+    const cp=hd[plannedMetric]||new Array(HOURS.length).fill('');
+    const ca=hd[activeMetric]||new Array(HOURS.length).fill('');
+    let h=`<table><thead><tr><th style="text-align:left">Conferentes</th>${HOURS.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>`;
+    h+=`<tr><td class="row-lbl">Planejado</td>${cp.map(v=>`<td>${v!==''?v:'-'}</td>`).join('')}</tr>`;
+    h+=`<tr><td class="row-lbl">Ativo</td>${ca.map((v,i)=>{
+      const pl=cp[i]!==''?+cp[i]:null,re=v!==''?+v:null;
+      let col='#fff';if(re!==null&&pl!==null){col=re>=pl?'#00e676':re>=pl*.8?'#ffd700':'#ff4c4c';}
+      return`<td style="color:${col};font-weight:bold">${v!==''?v:'-'}</td>`;
+    }).join('')}</tr></tbody></table>`;
+    const el=document.getElementById(id);if(el)el.innerHTML=h;
+  };
+  renderConfTbl('confTbl','Conf. Planejado','Conf. Ativo');
+  renderConfTbl('confTblPsico','Conf. Planejado Psico','Conf. Ativo Psico');
 
   const correiaMetrics=useSplitIndicators(day.date)
     ?['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.']
@@ -2245,7 +2295,7 @@ function getCapacities(){
 }
 // ── ACUMULADO → DELTA ────────────────────────────────────
 // Métricas que NÃO usam modo acumulado (valores já são por hora discreta)
-const DELTA_SKIP=['Vales','Conf. Planejado','Conf. Ativo'];
+const DELTA_SKIP=['Vales','Conf. Planejado','Conf. Ativo','Conf. Planejado Psico','Conf. Ativo Psico'];
 function isDeltaMetric(m,dt){return!isRouteMetric(m)&&!isRouteTotalMetric(m)&&!DELTA_SKIP.includes(m)&&!(useNewRules(dt)&&CORREIA_DIRECT_HOUR_METRICS.includes(m));}
 
 // Dado array de acumulados (alguns podem ser ''), retorna array de deltas por hora
@@ -2363,11 +2413,11 @@ function buildHoraTable(hd){
     {title:'🔴 CORREIA — Separação', color:'rgba(255,149,0,.15)',
      metrics:correiaMetrics},
     {title:'🔵 CHECKOUT — Conferência', color:'rgba(0,229,255,.1)',
-     metrics:['Vol. Checkout','Linhas Checkout','Unid. Checkout']},
+     metrics:['Vol. Checkout','Linhas Checkout',...(useCheckoutPsico(formDate)?CHECKOUT_PSICO_METRICS:[]),'Unid. Checkout']},
     {title:'🟢 EXPEDIÇÃO — DOCA (base até 04:00 | extensão até 06:00)', color:'rgba(0,230,118,.12)',
      metrics:expedicaoMetrics},
     {title:'📋 CONTROLE', color:'rgba(100,100,180,.1)',
-     metrics:['Vales','Conf. Planejado','Conf. Ativo']},
+     metrics:['Vales','Conf. Planejado','Conf. Ativo',...(useCheckoutPsico(formDate)?CHECKOUT_PSICO_CONTROL_METRICS:[])]},
   ];
   MHORA_GROUPS.forEach(group=>{
     const sepTr=document.createElement('tr');
@@ -2400,7 +2450,7 @@ function buildHoraTable(hd){
           if(isInv){bg=n>capH?'background:rgba(200,20,20,.55)':n>capH*.8?'background:rgba(180,130,0,.4)':'background:rgba(0,100,50,.45)';}
           else{const p=n/capH;bg=p>=1.05?'background:rgba(0,180,80,.45)':p>=.9?'background:rgba(0,120,60,.35)':p>=.7?'background:rgba(180,130,0,.4)':'background:rgba(180,20,20,.5)';}
         }
-        const isCKMetric=['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.','Vol. Checkout','Linhas Checkout','Unid. Checkout'].includes(m);
+        const isCKMetric=['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.','Vol. Checkout','Linhas Checkout','Unid. Checkout',...CHECKOUT_PSICO_METRICS].includes(m);
         const isExtra=(isCKMetric&&i>=H_CK)||i>=H_EX;
         const extraStyle=isExtra&&!bg?'background:rgba(255,149,0,.06);border-left:2px solid rgba(255,149,0,.2)':'';
         const deltaHint=(useDelta||isRoute)?`<div class="delta-hint ${vDelta===null?'delta-empty':''}">${deltaHintHtml(vDelta,isRoute?'feito/hora':'resultado/hora')}</div>`:'';
@@ -2590,7 +2640,11 @@ function readFormAsDay(){
     capLP:+document.getElementById('iCapLP').value||3000,
     capVPerf:+document.getElementById('iCapVPerf').value||425,capUPerf:+document.getElementById('iCapUPerf').value||6666,
     capErros:+document.getElementById('iCapErros').value||2500,capVC:+document.getElementById('iCapVC').value||1280,
-    capLC:+document.getElementById('iCapLC').value||6500,capUC:+document.getElementById('iCapUC').value||20800,
+    capLC:+document.getElementById('iCapLC').value||6500,
+    capVCPsi:+document.getElementById('iCapVCPsi').value||1280,
+    capLCPsi:document.getElementById('iCapLCPsi').value===''?'':+document.getElementById('iCapLCPsi').value||0,
+    capUCPsi:+document.getElementById('iCapUCPsi').value||20800,
+    capUC:+document.getElementById('iCapUC').value||20800,
     capVales:+document.getElementById('iCapVales').value||1,
     capEsp:+document.getElementById('iCapEsp').value||340,
     capEspFrac:+document.getElementById('iCapEspFrac').value||0,
@@ -2636,7 +2690,9 @@ function loadFormFrom(day){
   s('iCapLM',day.capLM||3500);s('iCapVMed',day.capVMed||575);s('iCapUMed',day.capUMed||10000);
   s('iCapLP',day.capLP||3000);s('iCapVPerf',day.capVPerf||425);s('iCapUPerf',day.capUPerf||6666);
   s('iCapErros',day.capErros||2500);
-  s('iCapVC',day.capVC||1280);s('iCapLC',day.capLC||6500);s('iCapUC',day.capUC||20800);
+  s('iCapVC',day.capVC||1280);s('iCapLC',day.capLC||6500);
+  s('iCapVCPsi',day.capVCPsi||1280);s('iCapLCPsi',day.capLCPsi||'');s('iCapUCPsi',day.capUCPsi||20800);
+  s('iCapUC',day.capUC||20800);
   s('iCapVales',day.capVales||1);
   s('iCapEsp',day.capEsp||340);s('iCapEspFrac',day.capEspFrac||0);
   s('iCapEspMed',newRules?100:(day.capEspMed||0));s('iCapEspPerf',day.capEspPerf||0);
@@ -3647,11 +3703,11 @@ function renderPreench(){
     'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca'];
   const grupos=[
     {lbl:'CORREIA',cor:'rgba(255,149,0,.7)',metrics:correiaMetrics},
-    {lbl:'CHECKOUT',cor:'rgba(0,229,255,.7)',metrics:['Vol. Checkout','Linhas Checkout','Unid. Checkout']},
+    {lbl:'CHECKOUT',cor:'rgba(0,229,255,.7)',metrics:['Vol. Checkout','Linhas Checkout',...(useCheckoutPsico(day.date)?CHECKOUT_PSICO_METRICS:[]),'Unid. Checkout']},
     {lbl:'EXPEDIÇÃO',cor:'rgba(0,230,118,.7)',metrics:expedicaoMetrics},
-    {lbl:'CONTROLE',cor:'rgba(170,170,170,.5)',metrics:['Vales','Conf. Planejado','Conf. Ativo']},
+    {lbl:'CONTROLE',cor:'rgba(170,170,170,.5)',metrics:['Vales','Conf. Planejado','Conf. Ativo',...(useCheckoutPsico(day.date)?CHECKOUT_PSICO_CONTROL_METRICS:[])]},
   ];
-  const soCK=new Set(['Vol. Checkout','Linhas Checkout','Unid. Checkout','Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.','Vales','Conf. Planejado','Conf. Ativo']);
+  const soCK=new Set(['Vol. Checkout','Linhas Checkout','Unid. Checkout',...CHECKOUT_PSICO_METRICS,'Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.','Vales','Conf. Planejado','Conf. Ativo',...CHECKOUT_PSICO_CONTROL_METRICS]);
   let rows='';
   grupos.forEach(g=>{
     rows+=`<tr><td colspan="${HOURS.length+1}" style="background:#071525;color:${g.cor};font-size:9px;font-weight:bold;padding:3px 8px;border:1px solid #1a3550;text-transform:uppercase;letter-spacing:.5px">${g.lbl}</td></tr>`;
