@@ -3522,6 +3522,67 @@ function calcPrevisaoEncerramento(dayOverride,options){
   });
 
   // ── CALCULAR ENCERRAMENTO TOTAL ───────────────────────────
+  setores.length=0;
+  const num=v=>Number(v)||0;
+  const setorFromDrivers=(nome,cor,icone,drivers)=>{
+    const valid=drivers.map(d=>{
+      const prev=num(d.prev),real=num(d.real),cap=num(d.cap);
+      const falta=Math.max(prev-real,0);
+      return{...d,prev,real,cap,falta,tempo:cap>0&&falta>0?falta/cap:0};
+    }).filter(d=>d.prev>0&&d.cap>0);
+    if(!valid.length)return;
+    const limitador=valid.reduce((mx,d)=>d.tempo>mx.tempo?d:mx,valid[0]);
+    setores.push({
+      nome,cor,icone,
+      prev:limitador.prev,real:limitador.real,falta:limitador.falta,cap:limitador.cap,
+      termino:fmtTermino(hAtual+limitador.tempo,limitador.falta),
+      terminoDec:limitador.falta>0?hAtual+limitador.tempo:hAtual,
+      tempo:limitador.tempo,
+      unidade:limitador.unidade||'',
+      baseLabel:limitador.lbl||''
+    });
+  };
+
+  const totalLinhasMed=num(day.osTotalMed)||num(day.osProdMedBase)||num(day.osImpMed);
+  const totalLinhasPerf=num(day.osTotalPerf)||num(day.osProdPerfBase)||num(day.osImpPerf);
+  const totalLinhasCheckout=num(day.osTotal)||(totalLinhasMed+totalLinhasPerf)||num(day.osImp);
+
+  setorFromDrivers('Correia Med.','#ff9500','ðŸ”´',[
+    {lbl:'Linhas Med.',prev:totalLinhasMed,real:realizado('Linhas Med.'),cap:day.capLM||3500,unidade:'linhas'}
+  ]);
+  setorFromDrivers('Correia Perf.','#ff9500','ðŸ”´',[
+    {lbl:'Linhas Perf.',prev:totalLinhasPerf,real:realizado('Linhas Perf.'),cap:day.capLP||3000,unidade:'linhas'}
+  ]);
+  setorFromDrivers('Checkout','#00e5ff','ðŸ”µ',[
+    {lbl:'Vol. Checkout',prev:prevCheckoutBase(day),real:realizado('Vol. Checkout'),cap:day.capVC||1280,unidade:'vol'},
+    {lbl:'Linhas Checkout',prev:totalLinhasCheckout,real:realizado('Linhas Checkout'),cap:day.capLC||6500,unidade:'linhas'},
+    {lbl:'Unid. Checkout',prev:day.pnUnid||0,real:realizado('Unid. Checkout'),cap:day.capUC||20800,unidade:'unid.'}
+  ]);
+  if(useCheckoutPsico(day.date))setorFromDrivers('Checkout Psico','#00e5ff','ðŸ”µ',[
+    {lbl:'Vol. Checkout Psico',prev:day.pnPsico||0,real:Math.max(realizado('Vol. Checkout Psico'),num(day.rPsico)),cap:day.capVCPsi||1280,unidade:'vol'}
+  ]);
+  setorFromDrivers('Especial','#9b59b6','ðŸŸ£',[
+    {lbl:'Vol. Especial',prev:day.pnEspecial||0,real:realizado('Vol. Especial'),cap:day.capEsp||340,unidade:'vol'}
+  ]);
+  setorFromDrivers('Esp. Frac.','#9b59b6','ðŸŸ£',[
+    {lbl:'Vol. Esp. Frac.',prev:day.pnEspFrac||0,real:realizado('Vol. Esp. Frac.'),cap:day.capEspFrac||0,unidade:'vol'}
+  ]);
+  setorFromDrivers('Esp. Med.','#9b59b6','ðŸŸ£',[
+    {lbl:'Vol. Esp. Med.',prev:day.pnEspMed||0,real:realizado('Vol. Esp. Med.'),cap:useNewRules(day.date)?100:(day.capEspMed||0),unidade:'vol'}
+  ]);
+  setorFromDrivers('Esp. Perf.','#9b59b6','ðŸŸ£',[
+    {lbl:'Vol. Esp. Perf.',prev:day.pnEspPerf||0,real:realizado('Vol. Esp. Perf.'),cap:day.capEspPerf||0,unidade:'vol'}
+  ]);
+  setorFromDrivers('Fraldas Cx Fech.','#4a90d9','ðŸ”·',[
+    {lbl:'Vol. Fraldas Cx Fech.',prev:day.pnFraldaF||0,real:realizado('Vol. Fraldas Cx Fech.'),cap:useNewRules(day.date)?100:(day.capFrF||114),unidade:'vol'}
+  ]);
+  setorFromDrivers('Fraldas Frac.','#4a90d9','ðŸ”·',[
+    {lbl:'Vol. Fraldas Frac.',prev:day.pnFralda||0,real:realizado('Vol. Fraldas Frac.'),cap:day.capFrFc||89,unidade:'vol'}
+  ]);
+  setorFromDrivers('DOCA (Expedição)','#00e676','ðŸŸ¢',[
+    {lbl:'Vol. Doca',prev:day.pnDoca||day.pnVol||0,real:Math.max(realizado('Vol. Doca'),num(day.rDoc)),cap:day.capVE||1303,unidade:'vol'}
+  ]);
+
   // = o setor que termina mais tarde
   const terminoMax=setores.reduce((mx,s)=>s.terminoDec>mx?s.terminoDec:mx,hAtual);
   let totalStr;
@@ -3541,6 +3602,7 @@ function calcPrevisaoEncerramento(dayOverride,options){
   const grid=document.getElementById('prevEncGrid');
   grid.innerHTML=setores.map(s=>{
     const pct=s.prev>0?Math.round(s.real/s.prev*100):0;
+    const pctFalta=s.prev>0?Math.max(0,Math.round(s.falta/s.prev*100)):0;
     const concluido=s.falta===0;
     const estouraTurno=!concluido&&s.terminoDec>SHIFT_END_DEC;
     const urgente=!concluido&&s.terminoDec>hAtual+3;
@@ -3555,6 +3617,9 @@ function calcPrevisaoEncerramento(dayOverride,options){
         <div><span style="color:#6a9fc0">Falta:</span> <span style="color:${s.falta>0?'#ff9500':'#00e676'};font-weight:bold">${s.falta.toLocaleString('pt-BR')}</span></div>
         <div><span style="color:#6a9fc0">Cap/h:</span> <span style="color:#89b4d4">${s.cap.toLocaleString('pt-BR')}</span></div>
       </div>
+      ${s.baseLabel?`<div style="font-size:9px;color:#89b4d4;margin-bottom:5px">Base calculo: <b>${s.baseLabel}</b></div>`:''}
+      <div style="font-size:9px;color:#ff9500;margin-bottom:5px">% falta: <b>${pctFalta}%</b> (${s.falta.toLocaleString('pt-BR')} / ${s.prev.toLocaleString('pt-BR')})</div>
+      <div style="font-size:9px;color:#89b4d4;margin-bottom:5px">Tempo calc.: <b>${(s.tempo||0).toFixed(2)}h</b> = falta / cap.h</div>
       <div style="background:#1e3a55;border-radius:2px;height:4px;margin-bottom:5px"><div style="background:${s.cor};width:${Math.min(pct,100)}%;height:100%;border-radius:2px"></div></div>
       <div style="display:flex;justify-content:space-between;align-items:center">
         <span style="font-size:9px;color:#6a9fc0">${pct}% concluído</span>
@@ -3565,7 +3630,7 @@ function calcPrevisaoEncerramento(dayOverride,options){
 
   // Observações automáticas
   const obs=[];
-  if(turnoAgora<SHIFT_START_DEC)obs.push('ℹ Turno noturno começa às 17:30 — cálculo usando 17:30 como base');
+  obs.push('Previsao dinamica: previsto do grafico - realizado no hora a hora; tempo = falta / capacidade hora');
   if(turnoEncerrado)obs.push('ℹ Turno operacional encerra às 04:00 — cálculo usando 04:00 como base');
   const setoresForaTurno=setores.filter(s=>s.falta>0&&s.terminoDec>SHIFT_END_DEC);
   if(setoresForaTurno.length>0)obs.push(`⚠ Previsão fora do turno (após 04:00): ${setoresForaTurno.map(s=>s.nome).join(', ')}`);
