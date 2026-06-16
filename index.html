@@ -20,6 +20,7 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
 .kpi-lbl{font-size:9px;color:#6a9fc0;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .kpi-val{font-size:13px;font-weight:bold;line-height:1.3;color:#ffd700}
 .kpi-val.g{color:#00e676}.kpi-val.r{color:#ff4c4c}.kpi-val.o{color:#ff9500}.kpi-val.c{color:#00e5ff}.kpi-val.w{color:#fff}
+.op-new{display:none}
 .kpi-split{font-size:11px;line-height:1.15;text-align:left;padding:0 4px}
 .kpi-subrow{display:flex;justify-content:space-between;gap:4px;white-space:nowrap}
 .kpi-subrow span:first-child{color:#6a9fc0;font-size:8px;text-transform:uppercase;letter-spacing:.2px}
@@ -551,18 +552,22 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
         <h4>📋 Resumo Operacional</h4>
         <input type="hidden" id="iMeta"/>
         <h4 style="margin-top:8px;font-size:10px;color:#00e5ff">Medicamento</h4>
-        <div class="adm-row"><label>Acumulado Produzido Medicamento (Linhas)</label><input type="number" id="iAcumMed" placeholder="0" oninput="liveUpdate()"/></div>
-        <div class="adm-row"><label>O.S. Impressas Medicamento (Linhas)</label><input type="number" id="iOsImpMed" placeholder="0" oninput="liveUpdate()"/></div>
-        <div class="adm-row"><label>O.S. Finalizadas Medicamento (Linhas)</label><input type="number" id="iOsFinMed" placeholder="0" oninput="syncOsProdSaldo();liveUpdate()"/></div>
-        <div class="adm-row"><label>O.S. A Produzir Medicamento Total Atualizado (Linhas)</label><input type="text" inputmode="numeric" id="iOsProdMedBase" placeholder="0 ou 1000+2000" title="Digite um total ou uma soma. Ex.: 1000+2000+2049" oninput="syncOsProdSaldo();liveUpdate()" onkeydown="if(event.key==='Enter'){event.preventDefault();commitOsProdBaseSum('Med');liveUpdate()}" onblur="commitOsProdBaseSum('Med');liveUpdate()"/></div>
-        <div class="adm-row"><label>O.S. A Produzir Medicamento Resultado (Linhas)</label><input type="number" id="iOsProdMed" placeholder="0" title="Total atualizado - O.S. Finalizadas Medicamento" readonly/></div>
+        <div class="adm-row op-old"><label>Acumulado Produzido Medicamento (Linhas)</label><input type="number" id="iAcumMed" placeholder="0" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>O.S. Impressas Medicamento (Linhas)</label><input type="number" id="iOsImpMed" placeholder="0" oninput="syncOsProdSaldo();liveUpdate()"/></div>
+        <div class="adm-row op-new"><label>O.S. Não Impressas Medicamento (Linhas)</label><input type="number" id="iOsNaoImpMed" placeholder="0" oninput="syncOsProdSaldo();liveUpdate()"/></div>
+        <div class="adm-row op-new"><label>O.S. Total Medicamento (Linhas)</label><input type="number" id="iOsTotalMed" placeholder="0" title="O.S. Impressas + O.S. Não Impressas" readonly/></div>
+        <div class="adm-row op-old"><label>O.S. Finalizadas Medicamento (Linhas)</label><input type="number" id="iOsFinMed" placeholder="0" oninput="syncOsProdSaldo();liveUpdate()"/></div>
+        <div class="adm-row op-old"><label>O.S. A Produzir Medicamento Total Atualizado (Linhas)</label><input type="text" inputmode="numeric" id="iOsProdMedBase" placeholder="0 ou 1000+2000" title="Digite um total ou uma soma. Ex.: 1000+2000+2049" oninput="syncOsProdSaldo();liveUpdate()" onkeydown="if(event.key==='Enter'){event.preventDefault();commitOsProdBaseSum('Med');liveUpdate()}" onblur="commitOsProdBaseSum('Med');liveUpdate()"/></div>
+        <div class="adm-row op-old"><label>O.S. A Produzir Medicamento Resultado (Linhas)</label><input type="number" id="iOsProdMed" placeholder="0" title="Total atualizado - O.S. Finalizadas Medicamento" readonly/></div>
 
         <h4 style="margin-top:10px;font-size:10px;color:#ffd700">Perfumaria</h4>
-        <div class="adm-row"><label>Acumulado Produzido Perfumaria (Linhas)</label><input type="number" id="iAcumPerf" placeholder="0" oninput="liveUpdate()"/></div>
-        <div class="adm-row"><label>O.S. Impressas Perfumaria (Linhas)</label><input type="number" id="iOsImpPerf" placeholder="0" oninput="liveUpdate()"/></div>
-        <div class="adm-row"><label>O.S. Finalizadas Perfumaria (Linhas)</label><input type="number" id="iOsFinPerf" placeholder="0" oninput="syncOsProdSaldo();liveUpdate()"/></div>
-        <div class="adm-row"><label>O.S. A Produzir Perfumaria Total Atualizado (Linhas)</label><input type="text" inputmode="numeric" id="iOsProdPerfBase" placeholder="0 ou 1000+2000" title="Digite um total ou uma soma. Ex.: 1000+2000+2049" oninput="syncOsProdSaldo();liveUpdate()" onkeydown="if(event.key==='Enter'){event.preventDefault();commitOsProdBaseSum('Perf');liveUpdate()}" onblur="commitOsProdBaseSum('Perf');liveUpdate()"/></div>
-        <div class="adm-row"><label>O.S. A Produzir Perfumaria Resultado (Linhas)</label><input type="number" id="iOsProdPerf" placeholder="0" title="Total atualizado - O.S. Finalizadas Perfumaria" readonly/></div>
+        <div class="adm-row op-old"><label>Acumulado Produzido Perfumaria (Linhas)</label><input type="number" id="iAcumPerf" placeholder="0" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>O.S. Impressas Perfumaria (Linhas)</label><input type="number" id="iOsImpPerf" placeholder="0" oninput="syncOsProdSaldo();liveUpdate()"/></div>
+        <div class="adm-row op-new"><label>O.S. Não Impressas Perfumaria (Linhas)</label><input type="number" id="iOsNaoImpPerf" placeholder="0" oninput="syncOsProdSaldo();liveUpdate()"/></div>
+        <div class="adm-row op-new"><label>O.S. Total Perfumaria (Linhas)</label><input type="number" id="iOsTotalPerf" placeholder="0" title="O.S. Impressas + O.S. Não Impressas" readonly/></div>
+        <div class="adm-row op-old"><label>O.S. Finalizadas Perfumaria (Linhas)</label><input type="number" id="iOsFinPerf" placeholder="0" oninput="syncOsProdSaldo();liveUpdate()"/></div>
+        <div class="adm-row op-old"><label>O.S. A Produzir Perfumaria Total Atualizado (Linhas)</label><input type="text" inputmode="numeric" id="iOsProdPerfBase" placeholder="0 ou 1000+2000" title="Digite um total ou uma soma. Ex.: 1000+2000+2049" oninput="syncOsProdSaldo();liveUpdate()" onkeydown="if(event.key==='Enter'){event.preventDefault();commitOsProdBaseSum('Perf');liveUpdate()}" onblur="commitOsProdBaseSum('Perf');liveUpdate()"/></div>
+        <div class="adm-row op-old"><label>O.S. A Produzir Perfumaria Resultado (Linhas)</label><input type="number" id="iOsProdPerf" placeholder="0" title="Total atualizado - O.S. Finalizadas Perfumaria" readonly/></div>
 
         <div class="adm-row"><label>O.S. Total (Medicamento + Perfumaria) (Linhas)</label><input type="number" id="iOsTotal" placeholder="0" readonly/></div>
         <input type="hidden" id="iMedIt"/>
@@ -780,6 +785,7 @@ const MEDIA_HORA_AUTO=[
 const SK='cdgam_v6';
 const PWD='gam2025';
 const NEW_RULES_FROM='2026-06-02';
+const SIMPLE_OPERATIONAL_FROM='2026-06-16';
 const SPLIT_INDICATORS_FROM='2026-06-09';
 const CAPACITY_OK_COLOR='#00a8ff';
 const CAPACITY_LOW_COLOR='#ff4c4c';
@@ -1026,6 +1032,7 @@ function emptyDay(dt){
     pnFralda:0,pnFraldaF:0,pnGel:0,pnOnco:0,pnOncoT:0,pnJuncao:0,pnDoca:0,
     acum:0,acumMed:0,acumPerf:0,meta:0,
     osImp:0,osImpMed:0,osImpPerf:0,osFin:0,osFinMed:0,osFinPerf:0,
+    osNaoImp:0,osNaoImpMed:0,osNaoImpPerf:0,osTotalMed:0,osTotalPerf:0,
     osProdBase:0,osProdMedBase:0,osProdPerfBase:0,osProd:0,osProdMed:0,osProdPerf:0,osTotal:0,
     medIt:0,faltas:0,obs:'',
     cPer:'',cMed:'',ckOut:'',esp:'',frF:'',frFc:'',exp:'',
@@ -1043,6 +1050,7 @@ function fmtDate(d){return new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{w
 function fmtDateShort(d){return new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});}
 function currentFormDate(){const el=document.getElementById('iData');return el&&el.value?el.value:(curDate||today());}
 function useNewRules(dt){return String(dt||currentFormDate())>=NEW_RULES_FROM;}
+function useSimpleOperational(dt){return String(dt||currentFormDate())>=SIMPLE_OPERATIONAL_FROM;}
 function useSplitIndicators(dt){return String(dt||currentFormDate())>=SPLIT_INDICATORS_FROM;}
 function routeMetricKey(r){return`Rota ${r.cod} — ${r.cidade}`;}
 function routeTotalMetricKey(r){return`Total ${routeMetricKey(r)}`;}
@@ -1095,6 +1103,14 @@ function parseSumNumber(value){
 function calcOsProdSaldo(base,finalizadas){
   return Math.max(parseSumNumber(base)-parseSumNumber(finalizadas),0);
 }
+function calcOsTotal(impressas,naoImpressas){
+  return parseSumNumber(impressas)+parseSumNumber(naoImpressas);
+}
+function hasSimpleOperational(day){
+  if(!day)return false;
+  return useSimpleOperational(day.date)||['osNaoImpMed','osNaoImpPerf','osTotalMed','osTotalPerf']
+    .some(k=>day[k]!==undefined&&day[k]!==null);
+}
 function hasSplitOperational(day){
   if(!day)return false;
   return ['acumMed','acumPerf','osImpMed','osImpPerf','osFinMed','osFinPerf','osProdMedBase','osProdPerfBase']
@@ -1107,11 +1123,13 @@ function operationalTotal(day,medKey,perfKey,fallbackKey){
 }
 function osProdBaseFromDay(day){
   if(!day)return 0;
+  if(hasSimpleOperational(day))return (+day.osTotalMed||0)+(+day.osTotalPerf||0);
   if(hasSplitOperational(day))return (+day.osProdMedBase||0)+(+day.osProdPerfBase||0);
   return day.osProdBase!==undefined&&day.osProdBase!==null?+day.osProdBase||0:+day.osProd||0;
 }
 function osProdSaldoFromDay(day){
   if(!day)return 0;
+  if(hasSimpleOperational(day))return (+day.osNaoImpMed||0)+(+day.osNaoImpPerf||0);
   if(hasSplitOperational(day)){
     return calcOsProdSaldo(day.osProdMedBase||0,day.osFinMed||0)+calcOsProdSaldo(day.osProdPerfBase||0,day.osFinPerf||0);
   }
@@ -1125,6 +1143,7 @@ function splitOperationalValues(day,medKey,perfKey,fallbackKey){
 }
 function splitOsProdValues(day){
   if(!day)return{med:0,perf:0};
+  if(hasSimpleOperational(day))return{med:+day.osNaoImpMed||0,perf:+day.osNaoImpPerf||0};
   return hasSplitOperational(day)
     ?{med:calcOsProdSaldo(day.osProdMedBase||0,day.osFinMed||0),perf:calcOsProdSaldo(day.osProdPerfBase||0,day.osFinPerf||0)}
     :{med:osProdSaldoFromDay(day),perf:0};
@@ -1134,15 +1153,37 @@ function setSplitKpi(id,values){
   if(!el)return;
   el.innerHTML=`<div class="kpi-subrow"><span>Med.</span><b>${(values.med||0).toLocaleString('pt-BR')}</b></div><div class="kpi-subrow"><span>Perf.</span><b>${(values.perf||0).toLocaleString('pt-BR')}</b></div>`;
 }
+function setKpiLabel(valueId,label){
+  const val=document.getElementById(valueId);
+  const lbl=val&&val.previousElementSibling;
+  if(lbl)lbl.textContent=label;
+}
 function osProdBaseInputId(scope){return scope==='Perf'?'iOsProdPerfBase':'iOsProdMedBase';}
 function syncOsProdSaldo(){
+  const simple=useSimpleOperational();
+  document.querySelectorAll('.op-old').forEach(el=>el.style.display=simple?'none':'flex');
+  document.querySelectorAll('.op-new').forEach(el=>el.style.display=simple?'flex':'none');
+  const medImp=document.getElementById('iOsImpMed');
+  const medNao=document.getElementById('iOsNaoImpMed');
+  const medTotal=document.getElementById('iOsTotalMed');
+  const perfImp=document.getElementById('iOsImpPerf');
+  const perfNao=document.getElementById('iOsNaoImpPerf');
+  const perfTotal=document.getElementById('iOsTotalPerf');
+  const totalOut=document.getElementById('iOsTotal');
+  if(simple){
+    const med=calcOsTotal(medImp?medImp.value:0,medNao?medNao.value:0);
+    const perf=calcOsTotal(perfImp?perfImp.value:0,perfNao?perfNao.value:0);
+    if(medTotal)medTotal.value=med;
+    if(perfTotal)perfTotal.value=perf;
+    if(totalOut)totalOut.value=med+perf;
+    return;
+  }
   const medBase=document.getElementById('iOsProdMedBase');
   const medFin=document.getElementById('iOsFinMed');
   const medOut=document.getElementById('iOsProdMed');
   const perfBase=document.getElementById('iOsProdPerfBase');
   const perfFin=document.getElementById('iOsFinPerf');
   const perfOut=document.getElementById('iOsProdPerf');
-  const totalOut=document.getElementById('iOsTotal');
   if(medBase&&medFin&&medOut)medOut.value=calcOsProdSaldo(medBase.value,medFin.value);
   if(perfBase&&perfFin&&perfOut)perfOut.value=calcOsProdSaldo(perfBase.value,perfFin.value);
   if(totalOut)totalOut.value=parseSumNumber(medBase?medBase.value:0)+parseSumNumber(perfBase?perfBase.value:0);
@@ -1326,8 +1367,14 @@ function renderKPIs(day){
   const acumTotal=operationalTotal(day,'acumMed','acumPerf','acum');
   const acumSplit=splitOperationalValues(day,'acumMed','acumPerf','acum');
   const osImpSplit=splitOperationalValues(day,'osImpMed','osImpPerf','osImp');
-  const osFinSplit=splitOperationalValues(day,'osFinMed','osFinPerf','osFin');
-  const osProdSplit=splitOsProdValues(day);
+  const simpleOp=hasSimpleOperational(day);
+  const osFinSplit=simpleOp
+    ?{med:+day.osNaoImpMed||0,perf:+day.osNaoImpPerf||0}
+    :splitOperationalValues(day,'osFinMed','osFinPerf','osFin');
+  const osProdSplit=simpleOp
+    ?{med:day.osTotalMed!==undefined?+day.osTotalMed||0:calcOsTotal(day.osImpMed||0,day.osNaoImpMed||0),
+      perf:day.osTotalPerf!==undefined?+day.osTotalPerf||0:calcOsTotal(day.osImpPerf||0,day.osNaoImpPerf||0)}
+    :splitOsProdValues(day);
   const perc=day.meta>0?Math.round(acumTotal/day.meta*100):0;
   document.getElementById('hdrDate').textContent=fmtDate(day.date||today());
   document.getElementById('kPN').textContent=(day.pnVol||0).toLocaleString('pt-BR');
@@ -1338,6 +1385,8 @@ function renderKPIs(day){
   const aProcessarVol=Math.max((day.pnDoca||day.pnVol||0)-sumHoraField('Vol. Doca',day.hd||{}),0);
   document.getElementById('kProc').textContent=aProcessarVol.toLocaleString('pt-BR');
   document.getElementById('kMeta').textContent=(day.meta||0).toLocaleString('pt-BR');
+  setKpiLabel('kOsFin',simpleOp?'O.S. Não Impressas':'O.S. Finalizadas');
+  setKpiLabel('kOsProd',simpleOp?'O.S. Total':'O.S. À Produzir');
   setSplitKpi('kOsImp',osImpSplit);
   setSplitKpi('kOsFin',osFinSplit);
   setSplitKpi('kOsProd',osProdSplit);
@@ -2475,17 +2524,22 @@ function readFormAsDay(){
   const existing=getDay(dt);
   const savedRotas=existing&&Array.isArray(existing.rotas)?JSON.parse(JSON.stringify(existing.rotas)):null;
   const newRules=useNewRules(dt);
-  const acumMed=+document.getElementById('iAcumMed').value||0;
-  const acumPerf=+document.getElementById('iAcumPerf').value||0;
+  const simpleOp=useSimpleOperational(dt);
+  const acumMed=simpleOp?0:+document.getElementById('iAcumMed').value||0;
+  const acumPerf=simpleOp?0:+document.getElementById('iAcumPerf').value||0;
   const osImpMed=+document.getElementById('iOsImpMed').value||0;
   const osImpPerf=+document.getElementById('iOsImpPerf').value||0;
-  const osFinMed=+document.getElementById('iOsFinMed').value||0;
-  const osFinPerf=+document.getElementById('iOsFinPerf').value||0;
-  const osProdMedBase=parseSumNumber(document.getElementById('iOsProdMedBase').value);
-  const osProdPerfBase=parseSumNumber(document.getElementById('iOsProdPerfBase').value);
-  const osProdMed=calcOsProdSaldo(osProdMedBase,osFinMed);
-  const osProdPerf=calcOsProdSaldo(osProdPerfBase,osFinPerf);
-  const osTotal=osProdMedBase+osProdPerfBase;
+  const osNaoImpMed=simpleOp?+document.getElementById('iOsNaoImpMed').value||0:0;
+  const osNaoImpPerf=simpleOp?+document.getElementById('iOsNaoImpPerf').value||0:0;
+  const osTotalMed=simpleOp?calcOsTotal(osImpMed,osNaoImpMed):parseSumNumber(document.getElementById('iOsProdMedBase').value);
+  const osTotalPerf=simpleOp?calcOsTotal(osImpPerf,osNaoImpPerf):parseSumNumber(document.getElementById('iOsProdPerfBase').value);
+  const osFinMed=simpleOp?0:+document.getElementById('iOsFinMed').value||0;
+  const osFinPerf=simpleOp?0:+document.getElementById('iOsFinPerf').value||0;
+  const osProdMedBase=osTotalMed;
+  const osProdPerfBase=osTotalPerf;
+  const osProdMed=simpleOp?osNaoImpMed:calcOsProdSaldo(osProdMedBase,osFinMed);
+  const osProdPerf=simpleOp?osNaoImpPerf:calcOsProdSaldo(osProdPerfBase,osFinPerf);
+  const osTotal=osTotalMed+osTotalPerf;
   return{
     date:dt,
     _updatedAt:Date.now(),
@@ -2512,6 +2566,9 @@ function readFormAsDay(){
     osImpMed,osImpPerf,
     osFin:osFinMed+osFinPerf,
     osFinMed,osFinPerf,
+    osNaoImp:osNaoImpMed+osNaoImpPerf,
+    osNaoImpMed,osNaoImpPerf,
+    osTotalMed,osTotalPerf,
     osProdBase:osTotal,
     osProdMedBase,osProdPerfBase,
     osProd:osProdMed+osProdPerf,
@@ -2563,8 +2620,11 @@ function loadFormFrom(day){
   s('iPNOncoT',day.pnOncoT||'');s('iPNJuncao',day.pnJuncao||'');
   s('iPNDoca',day.pnDoca||'');
   const splitOp=hasSplitOperational(day);
+  const simpleOp=useSimpleOperational(day.date);
   s('iAcumMed',splitOp?day.acumMed||'':day.acum||'');s('iAcumPerf',splitOp?day.acumPerf||'':'');s('iMeta',day.meta||'');
   s('iOsImpMed',splitOp?day.osImpMed||'':day.osImp||'');s('iOsImpPerf',splitOp?day.osImpPerf||'':'');
+  s('iOsNaoImpMed',day.osNaoImpMed!==undefined?day.osNaoImpMed:(simpleOp?Math.max((day.osTotalMed||day.osProdMedBase||0)-(day.osImpMed||0),0):''));
+  s('iOsNaoImpPerf',day.osNaoImpPerf!==undefined?day.osNaoImpPerf:(simpleOp?Math.max((day.osTotalPerf||day.osProdPerfBase||0)-(day.osImpPerf||0),0):''));
   s('iOsFinMed',splitOp?day.osFinMed||'':day.osFin||'');s('iOsFinPerf',splitOp?day.osFinPerf||'':'');
   s('iOsProdMedBase',splitOp?day.osProdMedBase||'':osProdBaseFromDay(day)||'');s('iOsProdPerfBase',splitOp?day.osProdPerfBase||'':'');syncOsProdSaldo();
   s('iMedIt',day.medIt||'');s('iFaltas',day.faltas||'');
