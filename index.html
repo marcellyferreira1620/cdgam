@@ -1315,6 +1315,10 @@ function sumHoraField(metric,hd){
   if(!hd||!hd[metric])return 0;
   return hd[metric].reduce((s,v)=>s+(v!==''&&v!==null&&v!==undefined?+v:0),0);
 }
+function sumActiveHoraField(metric,hd,dt){
+  if(!activeHourMetrics(dt).includes(metric))return 0;
+  return sumHoraField(metric,hd);
+}
 function prevCheckoutBase(day){
   if(!day)return 0;
   if(useNewRules(day.date))return +day.pnCorreia||0;
@@ -1492,7 +1496,7 @@ function renderKPIs(day){
   const osProdSplit=simpleOp?simpleTotalSplit:splitOsProdValues(day);
   const hd=day.hd||{};
   const volBase=+day.pnDoca||+day.pnVol||0;
-  const volFinalizado=sumHoraField('Vol. Doca',hd);
+  const volFinalizado=sumActiveHoraField('Vol. Doca',hd,day.date);
   const volPendente=Math.max(volBase-volFinalizado,0);
   const perc=volBase>0?Math.round(volFinalizado/volBase*100):0;
   document.getElementById('hdrDate').textContent=fmtDate(day.date||today());
@@ -1521,7 +1525,7 @@ function renderKPIs(day){
 // ── FLOW BAR (Correia → Checkout → Expedição) ────────────
 function renderFlowBar(day){
   const hd=day.hd||{};
-  const sumH=m=>sumHoraField(m,hd);
+  const sumH=m=>sumActiveHoraField(m,hd,day.date);
   const n=v=>Number(v)||0;
   const totalLinhasMed=n(day.osTotalMed)||n(day.osProdMedBase)||n(day.osImpMed);
   const totalLinhasPerf=n(day.osTotalPerf)||n(day.osProdPerfBase)||n(day.osImpPerf);
@@ -3750,7 +3754,7 @@ function calcPrevisaoEncerramento(dayOverride,options){
     {lbl:'Unid. Checkout',prev:day.pnUnid||0,real:realizado('Unid. Checkout'),cap:day.capUC||20800,unidade:'unid.'}
   ]);
   if(useCheckoutPsico(day.date))setorFromDrivers('Checkout Psico','#00e5ff','ðŸ”µ',[
-    {lbl:'Vol. Checkout Psico',prev:day.pnPsico||0,real:Math.max(realizado('Vol. Checkout Psico'),num(day.rPsico)),cap:day.capVCPsi||1280,unidade:'vol'}
+    {lbl:'Vol. Checkout Psico',prev:day.pnPsico||0,real:realizado('Vol. Checkout Psico'),cap:day.capVCPsi||1280,unidade:'vol'}
   ]);
   setorFromDrivers('Especial','#9b59b6','ðŸŸ£',[
     {lbl:'Vol. Especial',prev:day.pnEspecial||0,real:realizado('Vol. Especial'),cap:day.capEsp||340,unidade:'vol'}
@@ -3771,7 +3775,7 @@ function calcPrevisaoEncerramento(dayOverride,options){
     {lbl:'Vol. Fraldas Frac.',prev:day.pnFralda||0,real:realizado('Vol. Fraldas Frac.'),cap:day.capFrFc||89,unidade:'vol'}
   ]);
   setorFromDrivers('DOCA (Expedição)','#00e676','ðŸŸ¢',[
-    {lbl:'Vol. Doca',prev:day.pnDoca||day.pnVol||0,real:Math.max(realizado('Vol. Doca'),num(day.rDoc)),cap:day.capVE||1303,unidade:'vol'}
+    {lbl:'Vol. Doca',prev:day.pnDoca||day.pnVol||0,real:realizado('Vol. Doca'),cap:day.capVE||1303,unidade:'vol'}
   ]);
 
   // = o setor que termina mais tarde
