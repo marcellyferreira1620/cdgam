@@ -1321,7 +1321,6 @@ function sumActiveHoraField(metric,hd,dt){
 }
 function prevCheckoutBase(day){
   if(!day)return 0;
-  if(useNewRules(day.date))return +day.pnCorreia||0;
   return (+day.pnCorreia||0)+(+day.pnJuncao||0);
 }
 function sumHoraInput(metric){
