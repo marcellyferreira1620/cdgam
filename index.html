@@ -374,24 +374,24 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
   <div class="chart-grid" id="productionChartsGrid">
     <div class="chart-box" id="horaCombinedBox">
       <div class="chart-ttl">Produção hora a hora — Correia Med. / Perf. / Vol. Checkout</div>
-      <div style="position:relative;height:220px"><canvas id="cHora" role="img" aria-label="Producao por hora"></canvas></div>
+      <div style="position:relative;height:270px"><canvas id="cHora" role="img" aria-label="Producao por hora"></canvas></div>
     </div>
     <div class="chart-box" id="horaMedBox" style="display:none">
       <div class="chart-ttl"><span>Produção hora a hora — Correia Medicamentos</span><span style="font-size:9px;font-weight:normal">Intervalo 21:30→22:00</span></div>
-      <div style="position:relative;height:250px"><canvas id="cHoraMed" role="img" aria-label="Producao da correia medicamentos por hora"></canvas></div>
+      <div style="position:relative;height:320px"><canvas id="cHoraMed" role="img" aria-label="Producao da correia medicamentos por hora"></canvas></div>
     </div>
     <div class="chart-box" id="horaPerfBox" style="display:none">
       <div class="chart-ttl"><span>Produção hora a hora — Correia Perfumaria</span><span style="font-size:9px;font-weight:normal">Intervalo 22:00→22:30</span></div>
-      <div style="position:relative;height:250px"><canvas id="cHoraPerf" role="img" aria-label="Producao da correia perfumaria por hora"></canvas></div>
+      <div style="position:relative;height:320px"><canvas id="cHoraPerf" role="img" aria-label="Producao da correia perfumaria por hora"></canvas></div>
     </div>
     <div class="chart-box" id="horaCheckoutBox" style="display:none">
       <div class="chart-ttl"><span>Produção hora a hora — Checkout | Conferentes em linha</span><span style="font-size:9px;font-weight:normal">Intervalos alternados 21:30→22:30</span></div>
-      <div style="position:relative;height:250px"><canvas id="cHoraCheckout" role="img" aria-label="Producao do checkout por hora"></canvas></div>
+      <div style="position:relative;height:320px"><canvas id="cHoraCheckout" role="img" aria-label="Producao do checkout por hora"></canvas></div>
       <div class="checkout-conf-wrap" id="confTbl"></div>
     </div>
     <div class="chart-box" id="horaCheckoutPsicoBox" style="display:none">
       <div class="chart-ttl"><span>Producao hora a hora - Checkout Psico | Conferentes em linha</span><span style="font-size:9px;font-weight:normal">Intervalos alternados 21:30-22:30</span></div>
-      <div style="position:relative;height:250px"><canvas id="cHoraCheckoutPsico" role="img" aria-label="Producao do checkout psico por hora"></canvas></div>
+      <div style="position:relative;height:320px"><canvas id="cHoraCheckoutPsico" role="img" aria-label="Producao do checkout psico por hora"></canvas></div>
       <div class="checkout-conf-wrap" id="confTblPsico"></div>
     </div>
     <div class="chart-box" id="volTipoBox">
@@ -826,6 +826,8 @@ const BAR_VALUE_LABEL_PLUGIN={
     ctx.textAlign='center';
     ctx.textBaseline='middle';
     ctx.font='bold 9px Arial';
+    const placed=[];
+    const overlaps=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
     chart.data.datasets.forEach((dataset,datasetIndex)=>{
       const meta=chart.getDatasetMeta(datasetIndex);
       if(!meta||meta.hidden||meta.type!=='bar')return;
@@ -849,6 +851,21 @@ const BAR_VALUE_LABEL_PLUGIN={
         }
         if(x-boxW/2<chartArea.left)x=chartArea.left+boxW/2;
         if(x+boxW/2>chartArea.right)x=chartArea.right-boxW/2;
+        let rect={left:x-boxW/2,right:x+boxW/2,top:y-boxH/2,bottom:y+boxH/2};
+        let attempts=0;
+        while(placed.some(p=>overlaps(rect,p))&&attempts<10){
+          if(horizontal){
+            y+=(attempts%2===0?1:-1)*(boxH+3)*(Math.floor(attempts/2)+1);
+          }else{
+            y-=boxH+4;
+            if(y-boxH/2<chartArea.top)y=props.y+(attempts+1)*(boxH+4);
+          }
+          if(y-boxH/2<chartArea.top)y=chartArea.top+boxH/2;
+          if(y+boxH/2>chartArea.bottom)y=chartArea.bottom-boxH/2;
+          rect={left:x-boxW/2,right:x+boxW/2,top:y-boxH/2,bottom:y+boxH/2};
+          attempts++;
+        }
+        placed.push(rect);
         ctx.fillStyle='rgba(255,255,255,.94)';
         ctx.beginPath();
         ctx.moveTo(x-boxW/2+r,y-boxH/2);
