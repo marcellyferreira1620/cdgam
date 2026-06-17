@@ -1492,7 +1492,7 @@ function renderKPIs(day){
   const osProdSplit=simpleOp?simpleTotalSplit:splitOsProdValues(day);
   const hd=day.hd||{};
   const volBase=+day.pnDoca||+day.pnVol||0;
-  const volFinalizado=Math.max(sumHoraField('Vol. Doca',hd),+day.rDoc||0);
+  const volFinalizado=sumHoraField('Vol. Doca',hd);
   const volPendente=Math.max(volBase-volFinalizado,0);
   const perc=volBase>0?Math.round(volFinalizado/volBase*100):0;
   document.getElementById('hdrDate').textContent=fmtDate(day.date||today());
@@ -1504,7 +1504,7 @@ function renderKPIs(day){
   setKpiLabel('kMeta','Vol. Finalizado');
   document.getElementById('kPN').textContent=(day.pnVol||0).toLocaleString('pt-BR');
   document.getElementById('kPNU').textContent=(day.pnUnid||0).toLocaleString('pt-BR');
-  document.getElementById('kVenda').textContent=volBase.toLocaleString('pt-BR');
+  document.getElementById('kVenda').textContent=volFinalizado.toLocaleString('pt-BR');
   setSplitKpi('kAcum',acumSplit);
   document.getElementById('kProc').textContent=volPendente.toLocaleString('pt-BR');
   document.getElementById('kMeta').textContent=volFinalizado.toLocaleString('pt-BR');
@@ -1584,11 +1584,11 @@ function renderFlowBar(day){
       {lbl:'Unidades',real:sumH('Unid. Checkout'),capDia:124800,capHour:day.capUC||20800,target:day.pnUnid||124800}
     ]),
     cardHtml('Checkout Psico','#00e5ff',[
-      {lbl:'Volumes',real:Math.max(sumH('Vol. Checkout Psico'),n(day.rPsico)),capDia:1300,capHour:day.capVCPsi||1280,target:day.pnPsico||1300},
+      {lbl:'Volumes',real:sumH('Vol. Checkout Psico'),capDia:1300,capHour:day.capVCPsi||1280,target:day.pnPsico||1300},
       {lbl:'Unidades',real:sumH('Unid. Checkout Psico'),capDia:8300,capHour:day.capUCPsi||20800,target:8300}
     ]),
     cardHtml('Geladeira','#4da6ff',[
-      {lbl:'Volumes',real:n(day.rGel),capDia:170,capHour:170,target:day.pnGel||170}
+      {lbl:'Volumes',real:sumH('Vol. Geladeira'),capDia:170,capHour:170,target:day.pnGel||170}
     ]),
     cardHtml('Especial','#9b59b6',[
       {lbl:'Volumes',real:sumH('Vol. Especial'),capDia:2040,capHour:day.capEsp||340,target:day.pnEspecial||2040}
@@ -1600,7 +1600,7 @@ function renderFlowBar(day){
       {lbl:'Volumes',real:sumH('Vol. Fraldas Frac.'),capDia:534,capHour:day.capFrFc||89,target:day.pnFralda||534}
     ]),
     cardHtml('Expedicao','#00e676',[
-      {lbl:'Volumes',real:Math.max(sumH('Vol. Doca'),n(day.rDoc)),capDia:7820,capHour:day.capVE||1303,target:day.pnDoca||day.pnVol||7820}
+      {lbl:'Volumes',real:sumH('Vol. Doca'),capDia:7820,capHour:day.capVE||1303,target:day.pnDoca||day.pnVol||7820}
     ])
   ];
   const bar=document.getElementById('flowBar');
