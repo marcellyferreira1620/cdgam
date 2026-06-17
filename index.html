@@ -817,6 +817,59 @@ let liveTimer=null;
 let syncTimer=null;
 let lastSyncHash='';
 
+const BAR_VALUE_LABEL_PLUGIN={
+  id:'barValueLabels',
+  afterDatasetsDraw(chart){
+    const {ctx,chartArea}=chart;
+    if(!chartArea)return;
+    ctx.save();
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    ctx.font='bold 9px Arial';
+    chart.data.datasets.forEach((dataset,datasetIndex)=>{
+      const meta=chart.getDatasetMeta(datasetIndex);
+      if(!meta||meta.hidden||meta.type!=='bar')return;
+      meta.data.forEach((bar,i)=>{
+        const raw=Array.isArray(dataset.data)?dataset.data[i]:null;
+        const n=Number(raw);
+        if(!Number.isFinite(n)||n===0)return;
+        const label=Math.round(n).toLocaleString('pt-BR');
+        const props=bar.getProps(['x','y','base','width','height'],true);
+        const textW=ctx.measureText(label).width;
+        const boxW=textW+8,boxH=14,r=3;
+        const horizontal=chart.options&&chart.options.indexAxis==='y';
+        let x=props.x;
+        let y=props.y;
+        if(horizontal){
+          x=Math.max(props.x,props.base)+boxW/2+4;
+          if(x+boxW/2>chartArea.right)x=Math.max(Math.max(props.x,props.base)-boxW/2-4,chartArea.left+boxW/2);
+        }else{
+          y=Math.min(props.y,props.base)-9;
+          if(y<chartArea.top+boxH/2)y=Math.max(props.y+10,chartArea.top+boxH/2);
+        }
+        if(x-boxW/2<chartArea.left)x=chartArea.left+boxW/2;
+        if(x+boxW/2>chartArea.right)x=chartArea.right-boxW/2;
+        ctx.fillStyle='rgba(255,255,255,.94)';
+        ctx.beginPath();
+        ctx.moveTo(x-boxW/2+r,y-boxH/2);
+        ctx.lineTo(x+boxW/2-r,y-boxH/2);
+        ctx.quadraticCurveTo(x+boxW/2,y-boxH/2,x+boxW/2,y-boxH/2+r);
+        ctx.lineTo(x+boxW/2,y+boxH/2-r);
+        ctx.quadraticCurveTo(x+boxW/2,y+boxH/2,x+boxW/2-r,y+boxH/2);
+        ctx.lineTo(x-boxW/2+r,y+boxH/2);
+        ctx.quadraticCurveTo(x-boxW/2,y+boxH/2,x-boxW/2,y+boxH/2-r);
+        ctx.lineTo(x-boxW/2,y-boxH/2+r);
+        ctx.quadraticCurveTo(x-boxW/2,y-boxH/2,x-boxW/2+r,y-boxH/2);
+        ctx.fill();
+        ctx.fillStyle='#06111f';
+        ctx.fillText(label,x,y);
+      });
+    });
+    ctx.restore();
+  }
+};
+if(window.Chart)Chart.register(BAR_VALUE_LABEL_PLUGIN);
+
 // ── FIREBASE SYNC ──────────────────────────────────────────
 const FB_CONFIG={
   apiKey:"AIzaSyCkqDak4jXeRyzgJ3qaY6WPv4IC1N8q5vo",
