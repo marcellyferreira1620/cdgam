@@ -431,6 +431,15 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
     </div>
   </div>
   <!-- DOCA BALANCE ROW -->
+  <div class="chart-grid" style="grid-template-columns:1fr">
+    <div class="chart-box" id="geladeiraBox" style="border-color:rgba(77,166,255,.45)">
+      <div class="chart-ttl">
+        <span>🧊 Geladeira — Volumes por Hora</span>
+        <span style="font-size:9px;font-weight:normal;color:#6a9fc0">capacidade 28/h | dia 170 volumes</span>
+      </div>
+      <div style="position:relative;height:190px"><canvas id="cGeladeira" role="img" aria-label="Geladeira hora a hora"></canvas></div>
+    </div>
+  </div>
   <div class="chart-grid" style="grid-template-columns:2fr 1fr">
     <div class="chart-box" style="border-color:rgba(0,230,118,.4)">
       <div class="chart-ttl">
@@ -627,6 +636,7 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
         <div class="adm-row"><label>Linhas Checkout Psico /h</label><input type="number" id="iCapLCPsi" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>Unid. Checkout Psico /h</label><input type="number" id="iCapUCPsi" value="20800" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>Unid. Checkout /h</label><input type="number" id="iCapUC" value="20800" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Vol. Geladeira /h</label><input type="number" id="iCapGel" value="28" oninput="liveUpdate()"/></div>
 
         <div class="adm-row"><label>Vales máx /h <span style="color:#ff4c4c;font-size:9px">(máximo)</span></label><input type="number" id="iCapVales" value="1" oninput="liveUpdate()"/></div>
         <div style="background:#071525;border-radius:3px;padding:5px 8px;margin-top:4px;border:1px solid rgba(0,230,118,.2)">
@@ -749,7 +759,7 @@ const MHORA=[
   'Unid. Checkout',
   // EXPEDIÇÃO (DOCA) — base até 04:00, com extensão opcional até 06:00
   'Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.',
-  'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.',
+  'Vol. Geladeira','Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.',
   'Vol. Doca',
   // CONTROLE
   'Vales','Conf. Planejado','Conf. Ativo','Conf. Planejado Psico','Conf. Ativo Psico'
@@ -763,6 +773,7 @@ const CAP_MAP={
   'Vol. Checkout Psico':'iCapVCPsi','Linhas Checkout Psico':'iCapLCPsi','Unid. Checkout Psico':'iCapUCPsi',
   'Vol. Especial':'iCapEsp','Vol. Esp. Frac.':'iCapEspFrac',
   'Vol. Esp. Med.':'iCapEspMed','Vol. Esp. Perf.':'iCapEspPerf',
+  'Vol. Geladeira':'iCapGel',
   'Vol. Fraldas Cx Fech.':'iCapFrF','Vol. Fraldas Frac.':'iCapFrFc',
   'Vol. Doca':'iCapVE',
   'Vales':'iCapVales'
@@ -782,6 +793,7 @@ const REAL_AUTO=[
   {id:'aEspFr',lbl:'Esp. Frac.',        m:'Vol. Esp. Frac.'},
   {id:'aEspMd',lbl:'Esp. Med.',         m:'Vol. Esp. Med.'},
   {id:'aEspPf',lbl:'Esp. Perf.',        m:'Vol. Esp. Perf.'},
+  {id:'aGel',  lbl:'Geladeira',         m:'Vol. Geladeira'},
   {id:'aFrF',  lbl:'Fraldas Cx Fech.', m:'Vol. Fraldas Cx Fech.'},
   {id:'aFrFc', lbl:'Fraldas Frac.',     m:'Vol. Fraldas Frac.'},
   {id:'aDoca', lbl:'Vol. Doca',         m:'Vol. Doca'},
@@ -802,6 +814,7 @@ const MEDIA_HORA_AUTO=[
   {lbl:'Esp. Frac.',m:'Vol. Esp. Frac.',ini:'iEsp',fim:'iEspFim'},
   {lbl:'Esp. Med.',m:'Vol. Esp. Med.',ini:'iEsp',fim:'iEspFim'},
   {lbl:'Esp. Perf.',m:'Vol. Esp. Perf.',ini:'iEsp',fim:'iEspFim'},
+  {lbl:'Geladeira',m:'Vol. Geladeira',ini:'iExp',fim:'iExpFim'},
   {lbl:'Fraldas Cx Fech.',m:'Vol. Fraldas Cx Fech.',ini:'iFrF',fim:'iFrFFim'},
   {lbl:'Fraldas Frac.',m:'Vol. Fraldas Frac.',ini:'iFrFc',fim:'iFrFcFim'},
   {lbl:'Vol. Doca',m:'Vol. Doca',ini:'iExp',fim:'iExpFim'},
@@ -813,6 +826,7 @@ const NEW_RULES_FROM='2026-06-02';
 const SIMPLE_OPERATIONAL_FROM='2026-06-16';
 const SPLIT_INDICATORS_FROM='2026-06-09';
 const CHECKOUT_PSICO_FROM='2026-06-16';
+const GELADEIRA_HORA_FROM='2026-06-17';
 const CAPACITY_OK_COLOR='#00a8ff';
 const CAPACITY_LOW_COLOR='#ff4c4c';
 const CORREIA_DIRECT_HOUR_METRICS=['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.'];
@@ -1137,7 +1151,7 @@ function emptyDay(dt){
     cPer:'',cMed:'',ckOut:'',esp:'',frF:'',frFc:'',exp:'',
     cPerFim:'',cMedFim:'',ckOutFim:'',espFim:'',frFFim:'',frFcFim:'',expFim:'',
     capLM:3500,capVMed:575,capUMed:10000,capLP:3000,capVPerf:425,capUPerf:6666,
-    capErros:2500,capVC:1280,capLC:6500,capVCPsi:1280,capLCPsi:'',capUCPsi:20800,capUC:20800,
+    capErros:2500,capVC:1280,capLC:6500,capVCPsi:1280,capLCPsi:'',capUCPsi:20800,capUC:20800,capGel:28,
     capVales:1,
     capEsp:340,capEspFrac:0,capEspMed:newRules?100:0,capEspPerf:0,capFrF:newRules?100:114,capFrFc:89,capVE:1303,
     rPsico:0,rGel:0,rOnco:0,rOncoT:0,rJuncao:0,rDoc:0,
@@ -1152,6 +1166,7 @@ function useNewRules(dt){return String(dt||currentFormDate())>=NEW_RULES_FROM;}
 function useSimpleOperational(dt){return String(dt||currentFormDate())>=SIMPLE_OPERATIONAL_FROM;}
 function useSplitIndicators(dt){return String(dt||currentFormDate())>=SPLIT_INDICATORS_FROM;}
 function useCheckoutPsico(dt){return String(dt||currentFormDate())>=CHECKOUT_PSICO_FROM;}
+function useGeladeiraHora(dt){return String(dt||currentFormDate())>=GELADEIRA_HORA_FROM;}
 function routeMetricKey(r){return`Rota ${r.cod} — ${r.cidade}`;}
 function routeTotalMetricKey(r){return`Total ${routeMetricKey(r)}`;}
 function routeHourMetrics(){return ROTAS_FIXAS.map(routeMetricKey);}
@@ -1167,7 +1182,8 @@ function routeInitialTotal(day,metric){
   return saved?+saved.vol||0:0;
 }
 function activeHourMetrics(dt){
-  const base=useSplitIndicators(dt)?[...MHORA,...routeHourMetrics(),...routeTotalHourMetrics()]:MHORA.filter(m=>!NEW_CORREIA_DETAIL_METRICS.includes(m));
+  let base=useSplitIndicators(dt)?[...MHORA,...routeHourMetrics(),...routeTotalHourMetrics()]:MHORA.filter(m=>!NEW_CORREIA_DETAIL_METRICS.includes(m));
+  if(!useGeladeiraHora(dt))base=base.filter(m=>m!=='Vol. Geladeira');
   return useCheckoutPsico(dt)?base:base.filter(m=>!CHECKOUT_PSICO_ALL.includes(m));
 }
 function hourTargetFactor(metric,i,dt){
@@ -1592,7 +1608,7 @@ function renderFlowBar(day){
       {lbl:'Unidades',real:sumH('Unid. Checkout Psico'),capDia:8300,capHour:day.capUCPsi||20800,target:8300,noForecast:true}
     ]),
     cardHtml('Geladeira','#4da6ff',[
-      {lbl:'Volumes',real:sumH('Vol. Geladeira'),capDia:170,capHour:170,target:day.pnGel||0}
+      {lbl:'Volumes',real:sumH('Vol. Geladeira'),capDia:170,capHour:day.capGel||28,target:day.pnGel||0}
     ]),
     cardHtml('Especial','#9b59b6',[
       {lbl:'Volumes',real:sumH('Vol. Especial'),capDia:2040,capHour:day.capEsp||340,target:day.pnEspecial||0}
@@ -1680,12 +1696,14 @@ function renderDashCharts(day){
   const lp=dv(hd,'Linhas Perf.'),vPerf=dv(hd,'Vol. Perf.'),uPerf=dv(hd,'Unid. Perf.');
   const vc=dv(hd,'Vol. Checkout'),uc=dv(hd,'Unid. Checkout');
   const vcPsi=dv(hd,'Vol. Checkout Psico'),ucPsi=dv(hd,'Unid. Checkout Psico');
+  const gel=dv(hd,'Vol. Geladeira');
   const cp=dv(hd,'Conf. Planejado'),ca=dv(hd,'Conf. Ativo');
   const cpPsi=dv(hd,'Conf. Planejado Psico'),caPsi=dv(hd,'Conf. Ativo Psico');
   const capLM=day.capLM||3500,capVMed=day.capVMed||575,capUMed=day.capUMed||10000;
   const capLP=day.capLP||3000,capVPerf=day.capVPerf||425,capUPerf=day.capUPerf||6666;
   const capVC=day.capVC||1280,capUC=day.capUC||20800;
   const capVCPsi=day.capVCPsi||1280,capUCPsi=day.capUCPsi||20800;
+  const capGel=day.capGel||28;
   const splitIndicators=useSplitIndicators(day.date);
   const checkoutPsicoEnabled=splitIndicators&&useCheckoutPsico(day.date);
   const productionGrid=document.getElementById('productionChartsGrid');
@@ -1695,6 +1713,7 @@ function renderDashCharts(day){
   const checkoutBox=document.getElementById('horaCheckoutBox');
   const checkoutPsicoBox=document.getElementById('horaCheckoutPsicoBox');
   const volTipoBox=document.getElementById('volTipoBox');
+  const geladeiraBox=document.getElementById('geladeiraBox');
   productionGrid.style.gridTemplateColumns='1fr 1fr';
   combinedBox.style.display=splitIndicators?'none':'block';
   medBox.style.display=splitIndicators?'block':'none';
@@ -1704,6 +1723,7 @@ function renderDashCharts(day){
   checkoutBox.style.gridColumn=splitIndicators?'1 / -1':'auto';
   checkoutPsicoBox.style.gridColumn=checkoutPsicoEnabled?'1 / -1':'auto';
   volTipoBox.style.gridColumn=splitIndicators?'1 / -1':'auto';
+  if(geladeiraBox)geladeiraBox.style.display=useGeladeiraHora(day.date)?'block':'none';
 
   const hourChartOptions=(dualUnits=false)=>({responsive:true,maintainAspectRatio:false,
     plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},
@@ -1808,7 +1828,7 @@ function renderDashCharts(day){
     {lbl:'03 - ESPECIAL PERF.',       real:sumH('Vol. Esp. Perf.'),     prev:day.pnEspPerf||0,  cor:'especial'},
     {lbl:'06 - FRALDAS',              real:sumH('Vol. Fraldas Frac.'),  prev:day.pnFralda||0,   cor:'fralda'},
     {lbl:'10 - FRALDAS CX FECH.',     real:sumH('Vol. Fraldas Cx Fech.'),prev:day.pnFraldaF||0, cor:'especial'},
-    {lbl:'05 - GELADEIRA',            real:day.rGel||0,                 prev:day.pnGel||0,      cor:'gelad'},
+    {lbl:'05 - GELADEIRA',            real:useGeladeiraHora(day.date)?sumH('Vol. Geladeira'):(day.rGel||0), prev:day.pnGel||0, cor:'gelad'},
     {lbl:'15 - ONCOLÓGICO',           real:day.rOnco||0,          prev:day.pnOnco||0,     cor:'gelad'},
     {lbl:'16 - ONCO TERMOLÁBIL',      real:day.rOncoT||0,         prev:day.pnOncoT||0,    cor:'gelad'},
     {lbl:'22 - CONTROLE QUALIDADE',   real:realCheckout,          prev:prevCheckout,      cor:'checkout'},
@@ -1898,6 +1918,28 @@ function renderDashCharts(day){
   };
 
   // Expedição
+  const gelAcum=[];let runGel=0;
+  gel.forEach(v=>{if(v!==null){runGel+=v;gelAcum.push(runGel);}else gelAcum.push(runGel>0?runGel:null);});
+  destroyChart('geladeira');
+  const gelCanvas=document.getElementById('cGeladeira');
+  if(gelCanvas){
+    CH.geladeira=new Chart(gelCanvas,{type:'bar',
+      data:{labels:HOURS,datasets:[
+        capacityDataset('Meta Geladeira/h',capGel,'Vol. Geladeira','y','#ffd700'),
+        hourDataset('Vol. Geladeira/h',gel,capGel,'y','Vol. Geladeira'),
+        {label:'Acumulado Geladeira',data:gelAcum,type:'line',borderColor:'#4da6ff',backgroundColor:'#4da6ff',borderWidth:2,pointRadius:3,fill:false,yAxisID:'y2'}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,
+        plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},
+        scales:{
+          x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},
+          y:{beginAtZero:true,ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'},title:{display:true,text:'Volumes/h',color:'#6a9fc0',font:{size:9}}},
+          y2:{beginAtZero:true,position:'right',ticks:{color:'#4da6ff',font:{size:9}},grid:{display:false},title:{display:true,text:'Acumulado',color:'#4da6ff',font:{size:9}},suggestedMax:170}
+        }
+      }
+    });
+  }
+
   const ve=dv(hd,'Vol. Doca');const capVEh=day.capVE||1303;
   const veAcum=[];let runV=0;
   ve.forEach(v=>{if(v!==null){runV+=v;veAcum.push(runV);}else veAcum.push(runV>0?runV:null);});
@@ -2282,7 +2324,7 @@ function renderDashTables(day){
     ?['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.']
     :['Linhas Med.','Linhas Perf.','Erros Sep. Med.'];
   const expedicaoMetrics=['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.',
-    'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca'];
+    ...(useGeladeiraHora(day.date)?['Vol. Geladeira']:[]),'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca'];
   const DASH_GROUPS=[
     {title:'🔴 CORREIA — Separação',    bg:'rgba(255,149,0,.12)',
      metrics:correiaMetrics},
@@ -2603,7 +2645,7 @@ function buildHoraTable(hd){
     ?['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.']
     :['Linhas Med.','Linhas Perf.','Erros Sep. Med.'];
   const expedicaoMetrics=['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.',
-    'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca',...(useSplitIndicators(formDate)?routeHourMetrics():[])];
+    ...(useGeladeiraHora(formDate)?['Vol. Geladeira']:[]),'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca',...(useSplitIndicators(formDate)?routeHourMetrics():[])];
   const MHORA_GROUPS=[
     {title:'🔴 CORREIA — Separação', color:'rgba(255,149,0,.15)',
      metrics:correiaMetrics},
@@ -2840,6 +2882,7 @@ function readFormAsDay(){
     capLCPsi:document.getElementById('iCapLCPsi').value===''?'':+document.getElementById('iCapLCPsi').value||0,
     capUCPsi:+document.getElementById('iCapUCPsi').value||20800,
     capUC:+document.getElementById('iCapUC').value||20800,
+    capGel:+document.getElementById('iCapGel').value||28,
     capVales:+document.getElementById('iCapVales').value||1,
     capEsp:+document.getElementById('iCapEsp').value||340,
     capEspFrac:+document.getElementById('iCapEspFrac').value||0,
@@ -2888,6 +2931,7 @@ function loadFormFrom(day){
   s('iCapVC',day.capVC||1280);s('iCapLC',day.capLC||6500);
   s('iCapVCPsi',day.capVCPsi||1280);s('iCapLCPsi',day.capLCPsi||'');s('iCapUCPsi',day.capUCPsi||20800);
   s('iCapUC',day.capUC||20800);
+  s('iCapGel',day.capGel||28);
   s('iCapVales',day.capVales||1);
   s('iCapEsp',day.capEsp||340);s('iCapEspFrac',day.capEspFrac||0);
   s('iCapEspMed',newRules?100:(day.capEspMed||0));s('iCapEspPerf',day.capEspPerf||0);
@@ -3960,7 +4004,7 @@ function renderPreench(){
     ?['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.']
     :['Linhas Med.','Linhas Perf.','Erros Sep. Med.'];
   const expedicaoMetrics=['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.',
-    'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca'];
+    ...(useGeladeiraHora(day.date)?['Vol. Geladeira']:[]),'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca'];
   const grupos=[
     {lbl:'CORREIA',cor:'rgba(255,149,0,.7)',metrics:correiaMetrics},
     {lbl:'CHECKOUT',cor:'rgba(0,229,255,.7)',metrics:['Vol. Checkout','Linhas Checkout',...(useCheckoutPsico(day.date)?CHECKOUT_PSICO_METRICS:[]),'Unid. Checkout']},
