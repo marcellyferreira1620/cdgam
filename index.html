@@ -1577,35 +1577,35 @@ function renderFlowBar(day){
     cardHtml('Correia Medicamento','#ff9500',[
       {lbl:'Linhas',real:sumH('Linhas Med.'),capDia:21000,capHour:day.capLM||3500,target:totalLinhasMed||21000,noForecast:true},
       {lbl:'Unidades',real:sumH('Unid. Med.'),capDia:60000,capHour:day.capUMed||10000,target:60000,noForecast:true},
-      {lbl:'Volumes',real:sumH('Vol. Med.'),capDia:day.pnCorreia||0,capHour:day.capVMed||575,target:day.pnCorreia||0}
+      {lbl:'Volumes',real:sumH('Vol. Med.'),capDia:3450,capHour:day.capVMed||575,target:day.pnCorreia||0}
     ]),
     cardHtml('Correia Perfumaria','#ff9500',[
       {lbl:'Linhas',real:sumH('Linhas Perf.'),capDia:18000,capHour:day.capLP||3000,target:totalLinhasPerf||18000,noForecast:true},
       {lbl:'Unidades',real:sumH('Unid. Perf.'),capDia:40000,capHour:day.capUPerf||6666,target:40000,noForecast:true},
-      {lbl:'Volumes',real:sumH('Vol. Perf.'),capDia:day.pnCorreia||0,capHour:day.capVPerf||425,target:day.pnCorreia||0}
+      {lbl:'Volumes',real:sumH('Vol. Perf.'),capDia:2550,capHour:day.capVPerf||425,target:day.pnCorreia||0}
     ]),
     cardHtml('Checkout','#00e5ff',[
-      {lbl:'Volumes',real:sumH('Vol. Checkout'),capDia:prevCheckoutBase(day)||0,capHour:day.capVC||1280,target:prevCheckoutBase(day)||0},
-      {lbl:'Unidades',real:sumH('Unid. Checkout'),capDia:day.pnUnid||0,capHour:day.capUC||20800,target:day.pnUnid||0,noForecast:true}
+      {lbl:'Volumes',real:sumH('Vol. Checkout'),capDia:7680,capHour:day.capVC||1280,target:prevCheckoutBase(day)||0},
+      {lbl:'Unidades',real:sumH('Unid. Checkout'),capDia:124800,capHour:day.capUC||20800,target:day.pnUnid||0,noForecast:true}
     ]),
     cardHtml('Checkout Psico','#00e5ff',[
-      {lbl:'Volumes',real:sumH('Vol. Checkout Psico'),capDia:day.pnPsico||0,capHour:day.capVCPsi||1280,target:day.pnPsico||0},
+      {lbl:'Volumes',real:sumH('Vol. Checkout Psico'),capDia:1300,capHour:day.capVCPsi||1280,target:day.pnPsico||0},
       {lbl:'Unidades',real:sumH('Unid. Checkout Psico'),capDia:8300,capHour:day.capUCPsi||20800,target:8300,noForecast:true}
     ]),
     cardHtml('Geladeira','#4da6ff',[
-      {lbl:'Volumes',real:sumH('Vol. Geladeira'),capDia:day.pnGel||0,capHour:170,target:day.pnGel||0}
+      {lbl:'Volumes',real:sumH('Vol. Geladeira'),capDia:170,capHour:170,target:day.pnGel||0}
     ]),
     cardHtml('Especial','#9b59b6',[
-      {lbl:'Volumes',real:sumH('Vol. Especial'),capDia:day.pnEspecial||0,capHour:day.capEsp||340,target:day.pnEspecial||0}
+      {lbl:'Volumes',real:sumH('Vol. Especial'),capDia:2040,capHour:day.capEsp||340,target:day.pnEspecial||0}
     ]),
     cardHtml('Fraldas Cx Fech.','#4a90d9',[
-      {lbl:'Unidades',real:sumH('Vol. Fraldas Cx Fech.'),capDia:day.pnFraldaF||0,capHour:useNewRules(day.date)?100:(day.capFrF||114),target:day.pnFraldaF||0}
+      {lbl:'Unidades',real:sumH('Vol. Fraldas Cx Fech.'),capDia:684,capHour:useNewRules(day.date)?100:(day.capFrF||114),target:day.pnFraldaF||0}
     ]),
     cardHtml('Fralda Fracionada','#4a90d9',[
-      {lbl:'Volumes',real:sumH('Vol. Fraldas Frac.'),capDia:day.pnFralda||0,capHour:day.capFrFc||89,target:day.pnFralda||0}
+      {lbl:'Volumes',real:sumH('Vol. Fraldas Frac.'),capDia:534,capHour:day.capFrFc||89,target:day.pnFralda||0}
     ]),
     cardHtml('Expedicao','#00e676',[
-      {lbl:'Volumes',real:sumH('Vol. Doca'),capDia:day.pnDoca||day.pnVol||0,capHour:day.capVE||1303,target:day.pnDoca||day.pnVol||0}
+      {lbl:'Volumes',real:sumH('Vol. Doca'),capDia:7820,capHour:day.capVE||1303,target:day.pnDoca||day.pnVol||0}
     ])
   ];
   const bar=document.getElementById('flowBar');
