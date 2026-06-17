@@ -1578,7 +1578,7 @@ function renderFlowBar(day){
     },baseDec);
     const endTxt=rows.every(r=>r.noPct)?'Base':forecastRows.some(r=>Math.max(n(r.target??r.capDia)-n(r.real),0)>0)?fmtHora(fim):'OK';
     return `<div class="north-card" style="border-color:${color}">
-      <div class="north-card-h"><div class="north-title" style="color:${color}">${title}</div><div class="north-end">${endTxt}</div></div>
+      <div class="north-card-h"><div class="north-title" style="color:${color}">${title}</div></div>
       ${rows.map(rowHtml).join('')}
     </div>`;
   };
