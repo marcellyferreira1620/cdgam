@@ -1261,6 +1261,15 @@ function setKpiLabel(valueId,label){
   const lbl=val&&val.previousElementSibling;
   if(lbl)lbl.textContent=label;
 }
+function orderCutoffClosed(dt){
+  const d=String(dt||today());
+  if(d<SIMPLE_OPERATIONAL_FROM)return false;
+  const t=today();
+  if(d<t)return true;
+  if(d>t)return false;
+  const now=new Date();
+  return now.getHours()+now.getMinutes()/60>=21.5;
+}
 function osProdBaseInputId(scope){return scope==='Perf'?'iOsProdPerfBase':'iOsProdMedBase';}
 function syncOsProdSaldo(){
   const simple=useSimpleOperational();
@@ -1467,27 +1476,38 @@ function refreshFromDb(){
 
 // ── KPIs ──────────────────────────────────────────────────
 function renderKPIs(day){
-  const acumTotal=operationalTotal(day,'acumMed','acumPerf','acum');
-  const acumSplit=splitOperationalValues(day,'acumMed','acumPerf','acum');
-  const osImpSplit=splitOperationalValues(day,'osImpMed','osImpPerf','osImp');
   const simpleOp=hasSimpleOperational(day);
+  const cutoffClosed=orderCutoffClosed(day.date);
+  const simpleTotalSplit={
+    med:day.osTotalMed!==undefined?+day.osTotalMed||0:calcOsTotal(day.osImpMed||0,day.osNaoImpMed||0),
+    perf:day.osTotalPerf!==undefined?+day.osTotalPerf||0:calcOsTotal(day.osImpPerf||0,day.osNaoImpPerf||0)
+  };
+  const acumSplit=simpleOp?simpleTotalSplit:splitOperationalValues(day,'acumMed','acumPerf','acum');
+  const osImpSplit=simpleOp&&cutoffClosed
+    ?simpleTotalSplit
+    :splitOperationalValues(day,'osImpMed','osImpPerf','osImp');
   const osFinSplit=simpleOp
-    ?{med:+day.osNaoImpMed||0,perf:+day.osNaoImpPerf||0}
+    ?(cutoffClosed?{med:0,perf:0}:{med:+day.osNaoImpMed||0,perf:+day.osNaoImpPerf||0})
     :splitOperationalValues(day,'osFinMed','osFinPerf','osFin');
-  const osProdSplit=simpleOp
-    ?{med:day.osTotalMed!==undefined?+day.osTotalMed||0:calcOsTotal(day.osImpMed||0,day.osNaoImpMed||0),
-      perf:day.osTotalPerf!==undefined?+day.osTotalPerf||0:calcOsTotal(day.osImpPerf||0,day.osNaoImpPerf||0)}
-    :splitOsProdValues(day);
-  const perc=day.meta>0?Math.round(acumTotal/day.meta*100):0;
+  const osProdSplit=simpleOp?simpleTotalSplit:splitOsProdValues(day);
+  const hd=day.hd||{};
+  const volBase=+day.pnDoca||+day.pnVol||0;
+  const volFinalizado=Math.max(sumHoraField('Vol. Doca',hd),+day.rDoc||0);
+  const volPendente=Math.max(volBase-volFinalizado,0);
+  const perc=volBase>0?Math.round(volFinalizado/volBase*100):0;
   document.getElementById('hdrDate').textContent=fmtDate(day.date||today());
+  setKpiLabel('kPN','Venda: Volume');
+  setKpiLabel('kPNU','Venda: Unidade');
+  setKpiLabel('kVenda','Volumes Impressos');
+  setKpiLabel('kAcum','Acumulado (Linhas)');
+  setKpiLabel('kProc','Vol. Pend. Finalização');
+  setKpiLabel('kMeta','Vol. Finalizado');
   document.getElementById('kPN').textContent=(day.pnVol||0).toLocaleString('pt-BR');
   document.getElementById('kPNU').textContent=(day.pnUnid||0).toLocaleString('pt-BR');
-  document.getElementById('kVenda').textContent=(day.pnUnid||0).toLocaleString('pt-BR');
+  document.getElementById('kVenda').textContent=volBase.toLocaleString('pt-BR');
   setSplitKpi('kAcum',acumSplit);
-  // À Processar = Previsto Doca - já expedido (vol)
-  const aProcessarVol=Math.max((day.pnDoca||day.pnVol||0)-sumHoraField('Vol. Doca',day.hd||{}),0);
-  document.getElementById('kProc').textContent=aProcessarVol.toLocaleString('pt-BR');
-  document.getElementById('kMeta').textContent=(day.meta||0).toLocaleString('pt-BR');
+  document.getElementById('kProc').textContent=volPendente.toLocaleString('pt-BR');
+  document.getElementById('kMeta').textContent=volFinalizado.toLocaleString('pt-BR');
   setKpiLabel('kOsFin',simpleOp?'O.S. Não Impressas':'O.S. Finalizadas');
   setKpiLabel('kOsProd',simpleOp?'O.S. Total':'O.S. À Produzir');
   setSplitKpi('kOsImp',osImpSplit);
