@@ -45,6 +45,20 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
 .flow-arrow{display:flex;align-items:center;color:#1e4a72;font-size:20px;padding:0 2px}
 .pbar-mini{height:5px;background:#1e3a55;border-radius:2px;margin-top:3px;overflow:hidden;position:relative}
 .pbar-mini-fill{height:100%;border-radius:2px;transition:width .4s}
+.north-bar{background:#071525;padding:6px 8px;display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:6px;border-bottom:2px solid #1e4a72}
+.north-head{grid-column:1/-1;background:#0a2340;border:1px solid #1e4a72;border-radius:5px;padding:6px 10px;color:#ffd700;font-size:12px;font-weight:bold;text-transform:uppercase;letter-spacing:.4px;text-align:center}
+.north-card{background:#122033;border:1px solid #1a3550;border-radius:5px;overflow:hidden;min-width:0}
+.north-card-h{display:flex;align-items:center;justify-content:space-between;gap:6px;padding:5px 8px;background:#0a2340;border-bottom:1px solid #1a3550}
+.north-title{font-size:10px;font-weight:bold;color:#89b4d4;text-transform:uppercase;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.north-end{font-size:11px;font-weight:bold;color:#00e5ff;white-space:nowrap}
+.north-row{display:grid;grid-template-columns:minmax(48px,1fr) auto auto auto;gap:5px;align-items:center;padding:4px 8px;border-bottom:1px solid rgba(255,255,255,.04);font-size:10px}
+.north-row:last-child{border-bottom:none}
+.north-label{color:#6a9fc0;font-weight:bold;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.north-num{color:#fff;font-weight:bold;text-align:right;white-space:nowrap}
+.north-cap{color:#89b4d4;text-align:right;white-space:nowrap}
+.north-pct{font-weight:bold;text-align:right;white-space:nowrap}
+.north-pbar{grid-column:1/-1;height:4px;background:#1e3a55;border-radius:2px;overflow:hidden}
+.north-pfill{height:100%;border-radius:2px}
 /* TABS */
 .tabs{display:flex;gap:3px;padding:6px 8px 0;background:#0b1d2e;border-bottom:2px solid #1e4a72}
 .tab{padding:5px 14px;border-radius:4px 4px 0 0;cursor:pointer;font-size:11px;background:#122033;color:#6a9fc0;border:1px solid #1e4a72;border-bottom:none;transition:all .15s}
@@ -1488,6 +1502,93 @@ function renderKPIs(day){
 function renderFlowBar(day){
   const hd=day.hd||{};
   const sumH=m=>sumHoraField(m,hd);
+  const n=v=>Number(v)||0;
+  const totalLinhasMed=n(day.osTotalMed)||n(day.osProdMedBase)||n(day.osImpMed);
+  const totalLinhasPerf=n(day.osTotalPerf)||n(day.osProdPerfBase)||n(day.osImpPerf);
+  const totalLinhasCheckout=n(day.osTotal)||(totalLinhasMed+totalLinhasPerf)||n(day.osImp);
+  const now=new Date();
+  const horaAtual=now.getHours()+now.getMinutes()/60;
+  const baseDec=Math.min(Math.max(horaAtual<12?24+horaAtual:horaAtual,SHIFT_START_DEC),SHIFT_END_DEC);
+  const fmtHora=dec=>{
+    const totalMod=((dec%24)+24)%24;
+    let h=Math.floor(totalMod),m=Math.round((totalMod-h)*60);
+    if(m>=60){h=(h+1)%24;m=0;}
+    return h.toString().padStart(2,'0')+':'+m.toString().padStart(2,'0');
+  };
+  const pctColor=p=>p>=100?'#00e676':p>=80?'#ffd700':'#ff4c4c';
+  const pct=(real,capDia)=>capDia>0?Math.round(real/capDia*100):0;
+  const rowHtml=r=>{
+    const baseOnly=!!r.noPct;
+    const p=baseOnly?null:pct(r.real,r.capDia);
+    const c=baseOnly?'#ffd700':pctColor(p);
+    const pctTxt=baseOnly?'base':p+'%';
+    const pWidth=baseOnly?100:Math.min(p,100);
+    return `<div class="north-row">
+      <div class="north-label">${r.lbl}</div>
+      <div class="north-num">${n(r.real).toLocaleString('pt-BR')}</div>
+      <div class="north-cap">${n(r.capDia).toLocaleString('pt-BR')}</div>
+      <div class="north-pct" style="color:${c}">${pctTxt}</div>
+      <div class="north-pbar"><div class="north-pfill" style="width:${pWidth}%;background:${c}"></div></div>
+    </div>`;
+  };
+  const cardHtml=(title,color,rows)=>{
+    const fim=rows.reduce((latest,r)=>{
+      const falta=Math.max(n(r.target??r.capDia)-n(r.real),0);
+      const dec=falta&&r.capHour>0?baseDec+falta/r.capHour:baseDec;
+      return dec>latest?dec:latest;
+    },baseDec);
+    const endTxt=rows.every(r=>r.noPct)?'Base':rows.some(r=>Math.max(n(r.target??r.capDia)-n(r.real),0)>0)?fmtHora(fim):'OK';
+    return `<div class="north-card" style="border-color:${color}">
+      <div class="north-card-h"><div class="north-title" style="color:${color}">${title}</div><div class="north-end">${endTxt}</div></div>
+      ${rows.map(rowHtml).join('')}
+    </div>`;
+  };
+  const cards=[
+    cardHtml('Venda','#ffd700',[
+      {lbl:'Vol. Prev.',real:day.pnVol||0,capDia:day.pnVol||0,capHour:0,target:day.pnVol||0,noPct:true},
+      {lbl:'Unidades',real:day.pnUnid||0,capDia:day.pnUnid||0,capHour:0,target:day.pnUnid||0,noPct:true},
+      {lbl:'O.S. Total',real:totalLinhasCheckout||0,capDia:totalLinhasCheckout||0,capHour:0,target:totalLinhasCheckout||0,noPct:true}
+    ]),
+    cardHtml('Correia Medicamento','#ff9500',[
+      {lbl:'Linhas',real:sumH('Linhas Med.'),capDia:21000,capHour:day.capLM||3500,target:totalLinhasMed||21000},
+      {lbl:'Unidades',real:sumH('Unid. Med.'),capDia:60000,capHour:day.capUMed||10000,target:60000},
+      {lbl:'Volumes',real:sumH('Vol. Med.'),capDia:3450,capHour:day.capVMed||575,target:day.pnCorreia||3450}
+    ]),
+    cardHtml('Correia Perfumaria','#ff9500',[
+      {lbl:'Linhas',real:sumH('Linhas Perf.'),capDia:18000,capHour:day.capLP||3000,target:totalLinhasPerf||18000},
+      {lbl:'Unidades',real:sumH('Unid. Perf.'),capDia:40000,capHour:day.capUPerf||6666,target:40000},
+      {lbl:'Volumes',real:sumH('Vol. Perf.'),capDia:2550,capHour:day.capVPerf||425,target:day.pnCorreia||2550}
+    ]),
+    cardHtml('Checkout','#00e5ff',[
+      {lbl:'Volumes',real:sumH('Vol. Checkout'),capDia:7680,capHour:day.capVC||1280,target:prevCheckoutBase(day)||7680},
+      {lbl:'Unidades',real:sumH('Unid. Checkout'),capDia:124800,capHour:day.capUC||20800,target:day.pnUnid||124800}
+    ]),
+    cardHtml('Checkout Psico','#00e5ff',[
+      {lbl:'Volumes',real:Math.max(sumH('Vol. Checkout Psico'),n(day.rPsico)),capDia:1300,capHour:day.capVCPsi||1280,target:day.pnPsico||1300},
+      {lbl:'Unidades',real:sumH('Unid. Checkout Psico'),capDia:8300,capHour:day.capUCPsi||20800,target:8300}
+    ]),
+    cardHtml('Geladeira','#4da6ff',[
+      {lbl:'Volumes',real:n(day.rGel),capDia:170,capHour:170,target:day.pnGel||170}
+    ]),
+    cardHtml('Especial','#9b59b6',[
+      {lbl:'Volumes',real:sumH('Vol. Especial'),capDia:2040,capHour:day.capEsp||340,target:day.pnEspecial||2040}
+    ]),
+    cardHtml('Fraldas Cx Fech.','#4a90d9',[
+      {lbl:'Unidades',real:sumH('Vol. Fraldas Cx Fech.'),capDia:684,capHour:useNewRules(day.date)?100:(day.capFrF||114),target:day.pnFraldaF||684}
+    ]),
+    cardHtml('Fralda Fracionada','#4a90d9',[
+      {lbl:'Volumes',real:sumH('Vol. Fraldas Frac.'),capDia:534,capHour:day.capFrFc||89,target:day.pnFralda||534}
+    ]),
+    cardHtml('Expedicao','#00e676',[
+      {lbl:'Volumes',real:Math.max(sumH('Vol. Doca'),n(day.rDoc)),capDia:7820,capHour:day.capVE||1303,target:day.pnDoca||day.pnVol||7820}
+    ])
+  ];
+  const bar=document.getElementById('flowBar');
+  if(bar){
+    bar.className='north-bar';
+    bar.innerHTML='<div class="north-head">PREVISÃO DOS RESULTADOS CD SJP</div>'+cards.join('');
+  }
+  return;
   // Correia
   const medReal=sumH('Linhas Med.'),medPrev=day.pnCorreia||0;
   const perfReal=sumH('Linhas Perf.'),perfPrev=day.pnCorreia||0;
