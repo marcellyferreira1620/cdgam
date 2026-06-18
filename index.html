@@ -2737,11 +2737,14 @@ function horaInputValues(metric){
     .sort((a,b)=>+a.dataset.i-+b.dataset.i)
     .map(inp=>inp.value!==''?+inp.value:'');
 }
+function unitMedHourDeltasFromTable(){
+  return acumToDeltas(horaInputValues('Unid. Med.'));
+}
 function refreshEpmHintsFromTable(){
   const inputs=[...document.querySelectorAll(`#hTblBody input[data-m="Erros Sep. Med."]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
   if(!inputs.length)return;
   const errorDeltas=acumToDeltas(horaInputValues('Erros Sep. Med.'));
-  const epmVals=epmSeries(errorDeltas,horaInputValues('Unid. Med.'));
+  const epmVals=epmSeries(errorDeltas,unitMedHourDeltasFromTable());
   inputs.forEach((el,idx)=>{
     const td=el.parentNode;
     let hint=td.querySelector('.delta-hint');
@@ -2855,7 +2858,7 @@ function onHoraInput(inp){
     const inputs=[...row.querySelectorAll(`input[data-m="${m}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
     const acums=inputs.map(el=>el.value!==''?+el.value:'');
     const deltas=acumToDeltas(acums);
-    const resultVals=isEpmMetric(m)?epmSeries(deltas,horaInputValues('Unid. Med.')):deltas;
+    const resultVals=isEpmMetric(m)?epmSeries(deltas,unitMedHourDeltasFromTable()):deltas;
     const resultLabel=isEpmMetric(m)?'EPM/hora':'resultado/hora';
     inputs.forEach((el,idx)=>{
       // Atualiza hint Δ na célula
