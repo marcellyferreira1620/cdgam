@@ -1785,6 +1785,8 @@ function epmSeries(errorVals,unitVals){
 function epmSeriesFromHd(hd){
   return epmSeries(dv(hd,'Erros Sep. Med.'),dv(hd,'Unid. Med.'));
 }
+function isEpmMetric(m){return m==='Erros Sep. Med.';}
+function metricDisplayName(m){return isEpmMetric(m)?'EPM Sep. Med.':m;}
 function renderDashCharts(day){
   const hd=day.hd||{};
   const lm=dv(hd,'Linhas Med.'),vMed=dv(hd,'Vol. Med.'),uMed=dv(hd,'Unid. Med.');
@@ -2441,11 +2443,12 @@ function renderDashTables(day){
       const route=isRoute?routeFromMetric(m):null;
       const rawTotals=isRoute?(hd[routeTotalMetricKey(route)]||new Array(HOURS.length).fill('')):new Array(HOURS.length).fill('');
       const carriedTotals=isRoute?routeCarriedTotals(rawTotals,initialTotal):rawTotals;
-      const vals=isRoute?routeDoneToPending(rawVals,rawTotals,initialTotal):(m==='Erros Sep. Med.'?epmSeries(rawVals,hd['Unid. Med.']||[]):rawVals);
-      const displayMetric=m==='Erros Sep. Med.'?'EPM Sep. Med.':m;
+      const vals=isRoute?routeDoneToPending(rawVals,rawTotals,initialTotal):(isEpmMetric(m)?epmSeries(rawVals,hd['Unid. Med.']||[]):rawVals);
+      const displayMetric=metricDisplayName(m);
       const capLbl=cap?`<span style="font-size:9px;color:#6a9fc0;font-weight:normal;display:block">${isInv?'máx':'meta'}: ${cap.toLocaleString('pt-BR')}/h</span>`:'';
       const routeLbl=isRoute?`<span style="font-size:9px;color:#00e676;font-weight:normal;display:block">Total atualizado | saldo pendente</span>`:'';
-      h2+=`<tr><td class="row-lbl">${displayMetric}${capLbl}${routeLbl}</td>`;
+      const epmLbl=isEpmMetric(m)?`<span style="font-size:9px;color:#00e5ff;font-weight:normal;display:block">erros ÷ unid. med. × 1.000.000</span>`:'';
+      h2+=`<tr><td class="row-lbl">${displayMetric}${capLbl}${routeLbl}${epmLbl}</td>`;
       vals.forEach((v,i)=>{
         const dimmed=isCK&&i>=H_CK;
         let bg='',style='';
@@ -2782,13 +2785,14 @@ function buildHoraTable(hd){
       const modeHint=isRoute
         ?`<span class="route-mode-hint">Preencher total atualizado + pendente</span>`
         :useDelta?`<span style="font-size:8px;color:#4a7a9b;display:block">▲ acumulado</span>`:'';
-      let html=`<td class="hlbl">${m}${cap?`<span style="font-size:9px;color:#6a9fc0;font-weight:normal;display:block">${isInv?'máx':'meta'}: ${cap.toLocaleString('pt-BR')}/h</span>`:''} ${modeHint}</td>`;
+      const epmModeHint=isEpmMetric(m)?`<span style="font-size:8px;color:#00e5ff;display:block">erros ÷ unid. med. × 1.000.000</span>`:'';
+      let html=`<td class="hlbl">${metricDisplayName(m)}${cap?`<span style="font-size:9px;color:#6a9fc0;font-weight:normal;display:block">${isInv?'máx':'meta'}: ${cap.toLocaleString('pt-BR')}/h</span>`:''} ${modeHint}${epmModeHint}</td>`;
       // Para modo delta: converter deltas armazenados → acumulados para exibir
       const rawVals=hd&&hd[m]?hd[m]:new Array(HOURS.length).fill('');
       const rawTotals=isRoute&&hd&&hd[routeTotalMetricKey(route)]?hd[routeTotalMetricKey(route)]:new Array(HOURS.length).fill('');
       const displayVals=isRoute?routeDoneToPending(rawVals,rawTotals,initialTotal):useDelta?deltasToAcums(rawVals):rawVals;
       // Deltas calculados para colorir célula (baseado no ritmo/hora)
-      const deltaVals=m==='Erros Sep. Med.'?epmSeries(rawVals,(hd&&hd['Unid. Med.'])||[]):rawVals;
+      const deltaVals=isEpmMetric(m)?epmSeries(rawVals,(hd&&hd['Unid. Med.'])||[]):rawVals;
 
       HOURS.forEach((_,i)=>{
         const hasDisplay=displayVals[i]!==''&&displayVals[i]!==null&&displayVals[i]!==undefined;
@@ -2805,7 +2809,7 @@ function buildHoraTable(hd){
         const isCKMetric=['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.','Vol. Checkout','Linhas Checkout','Unid. Checkout',...CHECKOUT_PSICO_METRICS].includes(m);
         const isExtra=(isCKMetric&&i>=H_CK)||i>=H_EX;
         const extraStyle=isExtra&&!bg?'background:rgba(255,149,0,.06);border-left:2px solid rgba(255,149,0,.2)':'';
-        const deltaLabel=m==='Erros Sep. Med.'?'EPM/hora':(isRoute?'feito/hora':'resultado/hora');
+        const deltaLabel=isEpmMetric(m)?'EPM/hora':(isRoute?'feito/hora':'resultado/hora');
         const deltaHint=(useDelta||isRoute)?`<div class="delta-hint ${vDelta===null?'delta-empty':''}">${deltaHintHtml(vDelta,deltaLabel)}</div>`:'';
         const periodTarget=cap?capForHour(m,cap,i,formDate):null;
         const targetTitle=periodTarget?`${isInv?'Limite':'Meta'} do período: ${periodTarget.toLocaleString('pt-BR')}`:'';
@@ -2851,8 +2855,8 @@ function onHoraInput(inp){
     const inputs=[...row.querySelectorAll(`input[data-m="${m}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
     const acums=inputs.map(el=>el.value!==''?+el.value:'');
     const deltas=acumToDeltas(acums);
-    const resultVals=m==='Erros Sep. Med.'?epmSeries(deltas,horaInputValues('Unid. Med.')):deltas;
-    const resultLabel=m==='Erros Sep. Med.'?'EPM/hora':'resultado/hora';
+    const resultVals=isEpmMetric(m)?epmSeries(deltas,horaInputValues('Unid. Med.')):deltas;
+    const resultLabel=isEpmMetric(m)?'EPM/hora':'resultado/hora';
     inputs.forEach((el,idx)=>{
       // Atualiza hint Δ na célula
       const td=el.parentNode;
@@ -4151,8 +4155,10 @@ function renderPreench(){
       const rawVals=day.hd&&day.hd[m]?day.hd[m]:new Array(HOURS.length).fill('');
       const rawTotals=isRoute&&day.hd&&day.hd[routeTotalMetricKey(route)]?day.hd[routeTotalMetricKey(route)]:new Array(HOURS.length).fill('');
       const displayVals=isRoute?routeDoneToPending(rawVals,rawTotals,initialTotal):isDeltaMetric(m,day.date)?deltasToAcums(rawVals):rawVals;
+      const epmVals=isEpmMetric(m)?epmSeries(rawVals,(day.hd&&day.hd['Unid. Med.'])||[]):null;
       const routeHint=isRoute?`<span class="route-mode-hint">Total atualizado + pendente</span>`:'';
-      rows+=`<tr><td style="background:#0a1825;color:#89b4d4;font-size:10px;font-weight:bold;padding:3px 8px;border:1px solid #1a3550;white-space:nowrap">${m}${routeHint}</td>`;
+      const epmHint=isEpmMetric(m)?`<span style="font-size:9px;color:#00e5ff;font-weight:normal;display:block">EPM = erros ÷ unid. med. × 1.000.000</span>`:'';
+      rows+=`<tr><td style="background:#0a1825;color:#89b4d4;font-size:10px;font-weight:bold;padding:3px 8px;border:1px solid #1a3550;white-space:nowrap">${metricDisplayName(m)}${routeHint}${epmHint}</td>`;
       HOURS.forEach((_,i)=>{
         const val=displayVals[i]??'';
         const extra=i>=H_CK;
@@ -4169,6 +4175,7 @@ function renderPreench(){
               onblur="this.style.outline='none'"
               oninput="preenchInput(this)"/>
             ${isRoute?`<div data-route-done-m="${m}" data-route-done-i="${i}" style="font-size:8px;color:#00e5ff;text-align:center;min-height:10px">${rawVals[i]!==''?`feito: ${(+rawVals[i]).toLocaleString('pt-BR')}`:''}</div>`:''}
+            ${isEpmMetric(m)?`<div style="font-size:8px;color:#00e5ff;text-align:center;min-height:10px">${epmVals[i]!==null?`EPM: ${epmVals[i].toLocaleString('pt-BR')}`:''}</div>`:''}
           </td>`;
         }
       });
