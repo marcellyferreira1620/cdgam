@@ -961,7 +961,40 @@ const EPM_SERIES_NAME_LABEL_PLUGIN={
     ctx.restore();
   }
 };
-if(window.Chart)Chart.register(BAR_VALUE_LABEL_PLUGIN,EPM_SERIES_NAME_LABEL_PLUGIN);
+const HORA_PRODUCTION_SERIES_NAME_LABEL_PLUGIN={
+  id:'horaProductionSeriesNameLabels',
+  afterDraw(chart){
+    if(!chart.canvas||!['cHoraMed','cHoraPerf'].includes(chart.canvas.id))return;
+    const {ctx,chartArea}=chart;
+    if(!chartArea)return;
+    const labelFor=label=>{
+      if(/^Linhas/i.test(label))return {txt:'LINHA',color:'#ffd700'};
+      if(/^Volume/i.test(label))return {txt:'VOL.',color:'#00e5ff'};
+      if(/^Unidade/i.test(label))return {txt:'UNID.',color:'#c39bd3'};
+      return null;
+    };
+    ctx.save();
+    ctx.textAlign='center';
+    ctx.textBaseline='top';
+    ctx.font='bold 7px Arial';
+    chart.data.datasets.forEach((dataset,datasetIndex)=>{
+      const info=labelFor(dataset.label||'');
+      if(!info)return;
+      const meta=chart.getDatasetMeta(datasetIndex);
+      if(!meta||meta.hidden||meta.type!=='bar')return;
+      meta.data.forEach((bar,i)=>{
+        const raw=Array.isArray(dataset.data)?dataset.data[i]:null;
+        const n=Number(raw);
+        if(!Number.isFinite(n)||n===0)return;
+        const props=bar.getProps(['x'],true);
+        ctx.fillStyle=info.color;
+        ctx.fillText(info.txt,props.x,chartArea.bottom+3);
+      });
+    });
+    ctx.restore();
+  }
+};
+if(window.Chart)Chart.register(BAR_VALUE_LABEL_PLUGIN,EPM_SERIES_NAME_LABEL_PLUGIN,HORA_PRODUCTION_SERIES_NAME_LABEL_PLUGIN);
 
 // ── FIREBASE SYNC ──────────────────────────────────────────
 const FB_CONFIG={
@@ -1850,8 +1883,9 @@ function renderDashCharts(day){
   if(geladeiraBox)geladeiraBox.style.display=useGeladeiraHora(day.date)?'block':'none';
 
   const hourChartOptions=(dualUnits=false)=>({responsive:true,maintainAspectRatio:false,
+    layout:{padding:{bottom:10}},
     plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},
-    scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},
+    scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false,padding:18},grid:{color:'rgba(255,255,255,0.04)'}},
             y:{beginAtZero:true,ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'},title:{display:dualUnits,text:'Linhas / Volumes',color:'#6a9fc0',font:{size:9}}},
             ...(dualUnits?{yUnits:{beginAtZero:true,position:'right',ticks:{color:'#c39bd3',font:{size:9}},grid:{display:false},title:{display:true,text:'Unidades',color:'#c39bd3',font:{size:9}}}}:{})}});
   const destroyChart=key=>{if(CH[key]){CH[key].destroy();CH[key]=null;}};
