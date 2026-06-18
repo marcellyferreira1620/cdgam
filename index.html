@@ -934,7 +934,34 @@ const BAR_VALUE_LABEL_PLUGIN={
     ctx.restore();
   }
 };
-if(window.Chart)Chart.register(BAR_VALUE_LABEL_PLUGIN);
+const EPM_SERIES_NAME_LABEL_PLUGIN={
+  id:'epmSeriesNameLabels',
+  afterDraw(chart){
+    if(!chart.canvas||chart.canvas.id!=='cEPM')return;
+    const {ctx,chartArea}=chart;
+    if(!chartArea)return;
+    ctx.save();
+    ctx.textAlign='center';
+    ctx.textBaseline='top';
+    ctx.font='bold 8px Arial';
+    chart.data.datasets.forEach((dataset,datasetIndex)=>{
+      const meta=chart.getDatasetMeta(datasetIndex);
+      if(!meta||meta.hidden||meta.type!=='bar')return;
+      const name=datasetIndex===0?'EPM':'VALE';
+      const color=datasetIndex===0?'#ff4c4c':'#00e676';
+      meta.data.forEach((bar,i)=>{
+        const raw=Array.isArray(dataset.data)?dataset.data[i]:null;
+        const n=Number(raw);
+        if(!Number.isFinite(n)||n===0)return;
+        const props=bar.getProps(['x'],true);
+        ctx.fillStyle=color;
+        ctx.fillText(name,props.x,chartArea.bottom+3);
+      });
+    });
+    ctx.restore();
+  }
+};
+if(window.Chart)Chart.register(BAR_VALUE_LABEL_PLUGIN,EPM_SERIES_NAME_LABEL_PLUGIN);
 
 // ── FIREBASE SYNC ──────────────────────────────────────────
 const FB_CONFIG={
@@ -2095,8 +2122,9 @@ function renderDashCharts(day){
       {label:`Vales (máx ${capVales})`,data:vals,backgroundColor:vals.map(v=>v===null?'transparent':v>capVales?'#ff4c4c':'#00e676'),borderRadius:3,yAxisID:'y2'}
     ]},
     options:{responsive:true,maintainAspectRatio:false,
+      layout:{padding:{bottom:10}},
       plugins:{legend:{labels:{color:'#89b4d4',font:{size:9}}}},
-      scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},
+      scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false,padding:18},grid:{color:'rgba(255,255,255,0.04)'}},
               y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'},position:'left'},
               y2:{ticks:{color:'#ffd700',font:{size:9}},grid:{display:false},position:'right'}}}});
 
