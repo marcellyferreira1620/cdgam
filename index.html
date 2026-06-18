@@ -1222,6 +1222,7 @@ function hourTargetFactor(metric,i,dt){
 }
 function capForHour(metric,cap,i,dt){
   if(!cap)return cap;
+  if(metric==='Erros Sep. Med.')return cap;
   return cap*hourTargetFactor(metric,i,dt);
 }
 function parseSumNumber(value){
@@ -1771,6 +1772,19 @@ function renderFlowBar(day){
 
 // ── DASHBOARD CHARTS ──────────────────────────────────────
 function dv(hd,m){return HOURS.map((_,i)=>{const v=hd&&hd[m]?hd[m][i]:'';return(v!==''&&v!==null)?+v:null;});}
+function epmValue(errorCount,unitCount){
+  if(errorCount===''||errorCount===null||errorCount===undefined)return null;
+  const errors=Number(errorCount)||0;
+  const units=Number(unitCount)||0;
+  if(units<=0)return errors===0?0:null;
+  return Math.round(errors/units*1000000);
+}
+function epmSeries(errorVals,unitVals){
+  return HOURS.map((_,i)=>epmValue(errorVals?errorVals[i]:null,unitVals?unitVals[i]:null));
+}
+function epmSeriesFromHd(hd){
+  return epmSeries(dv(hd,'Erros Sep. Med.'),dv(hd,'Unid. Med.'));
+}
 function renderDashCharts(day){
   const hd=day.hd||{};
   const lm=dv(hd,'Linhas Med.'),vMed=dv(hd,'Vol. Med.'),uMed=dv(hd,'Unid. Med.');
@@ -2070,7 +2084,7 @@ function renderDashCharts(day){
               y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'}}}}});
 
   // EPM e Vales
-  const epm=dv(hd,'Erros Sep. Med.'),vals=dv(hd,'Vales');
+  const epm=epmSeriesFromHd(hd),vals=dv(hd,'Vales');
   const capEPM=day.capErros||2500,capVales=day.capVales||1;
   if(CH.epm)CH.epm.destroy();
   CH.epm=new Chart(document.getElementById('cEPM'),{type:'bar',
@@ -2427,15 +2441,16 @@ function renderDashTables(day){
       const route=isRoute?routeFromMetric(m):null;
       const rawTotals=isRoute?(hd[routeTotalMetricKey(route)]||new Array(HOURS.length).fill('')):new Array(HOURS.length).fill('');
       const carriedTotals=isRoute?routeCarriedTotals(rawTotals,initialTotal):rawTotals;
-      const vals=isRoute?routeDoneToPending(rawVals,rawTotals,initialTotal):rawVals;
+      const vals=isRoute?routeDoneToPending(rawVals,rawTotals,initialTotal):(m==='Erros Sep. Med.'?epmSeries(rawVals,hd['Unid. Med.']||[]):rawVals);
+      const displayMetric=m==='Erros Sep. Med.'?'EPM Sep. Med.':m;
       const capLbl=cap?`<span style="font-size:9px;color:#6a9fc0;font-weight:normal;display:block">${isInv?'máx':'meta'}: ${cap.toLocaleString('pt-BR')}/h</span>`:'';
       const routeLbl=isRoute?`<span style="font-size:9px;color:#00e676;font-weight:normal;display:block">Total atualizado | saldo pendente</span>`:'';
-      h2+=`<tr><td class="row-lbl">${m}${capLbl}${routeLbl}</td>`;
+      h2+=`<tr><td class="row-lbl">${displayMetric}${capLbl}${routeLbl}</td>`;
       vals.forEach((v,i)=>{
         const dimmed=isCK&&i>=H_CK;
         let bg='',style='';
         if(dimmed){bg='background:#071525';style='color:#2a3a4a';}
-        else if(cap&&v!==''){
+        else if(cap&&v!==''&&v!==null&&v!==undefined){
           const n=+v;
           const capH=capForHour(m,cap,i,day.date);
           if(isInv){bg=n>capH?'background:rgba(200,20,20,.5)':n>capH*.8?'background:rgba(180,130,0,.25)':'background:rgba(0,120,60,.25)';style=n>capH?'color:#ff4c4c;font-weight:bold':n>capH*.8?'color:#ffd700':'color:#00e676';}
@@ -2446,7 +2461,7 @@ function renderDashTables(day){
         const targetTitle=periodTarget?`${isInv?'Limite':'Meta'} do período: ${periodTarget.toLocaleString('pt-BR')}`:'';
         const routeDone=isRoute&&rawVals[i]!==''?`<span style="display:block;font-size:8px;color:#00e5ff">feito: ${(+rawVals[i]).toLocaleString('pt-BR')}</span>`:'';
         const routeTotal=isRoute&&carriedTotals[i]!==''?`<span style="display:block;font-size:8px;color:#00e676">total: ${(+carriedTotals[i]).toLocaleString('pt-BR')}</span>`:'';
-        h2+=`<td style="text-align:center;${bg}" title="${[isExtra?'⚡ Hora extra':'',targetTitle].filter(Boolean).join(' | ')}"><span style="${style}">${v!==''?v:isExtra?'·':'-'}</span>${routeTotal}${routeDone}</td>`;
+        h2+=`<td style="text-align:center;${bg}" title="${[isExtra?'⚡ Hora extra':'',targetTitle].filter(Boolean).join(' | ')}"><span style="${style}">${v!==''&&v!==null&&v!==undefined?Number(v).toLocaleString('pt-BR'):isExtra?'·':'-'}</span>${routeTotal}${routeDone}</td>`;
       });
       h2+='</tr>';
     });
@@ -2714,6 +2729,25 @@ function deltaHintHtml(delta,label='resultado/hora'){
   if(delta===''||delta===null||delta===undefined)return '';
   return `<span class="delta-label">${label}</span><span class="delta-val">${Number(delta).toLocaleString('pt-BR')}</span>`;
 }
+function horaInputValues(metric){
+  return [...document.querySelectorAll(`#hTblBody input[data-m="${metric}"]`)]
+    .sort((a,b)=>+a.dataset.i-+b.dataset.i)
+    .map(inp=>inp.value!==''?+inp.value:'');
+}
+function refreshEpmHintsFromTable(){
+  const inputs=[...document.querySelectorAll(`#hTblBody input[data-m="Erros Sep. Med."]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
+  if(!inputs.length)return;
+  const errorDeltas=acumToDeltas(horaInputValues('Erros Sep. Med.'));
+  const epmVals=epmSeries(errorDeltas,horaInputValues('Unid. Med.'));
+  inputs.forEach((el,idx)=>{
+    const td=el.parentNode;
+    let hint=td.querySelector('.delta-hint');
+    if(!hint){hint=document.createElement('div');hint.className='delta-hint';td.appendChild(hint);}
+    hint.classList.toggle('delta-empty',epmVals[idx]===null);
+    hint.innerHTML=deltaHintHtml(epmVals[idx],'EPM/hora');
+    colorCellByDelta(el,'Erros Sep. Med.',epmVals[idx]);
+  });
+}
 
 function buildHoraTable(hd){
   const hdr=document.getElementById('hTblHdr'),body=document.getElementById('hTblBody');
@@ -2754,7 +2788,7 @@ function buildHoraTable(hd){
       const rawTotals=isRoute&&hd&&hd[routeTotalMetricKey(route)]?hd[routeTotalMetricKey(route)]:new Array(HOURS.length).fill('');
       const displayVals=isRoute?routeDoneToPending(rawVals,rawTotals,initialTotal):useDelta?deltasToAcums(rawVals):rawVals;
       // Deltas calculados para colorir célula (baseado no ritmo/hora)
-      const deltaVals=useDelta?rawVals:rawVals;
+      const deltaVals=m==='Erros Sep. Med.'?epmSeries(rawVals,(hd&&hd['Unid. Med.'])||[]):rawVals;
 
       HOURS.forEach((_,i)=>{
         const hasDisplay=displayVals[i]!==''&&displayVals[i]!==null&&displayVals[i]!==undefined;
@@ -2771,7 +2805,8 @@ function buildHoraTable(hd){
         const isCKMetric=['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.','Vol. Checkout','Linhas Checkout','Unid. Checkout',...CHECKOUT_PSICO_METRICS].includes(m);
         const isExtra=(isCKMetric&&i>=H_CK)||i>=H_EX;
         const extraStyle=isExtra&&!bg?'background:rgba(255,149,0,.06);border-left:2px solid rgba(255,149,0,.2)':'';
-        const deltaHint=(useDelta||isRoute)?`<div class="delta-hint ${vDelta===null?'delta-empty':''}">${deltaHintHtml(vDelta,isRoute?'feito/hora':'resultado/hora')}</div>`:'';
+        const deltaLabel=m==='Erros Sep. Med.'?'EPM/hora':(isRoute?'feito/hora':'resultado/hora');
+        const deltaHint=(useDelta||isRoute)?`<div class="delta-hint ${vDelta===null?'delta-empty':''}">${deltaHintHtml(vDelta,deltaLabel)}</div>`:'';
         const periodTarget=cap?capForHour(m,cap,i,formDate):null;
         const targetTitle=periodTarget?`${isInv?'Limite':'Meta'} do período: ${periodTarget.toLocaleString('pt-BR')}`:'';
         html+=`<td class="hora-cell" style="${bg};${extraStyle}" title="${[isExtra?'⚡ Hora extra':'',targetTitle,isRoute?'Realizado acumulado = total atualizado - pendente':useDelta?'Resultado da hora = acumulado atual - acumulado anterior':''].filter(Boolean).join(' | ')}">
@@ -2816,18 +2851,21 @@ function onHoraInput(inp){
     const inputs=[...row.querySelectorAll(`input[data-m="${m}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
     const acums=inputs.map(el=>el.value!==''?+el.value:'');
     const deltas=acumToDeltas(acums);
+    const resultVals=m==='Erros Sep. Med.'?epmSeries(deltas,horaInputValues('Unid. Med.')):deltas;
+    const resultLabel=m==='Erros Sep. Med.'?'EPM/hora':'resultado/hora';
     inputs.forEach((el,idx)=>{
       // Atualiza hint Δ na célula
       const td=el.parentNode;
       let hint=td.querySelector('.delta-hint');
       if(!hint){hint=document.createElement('div');hint.className='delta-hint';td.appendChild(hint);}
-      hint.classList.toggle('delta-empty',deltas[idx]==='');
-      hint.innerHTML=deltaHintHtml(deltas[idx]);
+      hint.classList.toggle('delta-empty',resultVals[idx]===''||resultVals[idx]===null);
+      hint.innerHTML=deltaHintHtml(resultVals[idx],resultLabel);
       // Recolorir célula baseado no delta desta hora
-      colorCellByDelta(el,m,deltas[idx]);
+      colorCellByDelta(el,m,resultVals[idx]);
     });
   } else {
     colorCell(inp);
+    if(m==='Unid. Med.')refreshEpmHintsFromTable();
   }
 }
 
