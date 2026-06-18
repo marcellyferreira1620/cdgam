@@ -968,7 +968,7 @@ const HORA_PRODUCTION_SERIES_NAME_LABEL_PLUGIN={
     const {ctx,chartArea}=chart;
     if(!chartArea)return;
     const labelFor=label=>{
-      if(/^Linhas/i.test(label))return {txt:'LINHA',color:'#ffd700'};
+      if(/^Linhas/i.test(label))return {txt:'LIN.',color:'#ffd700'};
       if(/^Volume/i.test(label))return {txt:'VOL.',color:'#00e5ff'};
       if(/^Unidade/i.test(label))return {txt:'UNID.',color:'#c39bd3'};
       return null;
@@ -976,7 +976,7 @@ const HORA_PRODUCTION_SERIES_NAME_LABEL_PLUGIN={
     ctx.save();
     ctx.textAlign='center';
     ctx.textBaseline='top';
-    ctx.font='bold 7px Arial';
+    ctx.font='bold 8px Arial';
     chart.data.datasets.forEach((dataset,datasetIndex)=>{
       const info=labelFor(dataset.label||'');
       if(!info)return;
@@ -1877,6 +1877,8 @@ function renderDashCharts(day){
   perfBox.style.display=splitIndicators?'block':'none';
   checkoutBox.style.display=splitIndicators?'block':'none';
   checkoutPsicoBox.style.display=checkoutPsicoEnabled?'block':'none';
+  medBox.style.gridColumn=splitIndicators?'1 / -1':'auto';
+  perfBox.style.gridColumn=splitIndicators?'1 / -1':'auto';
   checkoutBox.style.gridColumn=splitIndicators?'1 / -1':'auto';
   checkoutPsicoBox.style.gridColumn=checkoutPsicoEnabled?'1 / -1':'auto';
   volTipoBox.style.gridColumn=splitIndicators?'1 / -1':'auto';
