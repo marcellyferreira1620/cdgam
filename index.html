@@ -440,7 +440,7 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
       <div style="position:relative;height:190px"><canvas id="cGeladeira" role="img" aria-label="Geladeira hora a hora"></canvas></div>
     </div>
   </div>
-  <div class="chart-grid" style="grid-template-columns:2fr 1fr">
+  <div class="chart-grid" style="grid-template-columns:1fr">
     <div class="chart-box" style="border-color:rgba(0,230,118,.4)">
       <div class="chart-ttl">
         <span>⚖️ Fechamento de Rotas — Volumes da Doca</span>
@@ -451,7 +451,7 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
     </div>
     <div class="chart-box" style="border-color:rgba(0,230,118,.4)">
       <div class="chart-ttl">📦 Resumo Doca — Turno</div>
-      <div id="docaKpiPanel" style="display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px"></div>
+      <div id="docaKpiPanel" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;padding:4px"></div>
     </div>
   </div>
   <div class="chart-grid" style="grid-template-columns:1fr">
@@ -2137,9 +2137,9 @@ function renderRouteClosure(day){
       {l:'Vol. Rotas H/H',v:totalRotasHora.toLocaleString('pt-BR'),c:totalRotasHora===totalSaida?'#00e676':'#ffd700',sub:'Somatório das linhas por rota'},
       {l:'Saldo Entrada x Rotas',v:(saldoFinal>0?'+':'')+saldoFinal.toLocaleString('pt-BR'),c:saldoFinal<=0?'#00e676':'#ff4c4c',sub:saldoFinal<=0?'Entrada coberta pelas rotas':'Volume ainda sem saída por rota'}
     ];
-    panel.innerHTML=kpis.map(k=>`<div class="kpi" style="border-color:rgba(0,230,118,.3);padding:6px 8px">
-      <div class="kpi-lbl">${k.l}</div><div class="kpi-val" style="color:${k.c};font-size:14px">${k.v}</div>
-      ${k.sub?`<div style="font-size:8px;color:#4a7a9b;margin-top:2px;line-height:1.2">${k.sub}</div>`:''}</div>`).join('');
+    panel.innerHTML=kpis.map(k=>`<div class="kpi" style="border-color:rgba(0,230,118,.3);padding:7px 9px;min-height:54px;text-align:left">
+      <div class="kpi-lbl" style="white-space:normal;overflow:visible;text-overflow:clip;line-height:1.15">${k.l}</div><div class="kpi-val" style="color:${k.c};font-size:16px;line-height:1.1;text-align:left;word-break:keep-all">${k.v}</div>
+      ${k.sub?`<div style="font-size:9px;color:#4a7a9b;margin-top:3px;line-height:1.2;white-space:normal">${k.sub}</div>`:''}</div>`).join('');
   }
 
   const alertEl=document.getElementById('docaBalanceAlert');
@@ -2257,10 +2257,10 @@ function renderDocaBalance(day){
       {l:'% Atraso no Turno',v:pctAtraso+'%',c:pctAtrasoColor,
        sub:pctAtraso===0?'✔ Sem atraso':pctAtraso<=10?'Mínimo':pctAtraso<=25?'Moderado':pctAtraso<=50?'Alto':'Crítico'},
     ];
-    panel.innerHTML=kpis.map(k=>`<div class="kpi" style="border-color:rgba(0,230,118,.3);padding:6px 8px">
-      <div class="kpi-lbl">${k.l}</div>
-      <div class="kpi-val" style="color:${k.c};font-size:14px">${k.v}</div>
-      ${k.sub?`<div style="font-size:8px;color:#4a7a9b;margin-top:2px;line-height:1.2">${k.sub}</div>`:''}
+    panel.innerHTML=kpis.map(k=>`<div class="kpi" style="border-color:rgba(0,230,118,.3);padding:7px 9px;min-height:54px;text-align:left">
+      <div class="kpi-lbl" style="white-space:normal;overflow:visible;text-overflow:clip;line-height:1.15">${k.l}</div>
+      <div class="kpi-val" style="color:${k.c};font-size:16px;line-height:1.1;text-align:left;word-break:keep-all">${k.v}</div>
+      ${k.sub?`<div style="font-size:9px;color:#4a7a9b;margin-top:3px;line-height:1.2;white-space:normal">${k.sub}</div>`:''}
     </div>`).join('');
   }
 
