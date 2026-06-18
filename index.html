@@ -609,6 +609,27 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
         <div class="adm-row"><label>Fralda Fechado</label><input type="time" id="iFrFFim" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>Fralda Fracionado</label><input type="time" id="iFrFcFim" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>Expedição</label><input type="time" id="iExpFim" oninput="liveUpdate()"/></div>
+        <h4 style="margin-top:12px">Resumo Sistêmico dos Processos 21:30</h4>
+        <div style="background:#071525;border:1px solid rgba(255,215,0,.25);border-radius:4px;padding:6px 8px;margin-top:4px">
+          <h4 style="color:#ff9500;font-size:10px;margin-bottom:6px">Correia</h4>
+          <div class="adm-row"><label>Linha Medicamento</label><input type="number" id="iSysLineMed" placeholder="0" oninput="liveUpdate()"/></div>
+          <div class="adm-row"><label>Unidade Medicamento</label><input type="number" id="iSysUnitMed" placeholder="0" oninput="liveUpdate()"/></div>
+          <div class="adm-row"><label>Volume Medicamento</label><input type="number" id="iSysVolMed" placeholder="0" readonly/></div>
+          <div class="adm-row"><label>Linha Perfumaria</label><input type="number" id="iSysLinePerf" placeholder="0" oninput="liveUpdate()"/></div>
+          <div class="adm-row"><label>Unidade Perfumaria</label><input type="number" id="iSysUnitPerf" placeholder="0" oninput="liveUpdate()"/></div>
+          <div class="adm-row"><label>Volume Perfumaria</label><input type="number" id="iSysVolPerf" placeholder="0" readonly/></div>
+          <h4 style="color:#00e5ff;font-size:10px;margin:8px 0 6px">Checkout</h4>
+          <div class="adm-row"><label>Volume Checkout</label><input type="number" id="iSysVolCheckout" placeholder="0" readonly/></div>
+          <div class="adm-row"><label>Unidade Checkout</label><input type="number" id="iSysUnitCheckout" placeholder="0" oninput="liveUpdate()"/></div>
+          <div class="adm-row"><label>Volume Checkout Psico</label><input type="number" id="iSysVolCheckoutPsico" placeholder="0" readonly/></div>
+          <div class="adm-row"><label>Unidade Checkout Psico</label><input type="number" id="iSysUnitCheckoutPsico" placeholder="0" oninput="liveUpdate()"/></div>
+          <h4 style="color:#00e676;font-size:10px;margin:8px 0 6px">Expedição</h4>
+          <div class="adm-row"><label>Volume Geladeira</label><input type="number" id="iSysVolGeladeira" placeholder="0" readonly/></div>
+          <div class="adm-row"><label>Volumes Especial</label><input type="number" id="iSysVolEspecial" placeholder="0" readonly/></div>
+          <div class="adm-row"><label>Fralda Fechado Unidades</label><input type="number" id="iSysFraldaFechado" placeholder="0" readonly/></div>
+          <div class="adm-row"><label>Fralda Fracionada Volumes</label><input type="number" id="iSysFraldaFrac" placeholder="0" readonly/></div>
+          <div class="adm-row"><label>Expedição Volumes (Doca)</label><input type="number" id="iSysVolDoca" placeholder="0" readonly/></div>
+        </div>
       </div>
 
       <!-- COL 2: HORÁRIOS E CAPACIDADE/HORA -->
@@ -744,6 +765,7 @@ const HOURS=['17:30→18h','18→19h','19→20h','20→21h','21→22h','22→23h
 const HOURS_LABEL=['17:30','18:00','19:00','20:00','21:00','22:00','23:00','00:00','01:00','02:00','03:00','04:00','05:00','06:00']; // início e fim dos slots
 const SHIFT_START_DEC=17.5;
 const SHIFT_END_DEC=28;
+const FORECAST_CUTOFF_DEC=21.5;
 const H_CK=7;  // correia/checkout: turno normal até 23:00 (slots 0-6); slots ≥7 = hora extra (laranja)
 const H_EX=11; // capacidade-base da expedição: até 04:00; slots seguintes são extensão opcional
 
@@ -1146,6 +1168,7 @@ function emptyDay(dt){
     osImp:0,osImpMed:0,osImpPerf:0,osFin:0,osFinMed:0,osFinPerf:0,
     osNaoImp:0,osNaoImpMed:0,osNaoImpPerf:0,osTotalMed:0,osTotalPerf:0,
     osProdBase:0,osProdMedBase:0,osProdPerfBase:0,osProd:0,osProdMed:0,osProdPerf:0,osTotal:0,
+    sys2130LineMed:0,sys2130UnitMed:0,sys2130LinePerf:0,sys2130UnitPerf:0,sys2130UnitCheckout:0,sys2130UnitCheckoutPsico:0,
     medIt:0,faltas:0,obs:'',
     cPer:'',cMed:'',ckOut:'',esp:'',frF:'',frFc:'',exp:'',
     cPerFim:'',cMedFim:'',ckOutFim:'',espFim:'',frFFim:'',frFcFim:'',expFim:'',
@@ -1338,6 +1361,63 @@ function prevCheckoutBase(day){
   if(!day)return 0;
   return (+day.pnCorreia||0)+(+day.pnJuncao||0);
 }
+function systemForecastTargets(day){
+  const n=v=>Number(v)||0;
+  const lineMed=n(day.sys2130LineMed)||n(day.osTotalMed)||n(day.osProdMedBase)||n(day.osImpMed);
+  const linePerf=n(day.sys2130LinePerf)||n(day.osTotalPerf)||n(day.osProdPerfBase)||n(day.osImpPerf);
+  const totalCorreiaVol=n(day.pnCorreia);
+  const totalLines=lineMed+linePerf;
+  const splitCorreiaVol=kind=>{
+    if(!totalCorreiaVol||!totalLines)return 0;
+    const base=kind==='med'?lineMed:linePerf;
+    return Math.round(totalCorreiaVol*base/totalLines);
+  };
+  return{
+    lineMed,
+    unitMed:n(day.sys2130UnitMed),
+    volMed:splitCorreiaVol('med'),
+    linePerf,
+    unitPerf:n(day.sys2130UnitPerf),
+    volPerf:splitCorreiaVol('perf'),
+    volCheckout:prevCheckoutBase(day),
+    unitCheckout:n(day.sys2130UnitCheckout),
+    volCheckoutPsico:n(day.pnPsico),
+    unitCheckoutPsico:n(day.sys2130UnitCheckoutPsico),
+    volGeladeira:n(day.pnGel),
+    volEspecial:n(day.pnEspecial),
+    fraldaFechado:n(day.pnFraldaF),
+    fraldaFrac:n(day.pnFralda),
+    volDoca:n(day.pnDoca)||n(day.pnVol)
+  };
+}
+function systemForecastFormSnapshot(){
+  const v=id=>{const el=document.getElementById(id);return el?+el.value||0:0;};
+  return{
+    pnVol:v('iPNVol'),pnUnid:v('iPNUnid'),pnCorreia:v('iPNCorreia'),pnPsico:v('iPNPsico'),
+    pnEspecial:v('iPNEspecial'),pnFralda:v('iPNFralda'),pnFraldaF:v('iPNFraldaF'),
+    pnGel:v('iPNGel'),pnJuncao:v('iPNJuncao'),pnDoca:v('iPNDoca'),
+    osImpMed:v('iOsImpMed'),osImpPerf:v('iOsImpPerf'),
+    osTotalMed:v('iOsTotalMed'),osTotalPerf:v('iOsTotalPerf'),
+    osProdMedBase:parseSumNumber(document.getElementById('iOsProdMedBase')?.value||0),
+    osProdPerfBase:parseSumNumber(document.getElementById('iOsProdPerfBase')?.value||0),
+    sys2130LineMed:v('iSysLineMed'),sys2130UnitMed:v('iSysUnitMed'),
+    sys2130LinePerf:v('iSysLinePerf'),sys2130UnitPerf:v('iSysUnitPerf'),
+    sys2130UnitCheckout:v('iSysUnitCheckout'),sys2130UnitCheckoutPsico:v('iSysUnitCheckoutPsico')
+  };
+}
+function syncSystemForecastAutoFields(day){
+  const sys=systemForecastTargets(day||systemForecastFormSnapshot());
+  const set=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val||'';};
+  set('iSysVolMed',sys.volMed);
+  set('iSysVolPerf',sys.volPerf);
+  set('iSysVolCheckout',sys.volCheckout);
+  set('iSysVolCheckoutPsico',sys.volCheckoutPsico);
+  set('iSysVolGeladeira',sys.volGeladeira);
+  set('iSysVolEspecial',sys.volEspecial);
+  set('iSysFraldaFechado',sys.fraldaFechado);
+  set('iSysFraldaFrac',sys.fraldaFrac);
+  set('iSysVolDoca',sys.volDoca);
+}
 function sumHoraInput(metric){
   const inputs=[...document.querySelectorAll(`#hTblBody input[data-m="${metric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
   if(!inputs.length)return 0;
@@ -1365,6 +1445,7 @@ function liveUpdate(){
   clearTimeout(liveTimer);
   liveTimer=setTimeout(()=>{
     updateRealAuto();
+    syncSystemForecastAutoFields();
     const day=readFormAsDay();
     if(day){
       document.getElementById('liveBadge').style.display='inline';
@@ -1541,6 +1622,7 @@ function renderFlowBar(day){
   const hd=day.hd||{};
   const sumH=m=>sumActiveHoraField(m,hd,day.date);
   const n=v=>Number(v)||0;
+  const sys=systemForecastTargets(day);
   const totalLinhasMed=n(day.osTotalMed)||n(day.osProdMedBase)||n(day.osImpMed);
   const totalLinhasPerf=n(day.osTotalPerf)||n(day.osProdPerfBase)||n(day.osImpPerf);
   const totalLinhasCheckout=n(day.osTotal)||(totalLinhasMed+totalLinhasPerf)||n(day.osImp);
@@ -1591,35 +1673,35 @@ function renderFlowBar(day){
     cardHtml('Correia Medicamento','#ff9500',[
       {lbl:'Linhas',real:sumH('Linhas Med.'),capDia:21000,capHour:day.capLM||3500,target:totalLinhasMed||21000,noForecast:true},
       {lbl:'Unidades',real:sumH('Unid. Med.'),capDia:60000,capHour:day.capUMed||10000,target:60000,noForecast:true},
-      {lbl:'Volumes',real:sumH('Vol. Med.'),capDia:3450,capHour:day.capVMed||575,target:day.pnCorreia||0}
+      {lbl:'Volumes',real:sumH('Vol. Med.'),capDia:3450,capHour:day.capVMed||575,target:sys.volMed||0}
     ]),
     cardHtml('Correia Perfumaria','#ff9500',[
       {lbl:'Linhas',real:sumH('Linhas Perf.'),capDia:18000,capHour:day.capLP||3000,target:totalLinhasPerf||18000,noForecast:true},
       {lbl:'Unidades',real:sumH('Unid. Perf.'),capDia:40000,capHour:day.capUPerf||6666,target:40000,noForecast:true},
-      {lbl:'Volumes',real:sumH('Vol. Perf.'),capDia:2550,capHour:day.capVPerf||425,target:day.pnCorreia||0}
+      {lbl:'Volumes',real:sumH('Vol. Perf.'),capDia:2550,capHour:day.capVPerf||425,target:sys.volPerf||0}
     ]),
     cardHtml('Checkout','#00e5ff',[
-      {lbl:'Volumes',real:sumH('Vol. Checkout'),capDia:7680,capHour:day.capVC||1280,target:prevCheckoutBase(day)||0},
+      {lbl:'Volumes',real:sumH('Vol. Checkout'),capDia:7680,capHour:day.capVC||1280,target:sys.volCheckout||0},
       {lbl:'Unidades',real:sumH('Unid. Checkout'),capDia:124800,capHour:day.capUC||20800,target:day.pnUnid||0,noForecast:true}
     ]),
     cardHtml('Checkout Psico','#00e5ff',[
-      {lbl:'Volumes',real:sumH('Vol. Checkout Psico'),capDia:1300,capHour:day.capVCPsi||1280,target:day.pnPsico||0},
+      {lbl:'Volumes',real:sumH('Vol. Checkout Psico'),capDia:1300,capHour:day.capVCPsi||1280,target:sys.volCheckoutPsico||0},
       {lbl:'Unidades',real:sumH('Unid. Checkout Psico'),capDia:8300,capHour:day.capUCPsi||20800,target:8300,noForecast:true}
     ]),
     cardHtml('Geladeira','#4da6ff',[
-      {lbl:'Volumes',real:sumH('Vol. Geladeira'),capDia:170,capHour:day.capGel||28,target:day.pnGel||0}
+      {lbl:'Volumes',real:sumH('Vol. Geladeira'),capDia:170,capHour:day.capGel||28,target:sys.volGeladeira||0}
     ]),
     cardHtml('Especial','#9b59b6',[
-      {lbl:'Volumes',real:sumH('Vol. Especial'),capDia:2040,capHour:day.capEsp||340,target:day.pnEspecial||0}
+      {lbl:'Volumes',real:sumH('Vol. Especial'),capDia:2040,capHour:day.capEsp||340,target:sys.volEspecial||0}
     ]),
     cardHtml('Fraldas Cx Fech.','#4a90d9',[
-      {lbl:'Unidades',real:sumH('Vol. Fraldas Cx Fech.'),capDia:684,capHour:useNewRules(day.date)?100:(day.capFrF||114),target:day.pnFraldaF||0}
+      {lbl:'Unidades',real:sumH('Vol. Fraldas Cx Fech.'),capDia:684,capHour:useNewRules(day.date)?100:(day.capFrF||114),target:sys.fraldaFechado||0}
     ]),
     cardHtml('Fralda Fracionada','#4a90d9',[
-      {lbl:'Volumes',real:sumH('Vol. Fraldas Frac.'),capDia:534,capHour:day.capFrFc||89,target:day.pnFralda||0}
+      {lbl:'Volumes',real:sumH('Vol. Fraldas Frac.'),capDia:534,capHour:day.capFrFc||89,target:sys.fraldaFrac||0}
     ]),
     cardHtml('Expedicao','#00e676',[
-      {lbl:'Volumes',real:sumH('Vol. Doca'),capDia:7820,capHour:day.capVE||1303,target:day.pnDoca||day.pnVol||0}
+      {lbl:'Volumes',real:sumH('Vol. Doca'),capDia:7820,capHour:day.capVE||1303,target:sys.volDoca||0}
     ])
   ];
   const bar=document.getElementById('flowBar');
@@ -2860,6 +2942,12 @@ function readFormAsDay(){
     osProd:osProdMed+osProdPerf,
     osProdMed,osProdPerf,
     osTotal,
+    sys2130LineMed:+document.getElementById('iSysLineMed').value||0,
+    sys2130UnitMed:+document.getElementById('iSysUnitMed').value||0,
+    sys2130LinePerf:+document.getElementById('iSysLinePerf').value||0,
+    sys2130UnitPerf:+document.getElementById('iSysUnitPerf').value||0,
+    sys2130UnitCheckout:+document.getElementById('iSysUnitCheckout').value||0,
+    sys2130UnitCheckoutPsico:+document.getElementById('iSysUnitCheckoutPsico').value||0,
     medIt:+document.getElementById('iMedIt').value||0,
     faltas:+document.getElementById('iFaltas').value||0,
     obs:document.getElementById('iObs').value,
@@ -2918,6 +3006,10 @@ function loadFormFrom(day){
   s('iOsNaoImpPerf',day.osNaoImpPerf!==undefined?day.osNaoImpPerf:(simpleOp?Math.max((day.osTotalPerf||day.osProdPerfBase||0)-(day.osImpPerf||0),0):''));
   s('iOsFinMed',splitOp?day.osFinMed||'':day.osFin||'');s('iOsFinPerf',splitOp?day.osFinPerf||'':'');
   s('iOsProdMedBase',splitOp?day.osProdMedBase||'':osProdBaseFromDay(day)||'');s('iOsProdPerfBase',splitOp?day.osProdPerfBase||'':'');syncOsProdSaldo();
+  s('iSysLineMed',day.sys2130LineMed||'');s('iSysUnitMed',day.sys2130UnitMed||'');
+  s('iSysLinePerf',day.sys2130LinePerf||'');s('iSysUnitPerf',day.sys2130UnitPerf||'');
+  s('iSysUnitCheckout',day.sys2130UnitCheckout||'');s('iSysUnitCheckoutPsico',day.sys2130UnitCheckoutPsico||'');
+  syncSystemForecastAutoFields(day);
   s('iMedIt',day.medIt||'');s('iFaltas',day.faltas||'');
   document.getElementById('iObs').value=day.obs||'';
   s('iCPer',day.cPer||'');s('iCMed',day.cMed||'');s('iCkOut',day.ckOut||'');
@@ -3608,7 +3700,9 @@ function calcPrevisaoEncerramento(dayOverride,options){
   const horaStr=now.getHours().toString().padStart(2,'0')+':'+now.getMinutes().toString().padStart(2,'0');
   const turnoAgora=horaAtual<12?24+horaAtual:horaAtual;
   const hAtual=Math.min(Math.max(turnoAgora,SHIFT_START_DEC),SHIFT_END_DEC);
+  const forecastBaseDec=Math.max(hAtual,FORECAST_CUTOFF_DEC);
   const turnoEncerrado=turnoAgora>SHIFT_END_DEC&&turnoAgora<SHIFT_START_DEC+24;
+  const sys=systemForecastTargets(day);
 
   // Helper: soma deltas já realizados de uma métrica
   const realizado=m=>sumHoraField(m,hd);
@@ -3773,34 +3867,34 @@ function calcPrevisaoEncerramento(dayOverride,options){
     setores.push({
       nome,cor,icone,
       prev:limitador.prev,real:limitador.real,falta:limitador.falta,cap:limitador.cap,
-      termino:fmtTermino(hAtual+limitador.tempo,limitador.falta),
-      terminoDec:limitador.falta>0?hAtual+limitador.tempo:hAtual,
+      termino:fmtTermino(forecastBaseDec+limitador.tempo,limitador.falta),
+      terminoDec:limitador.falta>0?forecastBaseDec+limitador.tempo:forecastBaseDec,
       tempo:limitador.tempo,
       unidade:limitador.unidade||'',
       baseLabel:limitador.lbl||''
     });
   };
 
-  const totalLinhasMed=num(day.osTotalMed)||num(day.osProdMedBase)||num(day.osImpMed);
-  const totalLinhasPerf=num(day.osTotalPerf)||num(day.osProdPerfBase)||num(day.osImpPerf);
-  const totalLinhasCheckout=num(day.osTotal)||(totalLinhasMed+totalLinhasPerf)||num(day.osImp);
-
   setorFromDrivers('Correia Med.','#ff9500','ðŸ”´',[
-    {lbl:'Linhas Med.',prev:totalLinhasMed,real:realizado('Linhas Med.'),cap:day.capLM||3500,unidade:'linhas'}
+    {lbl:'Linhas Med.',prev:sys.lineMed,real:realizado('Linhas Med.'),cap:day.capLM||3500,unidade:'linhas'},
+    {lbl:'Unid. Med.',prev:sys.unitMed,real:realizado('Unid. Med.'),cap:day.capUMed||10000,unidade:'unid.'},
+    {lbl:'Vol. Med.',prev:sys.volMed,real:realizado('Vol. Med.'),cap:day.capVMed||575,unidade:'vol'}
   ]);
   setorFromDrivers('Correia Perf.','#ff9500','ðŸ”´',[
-    {lbl:'Linhas Perf.',prev:totalLinhasPerf,real:realizado('Linhas Perf.'),cap:day.capLP||3000,unidade:'linhas'}
+    {lbl:'Linhas Perf.',prev:sys.linePerf,real:realizado('Linhas Perf.'),cap:day.capLP||3000,unidade:'linhas'},
+    {lbl:'Unid. Perf.',prev:sys.unitPerf,real:realizado('Unid. Perf.'),cap:day.capUPerf||6666,unidade:'unid.'},
+    {lbl:'Vol. Perf.',prev:sys.volPerf,real:realizado('Vol. Perf.'),cap:day.capVPerf||425,unidade:'vol'}
   ]);
   setorFromDrivers('Checkout','#00e5ff','ðŸ”µ',[
-    {lbl:'Vol. Checkout',prev:prevCheckoutBase(day),real:realizado('Vol. Checkout'),cap:day.capVC||1280,unidade:'vol'},
-    {lbl:'Linhas Checkout',prev:totalLinhasCheckout,real:realizado('Linhas Checkout'),cap:day.capLC||6500,unidade:'linhas'},
-    {lbl:'Unid. Checkout',prev:day.pnUnid||0,real:realizado('Unid. Checkout'),cap:day.capUC||20800,unidade:'unid.'}
+    {lbl:'Vol. Checkout',prev:sys.volCheckout,real:realizado('Vol. Checkout'),cap:day.capVC||1280,unidade:'vol'},
+    {lbl:'Unid. Checkout',prev:sys.unitCheckout,real:realizado('Unid. Checkout'),cap:day.capUC||20800,unidade:'unid.'}
   ]);
   if(useCheckoutPsico(day.date))setorFromDrivers('Checkout Psico','#00e5ff','ðŸ”µ',[
-    {lbl:'Vol. Checkout Psico',prev:day.pnPsico||0,real:realizado('Vol. Checkout Psico'),cap:day.capVCPsi||1280,unidade:'vol'}
+    {lbl:'Vol. Checkout Psico',prev:sys.volCheckoutPsico,real:realizado('Vol. Checkout Psico'),cap:day.capVCPsi||1280,unidade:'vol'},
+    {lbl:'Unid. Checkout Psico',prev:sys.unitCheckoutPsico,real:realizado('Unid. Checkout Psico'),cap:day.capUCPsi||20800,unidade:'unid.'}
   ]);
   setorFromDrivers('Especial','#9b59b6','ðŸŸ£',[
-    {lbl:'Vol. Especial',prev:day.pnEspecial||0,real:realizado('Vol. Especial'),cap:day.capEsp||340,unidade:'vol'}
+    {lbl:'Vol. Especial',prev:sys.volEspecial,real:realizado('Vol. Especial'),cap:day.capEsp||340,unidade:'vol'}
   ]);
   setorFromDrivers('Esp. Frac.','#9b59b6','ðŸŸ£',[
     {lbl:'Vol. Esp. Frac.',prev:day.pnEspFrac||0,real:realizado('Vol. Esp. Frac.'),cap:day.capEspFrac||0,unidade:'vol'}
@@ -3812,19 +3906,19 @@ function calcPrevisaoEncerramento(dayOverride,options){
     {lbl:'Vol. Esp. Perf.',prev:day.pnEspPerf||0,real:realizado('Vol. Esp. Perf.'),cap:day.capEspPerf||0,unidade:'vol'}
   ]);
   setorFromDrivers('Fraldas Cx Fech.','#4a90d9','ðŸ”·',[
-    {lbl:'Vol. Fraldas Cx Fech.',prev:day.pnFraldaF||0,real:realizado('Vol. Fraldas Cx Fech.'),cap:useNewRules(day.date)?100:(day.capFrF||114),unidade:'vol'}
+    {lbl:'Fraldas Cx Fech.',prev:sys.fraldaFechado,real:realizado('Vol. Fraldas Cx Fech.'),cap:useNewRules(day.date)?100:(day.capFrF||114),unidade:'unid.'}
   ]);
   setorFromDrivers('Fraldas Frac.','#4a90d9','ðŸ”·',[
-    {lbl:'Vol. Fraldas Frac.',prev:day.pnFralda||0,real:realizado('Vol. Fraldas Frac.'),cap:day.capFrFc||89,unidade:'vol'}
+    {lbl:'Vol. Fraldas Frac.',prev:sys.fraldaFrac,real:realizado('Vol. Fraldas Frac.'),cap:day.capFrFc||89,unidade:'vol'}
   ]);
   setorFromDrivers('DOCA (Expedição)','#00e676','ðŸŸ¢',[
-    {lbl:'Vol. Doca',prev:day.pnDoca||day.pnVol||0,real:realizado('Vol. Doca'),cap:day.capVE||1303,unidade:'vol'}
+    {lbl:'Vol. Doca',prev:sys.volDoca,real:realizado('Vol. Doca'),cap:day.capVE||1303,unidade:'vol'}
   ]);
 
   // = o setor que termina mais tarde
-  const terminoMax=setores.reduce((mx,s)=>s.terminoDec>mx?s.terminoDec:mx,hAtual);
+  const terminoMax=setores.reduce((mx,s)=>s.terminoDec>mx?s.terminoDec:mx,forecastBaseDec);
   let totalStr;
-  if(terminoMax<=hAtual+0.1){
+  if(terminoMax<=forecastBaseDec+0.1){
     totalStr='✅ Já encerrou!';
   } else if(terminoMax>SHIFT_END_DEC){
     totalStr=fmtTermino(terminoMax,1);
@@ -3833,7 +3927,7 @@ function calcPrevisaoEncerramento(dayOverride,options){
   }
 
   // ── RENDERIZAR PAINEL ─────────────────────────────────────
-  const baseInfo=hAtual!==turnoAgora?`${horaStr} (base ${fmtTurnoHora(hAtual)})`:horaStr;
+  const baseInfo=forecastBaseDec!==turnoAgora?`${horaStr} (base ${fmtTurnoHora(forecastBaseDec)})`:horaStr;
   document.getElementById('prevEncHora').textContent=baseInfo;
   document.getElementById('prevEncTotal').textContent=totalStr;
 
@@ -3843,8 +3937,8 @@ function calcPrevisaoEncerramento(dayOverride,options){
     const pctFalta=s.prev>0?Math.max(0,Math.round(s.falta/s.prev*100)):0;
     const concluido=s.falta===0;
     const estouraTurno=!concluido&&s.terminoDec>SHIFT_END_DEC;
-    const urgente=!concluido&&s.terminoDec>hAtual+3;
-    const critico=estouraTurno||(!concluido&&s.terminoDec>hAtual+4);
+    const urgente=!concluido&&s.terminoDec>forecastBaseDec+3;
+    const critico=estouraTurno||(!concluido&&s.terminoDec>forecastBaseDec+4);
     const bgCard=concluido?'rgba(0,180,80,.15)':critico?'rgba(180,20,20,.2)':urgente?'rgba(180,130,0,.15)':'rgba(0,100,180,.12)';
     const corTermino=concluido?'#00e676':critico?'#ff4c4c':urgente?'#ffd700':'#00e5ff';
     return`<div style="background:${bgCard};padding:8px 12px;border-right:1px solid rgba(155,89,182,.1);border-bottom:1px solid rgba(155,89,182,.1)">
@@ -3868,11 +3962,11 @@ function calcPrevisaoEncerramento(dayOverride,options){
 
   // Observações automáticas
   const obs=[];
-  obs.push('Previsao dinamica: previsto do grafico - realizado no hora a hora; tempo = falta / capacidade hora');
+  obs.push('Previsao dinamica: total sistemico 21:30 - realizado no hora a hora; tempo = falta / capacidade hora');
   if(turnoEncerrado)obs.push('ℹ Turno operacional encerra às 04:00 — cálculo usando 04:00 como base');
   const setoresForaTurno=setores.filter(s=>s.falta>0&&s.terminoDec>SHIFT_END_DEC);
   if(setoresForaTurno.length>0)obs.push(`⚠ Previsão fora do turno (após 04:00): ${setoresForaTurno.map(s=>s.nome).join(', ')}`);
-  const setoresCriticos=setores.filter(s=>s.falta>0&&s.terminoDec>hAtual+4);
+  const setoresCriticos=setores.filter(s=>s.falta>0&&s.terminoDec>forecastBaseDec+4);
   if(setoresCriticos.length>0)obs.push(`⚠ Setores críticos (>4h restantes): ${setoresCriticos.map(s=>s.nome).join(', ')}`);
   const docaSetor=setores.find(s=>s.nome==='DOCA (Expedição)');
   if(docaSetor&&docaSetor.falta>0){
