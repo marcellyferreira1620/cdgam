@@ -2097,7 +2097,7 @@ function renderRouteClosure(day){
     ]},
     plugins:[routeProgressLabels],
     options:{responsive:true,maintainAspectRatio:false,
-      layout:{padding:{top:18,right:28,left:8,bottom:6}},
+      layout:{padding:{top:24,right:28,left:8,bottom:6}},
       plugins:{legend:{display:false},
         tooltip:{callbacks:{
           title:items=>{const r=rotas[items[0].dataIndex];return`${r.cod} — ${r.cidade}`;},
@@ -2115,7 +2115,7 @@ function renderRouteClosure(day){
         }}},
       scales:{
         x:{ticks:{color:'#89b4d4',font:{size:9,weight:'bold'},maxRotation:0,minRotation:0,autoSkip:false,padding:7},grid:{display:false},offset:true},
-        y:{beginAtZero:true,max:100,ticks:{color:'#89b4d4',font:{size:9},stepSize:20,callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.07)'},title:{display:true,text:'% Fechamento',color:'#6a9fc0',font:{size:9}}}
+        y:{beginAtZero:true,max:110,ticks:{color:'#89b4d4',font:{size:9},stepSize:20,callback:v=>v>100?'':v+'%'},grid:{color:'rgba(255,255,255,0.07)'},title:{display:true,text:'% Fechamento',color:'#6a9fc0',font:{size:9}}}
       }}
   });
 
