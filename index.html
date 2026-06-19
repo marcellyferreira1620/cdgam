@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="robots" content="noindex,nofollow,noarchive,nosnippet,noimageindex">
+<meta name="googlebot" content="noindex,nofollow,noarchive,nosnippet,noimageindex">
+<meta name="referrer" content="no-referrer">
 <title>CD GAM — Acompanhamento de Produtividade</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -10,6 +13,10 @@
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13px;min-height:100vh}
+body.privacy-lock{user-select:none;-webkit-user-select:none}
+body.privacy-lock input,body.privacy-lock textarea,body.privacy-lock [contenteditable="true"]{user-select:text;-webkit-user-select:text}
+body.privacy-lock::after{content:attr(data-watermark);position:fixed;right:16px;bottom:12px;z-index:9998;pointer-events:none;color:rgba(137,180,212,.18);font-size:10px;font-weight:bold;letter-spacing:.8px;text-transform:uppercase}
+@media print{body>*{display:none!important}body::before{content:"Documento interno - impressao bloqueada";display:block;color:#000;font:700 18px Arial;margin:40px}}
 .hdr{background:#0a2340;padding:5px 10px;display:flex;align-items:center;gap:8px;border-bottom:3px solid #e94560;position:sticky;top:0;z-index:100}
 .hdr-logo{background:#e94560;color:#fff;padding:4px 10px;border-radius:4px;font-weight:900;font-size:13px;letter-spacing:1px;white-space:nowrap}
 .hdr-title{flex:1;text-align:center;font-size:15px;font-weight:bold;color:#ffd700;letter-spacing:.8px}
@@ -4144,6 +4151,30 @@ const USERS_FB='cdgam/users';
 const USERS_LS='cdgam_users_v2';
 let currentUser=null;
 
+function isEditableTarget(target){
+  return !!(target&&target.closest&&target.closest('input,textarea,select,[contenteditable="true"]'));
+}
+function enablePrivacyLock(){
+  const who=currentUser?(currentUser.displayName||currentUser.username||'usuario'):'usuario';
+  document.body.classList.add('privacy-lock');
+  document.body.dataset.watermark=`USO INTERNO CD GAM - ${who}`;
+}
+function installPrivacyGuards(){
+  document.addEventListener('contextmenu',e=>{if(!isEditableTarget(e.target))e.preventDefault();});
+  document.addEventListener('copy',e=>{if(!isEditableTarget(e.target))e.preventDefault();});
+  document.addEventListener('cut',e=>{if(!isEditableTarget(e.target))e.preventDefault();});
+  document.addEventListener('dragstart',e=>e.preventDefault());
+  document.addEventListener('keydown',e=>{
+    const k=(e.key||'').toLowerCase();
+    const mod=e.ctrlKey||e.metaKey;
+    const blocked=(!isEditableTarget(e.target)&&mod&&['c','a'].includes(k))||
+      (mod&&['u','s','p'].includes(k))||
+      (e.key==='F12')||
+      (mod&&e.shiftKey&&['i','j','c'].includes(k));
+    if(blocked){e.preventDefault();e.stopPropagation();}
+  },true);
+}
+
 async function hashPwd(p){
   const buf=await crypto.subtle.digest('SHA-256',new TextEncoder().encode(p+'_gam_sjp_2026'));
   return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
@@ -4200,6 +4231,7 @@ function doLogout(){
   clearSession();location.reload();
 }
 function afterLogin(){
+  enablePrivacyLock();
   updateUserBadge();
   applyRoleUI();
   const day=getDay(curDate)||emptyDay(curDate||today());
@@ -4396,6 +4428,7 @@ async function editUser(uname){
 
 // ══════════════════════════════════════════════════════════
 function init(){
+  installPrivacyGuards();
   // 1. Carregar local — instantâneo, não bloqueia
   load();
 
