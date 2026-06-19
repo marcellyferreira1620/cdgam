@@ -614,20 +614,20 @@ body{font-family:Arial,sans-serif;background:#0e1621;color:#e0e8f0;font-size:13p
           <h4 style="color:#ff9500;font-size:10px;margin-bottom:6px">Correia</h4>
           <div class="adm-row"><label>Linha Medicamento</label><input type="number" id="iSysLineMed" placeholder="0" oninput="liveUpdate()"/></div>
           <div class="adm-row"><label>Unidade Medicamento</label><input type="number" id="iSysUnitMed" placeholder="0" oninput="liveUpdate()"/></div>
-          <div class="adm-row"><label>Volume Medicamento</label><input type="number" id="iSysVolMed" placeholder="0" readonly/></div>
+          <div class="adm-row"><label>Volume Medicamento</label><input type="number" id="iSysVolMed" placeholder="0" oninput="liveUpdate()" readonly/></div>
           <div class="adm-row"><label>Linha Perfumaria</label><input type="number" id="iSysLinePerf" placeholder="0" oninput="liveUpdate()"/></div>
           <div class="adm-row"><label>Unidade Perfumaria</label><input type="number" id="iSysUnitPerf" placeholder="0" oninput="liveUpdate()"/></div>
-          <div class="adm-row"><label>Volume Perfumaria</label><input type="number" id="iSysVolPerf" placeholder="0" readonly/></div>
+          <div class="adm-row"><label>Volume Perfumaria</label><input type="number" id="iSysVolPerf" placeholder="0" oninput="liveUpdate()" readonly/></div>
           <h4 style="color:#00e5ff;font-size:10px;margin:8px 0 6px">Checkout</h4>
-          <div class="adm-row"><label>Volume Checkout</label><input type="number" id="iSysVolCheckout" placeholder="0" readonly/></div>
+          <div class="adm-row"><label>Volume Checkout</label><input type="number" id="iSysVolCheckout" placeholder="0" oninput="liveUpdate()" readonly/></div>
           <div class="adm-row"><label>Unidade Checkout</label><input type="number" id="iSysUnitCheckout" placeholder="0" oninput="liveUpdate()"/></div>
-          <div class="adm-row"><label>Volume Checkout Psico</label><input type="number" id="iSysVolCheckoutPsico" placeholder="0" readonly/></div>
+          <div class="adm-row"><label>Volume Checkout Psico</label><input type="number" id="iSysVolCheckoutPsico" placeholder="0" oninput="liveUpdate()" readonly/></div>
           <div class="adm-row"><label>Unidade Checkout Psico</label><input type="number" id="iSysUnitCheckoutPsico" placeholder="0" oninput="liveUpdate()"/></div>
           <h4 style="color:#00e676;font-size:10px;margin:8px 0 6px">Expedição</h4>
-          <div class="adm-row"><label>Volume Geladeira</label><input type="number" id="iSysVolGeladeira" placeholder="0" readonly/></div>
-          <div class="adm-row"><label>Volumes Especial</label><input type="number" id="iSysVolEspecial" placeholder="0" readonly/></div>
-          <div class="adm-row"><label>Fralda Fechado Unidades</label><input type="number" id="iSysFraldaFechado" placeholder="0" readonly/></div>
-          <div class="adm-row"><label>Fralda Fracionada Volumes</label><input type="number" id="iSysFraldaFrac" placeholder="0" readonly/></div>
+          <div class="adm-row"><label>Volume Geladeira</label><input type="number" id="iSysVolGeladeira" placeholder="0" oninput="liveUpdate()" readonly/></div>
+          <div class="adm-row"><label>Volumes Especial</label><input type="number" id="iSysVolEspecial" placeholder="0" oninput="liveUpdate()" readonly/></div>
+          <div class="adm-row"><label>Fralda Fechado Unidades</label><input type="number" id="iSysFraldaFechado" placeholder="0" oninput="liveUpdate()" readonly/></div>
+          <div class="adm-row"><label>Fralda Fracionada Volumes</label><input type="number" id="iSysFraldaFrac" placeholder="0" oninput="liveUpdate()" readonly/></div>
           <div class="adm-row"><label>Expedição Volumes (Doca)</label><input type="number" id="iSysVolDoca" placeholder="0" readonly/></div>
         </div>
       </div>
@@ -848,6 +848,7 @@ const SIMPLE_OPERATIONAL_FROM='2026-06-16';
 const SPLIT_INDICATORS_FROM='2026-06-09';
 const CHECKOUT_PSICO_FROM='2026-06-16';
 const GELADEIRA_HORA_FROM='2026-06-17';
+const SYSTEM_FORECAST_EDITABLE_FROM='2026-06-19';
 const CAPACITY_OK_COLOR='#00a8ff';
 const CAPACITY_LOW_COLOR='#ff4c4c';
 const CORREIA_DIRECT_HOUR_METRICS=['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.'];
@@ -1249,6 +1250,7 @@ function useSimpleOperational(dt){return String(dt||currentFormDate())>=SIMPLE_O
 function useSplitIndicators(dt){return String(dt||currentFormDate())>=SPLIT_INDICATORS_FROM;}
 function useCheckoutPsico(dt){return String(dt||currentFormDate())>=CHECKOUT_PSICO_FROM;}
 function useGeladeiraHora(dt){return String(dt||currentFormDate())>=GELADEIRA_HORA_FROM;}
+function useEditableSystemForecast(dt){return String(dt||currentFormDate())>=SYSTEM_FORECAST_EDITABLE_FROM;}
 function routeMetricKey(r){return`Rota ${r.cod} — ${r.cidade}`;}
 function routeTotalMetricKey(r){return`Total ${routeMetricKey(r)}`;}
 function routeHourMetrics(){return ROTAS_FIXAS.map(routeMetricKey);}
@@ -1422,7 +1424,8 @@ function prevCheckoutBase(day){
   if(!day)return 0;
   return (+day.pnCorreia||0)+(+day.pnJuncao||0);
 }
-function systemForecastTargets(day){
+function systemForecastTargets(day,opts={}){
+  day=day||{};
   const n=v=>Number(v)||0;
   const lineMed=n(day.sys2130LineMed)||n(day.osTotalMed)||n(day.osProdMedBase)||n(day.osImpMed);
   const linePerf=n(day.sys2130LinePerf)||n(day.osTotalPerf)||n(day.osProdPerfBase)||n(day.osImpPerf);
@@ -1433,27 +1436,33 @@ function systemForecastTargets(day){
     const base=kind==='med'?lineMed:linePerf;
     return Math.round(totalCorreiaVol*base/totalLines);
   };
+  const useOverrides=opts.useOverrides!==false&&useEditableSystemForecast(day.date);
+  const pick=(prop,auto)=>{
+    if(useOverrides&&Object.prototype.hasOwnProperty.call(day,prop)&&day[prop]!==''&&day[prop]!==null&&day[prop]!==undefined)return n(day[prop]);
+    return auto;
+  };
   return{
     lineMed,
     unitMed:n(day.sys2130UnitMed),
-    volMed:splitCorreiaVol('med'),
+    volMed:pick('sys2130VolMed',splitCorreiaVol('med')),
     linePerf,
     unitPerf:n(day.sys2130UnitPerf),
-    volPerf:splitCorreiaVol('perf'),
-    volCheckout:prevCheckoutBase(day),
+    volPerf:pick('sys2130VolPerf',splitCorreiaVol('perf')),
+    volCheckout:pick('sys2130VolCheckout',prevCheckoutBase(day)),
     unitCheckout:n(day.sys2130UnitCheckout),
-    volCheckoutPsico:n(day.pnPsico),
+    volCheckoutPsico:pick('sys2130VolCheckoutPsico',n(day.pnPsico)),
     unitCheckoutPsico:n(day.sys2130UnitCheckoutPsico),
-    volGeladeira:n(day.pnGel),
-    volEspecial:n(day.pnEspecial),
-    fraldaFechado:n(day.pnFraldaF),
-    fraldaFrac:n(day.pnFralda),
-    volDoca:n(day.pnDoca)||n(day.pnVol)
+    volGeladeira:pick('sys2130VolGeladeira',n(day.pnGel)),
+    volEspecial:pick('sys2130VolEspecial',n(day.pnEspecial)),
+    fraldaFechado:pick('sys2130FraldaFechado',n(day.pnFraldaF)),
+    fraldaFrac:pick('sys2130FraldaFrac',n(day.pnFralda)),
+    volDoca:pick('sys2130VolDoca',n(day.pnDoca)||n(day.pnVol))
   };
 }
 function systemForecastFormSnapshot(){
   const v=id=>{const el=document.getElementById(id);return el?+el.value||0:0;};
   return{
+    date:currentFormDate(),
     pnVol:v('iPNVol'),pnUnid:v('iPNUnid'),pnCorreia:v('iPNCorreia'),pnPsico:v('iPNPsico'),
     pnEspecial:v('iPNEspecial'),pnFralda:v('iPNFralda'),pnFraldaF:v('iPNFraldaF'),
     pnGel:v('iPNGel'),pnJuncao:v('iPNJuncao'),pnDoca:v('iPNDoca'),
@@ -1467,17 +1476,44 @@ function systemForecastFormSnapshot(){
   };
 }
 function syncSystemForecastAutoFields(day){
-  const sys=systemForecastTargets(day||systemForecastFormSnapshot());
-  const set=(id,val)=>{const el=document.getElementById(id);if(el)el.value=val||'';};
-  set('iSysVolMed',sys.volMed);
-  set('iSysVolPerf',sys.volPerf);
-  set('iSysVolCheckout',sys.volCheckout);
-  set('iSysVolCheckoutPsico',sys.volCheckoutPsico);
-  set('iSysVolGeladeira',sys.volGeladeira);
-  set('iSysVolEspecial',sys.volEspecial);
-  set('iSysFraldaFechado',sys.fraldaFechado);
-  set('iSysFraldaFrac',sys.fraldaFrac);
-  set('iSysVolDoca',sys.volDoca);
+  const source=day||systemForecastFormSnapshot();
+  const sys=systemForecastTargets(source,{useOverrides:false});
+  const editable=useEditableSystemForecast(source.date);
+  const fields=[
+    ['iSysVolMed','volMed','sys2130VolMed'],
+    ['iSysVolPerf','volPerf','sys2130VolPerf'],
+    ['iSysVolCheckout','volCheckout','sys2130VolCheckout'],
+    ['iSysVolCheckoutPsico','volCheckoutPsico','sys2130VolCheckoutPsico'],
+    ['iSysVolGeladeira','volGeladeira','sys2130VolGeladeira'],
+    ['iSysVolEspecial','volEspecial','sys2130VolEspecial'],
+    ['iSysFraldaFechado','fraldaFechado','sys2130FraldaFechado'],
+    ['iSysFraldaFrac','fraldaFrac','sys2130FraldaFrac'],
+    ['iSysVolDoca','volDoca','sys2130VolDoca']
+  ];
+  const toInput=v=>v===0?'0':(v||'');
+  fields.forEach(([id,key,prop])=>{
+    const el=document.getElementById(id);if(!el)return;
+    const autoVal=editable?toInput(sys[key]):(sys[key]||'');
+    if(!editable){
+      el.readOnly=true;
+      el.value=autoVal;
+      el.dataset.autoValue=autoVal;
+      el.title='Preenchido automaticamente.';
+      return;
+    }
+    el.readOnly=false;
+    el.oninput=liveUpdate;
+    el.title='Preenchido automaticamente. Se precisar corrigir, digite outro valor.';
+    const hasStored=day&&Object.prototype.hasOwnProperty.call(day,prop)&&day[prop]!==undefined&&day[prop]!==null&&day[prop]!=='';
+    const prevAuto=el.dataset.autoValue||'';
+    const hasManualValue=el.value!==''&&prevAuto!==''&&el.value!==prevAuto;
+    if(hasStored){
+      el.value=toInput(day[prop]);
+    }else if(!hasManualValue){
+      el.value=autoVal;
+    }
+    el.dataset.autoValue=autoVal;
+  });
 }
 function sumHoraInput(metric){
   const inputs=[...document.querySelectorAll(`#hTblBody input[data-m="${metric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
@@ -3017,6 +3053,7 @@ function readFormAsDay(){
   const osProdMed=simpleOp?osNaoImpMed:calcOsProdSaldo(osProdMedBase,osFinMed);
   const osProdPerf=simpleOp?osNaoImpPerf:calcOsProdSaldo(osProdPerfBase,osFinPerf);
   const osTotal=osTotalMed+osTotalPerf;
+  const sysVal=id=>{const el=document.getElementById(id);return el&&el.value!==''?+el.value||0:'';};
   return{
     date:dt,
     _updatedAt:Date.now(),
@@ -3053,10 +3090,19 @@ function readFormAsDay(){
     osTotal,
     sys2130LineMed:+document.getElementById('iSysLineMed').value||0,
     sys2130UnitMed:+document.getElementById('iSysUnitMed').value||0,
+    sys2130VolMed:sysVal('iSysVolMed'),
     sys2130LinePerf:+document.getElementById('iSysLinePerf').value||0,
     sys2130UnitPerf:+document.getElementById('iSysUnitPerf').value||0,
+    sys2130VolPerf:sysVal('iSysVolPerf'),
+    sys2130VolCheckout:sysVal('iSysVolCheckout'),
     sys2130UnitCheckout:+document.getElementById('iSysUnitCheckout').value||0,
+    sys2130VolCheckoutPsico:sysVal('iSysVolCheckoutPsico'),
     sys2130UnitCheckoutPsico:+document.getElementById('iSysUnitCheckoutPsico').value||0,
+    sys2130VolGeladeira:sysVal('iSysVolGeladeira'),
+    sys2130VolEspecial:sysVal('iSysVolEspecial'),
+    sys2130FraldaFechado:sysVal('iSysFraldaFechado'),
+    sys2130FraldaFrac:sysVal('iSysFraldaFrac'),
+    sys2130VolDoca:sysVal('iSysVolDoca'),
     medIt:+document.getElementById('iMedIt').value||0,
     faltas:+document.getElementById('iFaltas').value||0,
     obs:document.getElementById('iObs').value,
