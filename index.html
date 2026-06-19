@@ -856,6 +856,7 @@ const SPLIT_INDICATORS_FROM='2026-06-09';
 const CHECKOUT_PSICO_FROM='2026-06-16';
 const GELADEIRA_HORA_FROM='2026-06-17';
 const SYSTEM_FORECAST_EDITABLE_FROM='2026-06-19';
+const ROUTE_LIVE_DELAY_FROM='2026-06-19';
 const CAPACITY_OK_COLOR='#00a8ff';
 const CAPACITY_LOW_COLOR='#ff4c4c';
 const CORREIA_DIRECT_HOUR_METRICS=['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.'];
@@ -873,6 +874,7 @@ let histCharts={};
 let liveTimer=null;
 let syncTimer=null;
 let lastSyncHash='';
+let routeDelayTimer=null;
 
 const BAR_VALUE_LABEL_PLUGIN={
   id:'barValueLabels',
@@ -1258,6 +1260,7 @@ function useSplitIndicators(dt){return String(dt||currentFormDate())>=SPLIT_INDI
 function useCheckoutPsico(dt){return String(dt||currentFormDate())>=CHECKOUT_PSICO_FROM;}
 function useGeladeiraHora(dt){return String(dt||currentFormDate())>=GELADEIRA_HORA_FROM;}
 function useEditableSystemForecast(dt){return String(dt||currentFormDate())>=SYSTEM_FORECAST_EDITABLE_FROM;}
+function useRouteLiveDelay(dt){return String(dt||currentFormDate())>=ROUTE_LIVE_DELAY_FROM;}
 function routeMetricKey(r){return`Rota ${r.cod} — ${r.cidade}`;}
 function routeTotalMetricKey(r){return`Total ${routeMetricKey(r)}`;}
 function routeHourMetrics(){return ROTAS_FIXAS.map(routeMetricKey);}
@@ -3363,6 +3366,22 @@ function calcAtraso(hPrev,hReal){
   if(prev<360&&real>1080)prev+=1440;
   return real-prev; // positive = atrasado, negative = adiantado
 }
+function rotaPrevDateTime(dayDate,hPrev){
+  if(!dayDate||!hPrev)return null;
+  const p=String(hPrev).split(':').map(Number);
+  if(p.length<2||p.some(Number.isNaN))return null;
+  const dt=new Date(`${dayDate}T00:00:00`);
+  dt.setHours(p[0],p[1],0,0);
+  if(p[0]*60+p[1]<SHIFT_START_MIN)dt.setDate(dt.getDate()+1);
+  return dt;
+}
+function calcAtrasoAoVivo(day,hPrev,now=new Date()){
+  if(!day||!useRouteLiveDelay(day.date))return null;
+  const prev=rotaPrevDateTime(day.date,hPrev);
+  if(!prev)return null;
+  const min=Math.floor((now.getTime()-prev.getTime())/60000);
+  return min>=1?min:null;
+}
 
 function fmtAtraso(min){
   if(min===null)return'—';
@@ -3461,7 +3480,11 @@ function calcExpRotaImpact(day,hPrev){
 }
 function calcRotaStatus(day,r){
   const realDelay=calcAtraso(r.hPrev,r.hReal);
-  if(!r.hReal)return{delay:null,realDelay,exp:null,stClass:'st-pendente',stLabel:'— PENDENTE'};
+  if(!r.hReal){
+    const liveDelay=calcAtrasoAoVivo(day,r.hPrev);
+    if(liveDelay!==null)return{delay:liveDelay,realDelay:null,liveDelay,exp:null,stClass:'st-atrasado',stLabel:'✖ FORA DO HORÁRIO'};
+    return{delay:null,realDelay,liveDelay:null,exp:null,stClass:'st-pendente',stLabel:'— PENDENTE'};
+  }
   const baseDelay=realDelay===null?0:realDelay;
   if(baseDelay<=0)return{delay:baseDelay,realDelay,exp:null,stClass:'st-ok',stLabel:'✔ DENTRO DO HORÁRIO'};
   const exp=calcExpRotaImpact(day,r.hPrev);
@@ -3563,10 +3586,10 @@ function updateRotasKPIs(day){
   const total=rotas.reduce((s,r)=>s+(r.vol||0),0);
   const status=rotas.map(r=>calcRotaStatus(day,r));
   const ok=status.filter((st,i)=>rotas[i].hReal&&st.stClass==='st-ok').length;
-  const atras=status.filter((st,i)=>rotas[i].hReal&&st.stClass==='st-atrasado').length;
-  const pend=rotas.filter(r=>!r.hReal).length;
-  const finalizadas=rotas.filter(r=>r.hReal).length;
-  const efic=finalizadas>0?Math.round(ok/finalizadas*100):0;
+  const atras=status.filter(st=>st.stClass==='st-atrasado').length;
+  const pend=status.filter((st,i)=>!rotas[i].hReal&&st.stClass!=='st-atrasado').length;
+  const consideradas=ok+atras;
+  const efic=consideradas>0?Math.round(ok/consideradas*100):0;
   const totalPal=rotas.reduce((s,r)=>s+(r.paletes||0),0);
   ['','2'].forEach(s=>{
     const sv=id=>document.getElementById(id+s);
@@ -3577,6 +3600,22 @@ function updateRotasKPIs(day){
     if(sv('rotasEfic'))sv('rotasEfic').textContent=efic+'%';
     if(sv('rotasTotalPal'))sv('rotasTotalPal').textContent=totalPal;
   });
+}
+
+function refreshRouteLiveDelay(){
+  const day=getDay(curDate);
+  if(!day||!useRouteLiveDelay(day.date))return;
+  const rotas=buildRotasMerged(day);
+  if(!rotas.some(r=>!r.hReal))return;
+  renderRotasTbl(day,'rotasTbl');
+  updateRotasKPIs(day);
+  if(activeTab()==='rotas'&&!isEditingDataField())renderRotasTblFull(day);
+}
+
+function startRouteLiveDelayClock(){
+  if(routeDelayTimer)clearInterval(routeDelayTimer);
+  refreshRouteLiveDelay();
+  routeDelayTimer=setInterval(refreshRouteLiveDelay,60000);
 }
 
 function renderRotasTab(){
@@ -4449,6 +4488,7 @@ function init(){
     afterLogin();
   }
   // loginOv já está visível por CSS (display:flex) quando não há sessão
+  startRouteLiveDelayClock();
 
   // 6. Iniciar sync completo em background
   setTimeout(async()=>{
