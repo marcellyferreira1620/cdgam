@@ -425,6 +425,10 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 #tb-dash .rotas-kpi .v,#tb-rotas .rotas-kpi .v,#tb-hist .hist-kpi .v,#tb-comp .hist-kpi .v{
   font-weight:900!important;
 }
+#tb-dash .chart-ttl span,#tb-comp .chart-ttl span,#tb-hist .chart-ttl span,#tb-rotas .chart-ttl span,#tb-preench .chart-ttl span{
+  color:#00385f!important;
+  font-weight:900!important;
+}
 </style>
 </head>
 <body>
@@ -2124,10 +2128,10 @@ function renderDashCharts(day){
 
   const hourChartOptions=(dualUnits=false)=>({responsive:true,maintainAspectRatio:false,
     layout:{padding:{bottom:10}},
-    plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},
-    scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false,padding:18},grid:{color:'rgba(255,255,255,0.04)'}},
-            y:{beginAtZero:true,ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'},title:{display:dualUnits,text:'Linhas / Volumes',color:'#6a9fc0',font:{size:9}}},
-            ...(dualUnits?{yUnits:{beginAtZero:true,position:'right',ticks:{color:'#c39bd3',font:{size:9}},grid:{display:false},title:{display:true,text:'Unidades',color:'#c39bd3',font:{size:9}}}}:{})}});
+    plugins:{legend:{labels:{color:'#00385f',font:{size:10,weight:'bold'}}}},
+    scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45,autoSkip:false,padding:18},grid:{color:'rgba(6,35,61,0.10)'}},
+            y:{beginAtZero:true,ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'},title:{display:dualUnits,text:'Linhas / Volumes',color:'#00385f',font:{size:9,weight:'bold'}}},
+            ...(dualUnits?{yUnits:{beginAtZero:true,position:'right',ticks:{color:'#4f2c63',font:{size:9,weight:'bold'}},grid:{display:false},title:{display:true,text:'Unidades',color:'#4f2c63',font:{size:9,weight:'bold'}}}}:{})}});
   const destroyChart=key=>{if(CH[key]){CH[key].destroy();CH[key]=null;}};
   const hourDataset=(label,values,cap,yAxisID='y',metric=label)=>({
     label,data:values,yAxisID,
@@ -2177,7 +2181,7 @@ function renderDashCharts(day){
       ]},
       options:{...hourChartOptions(true),scales:{
         ...hourChartOptions(true).scales,
-        yConf:{beginAtZero:true,position:'right',offset:true,ticks:{color:'#ffd700',font:{size:9},precision:0},grid:{display:false},title:{display:true,text:'Conferentes',color:'#ffd700',font:{size:9}}}
+        yConf:{beginAtZero:true,position:'right',offset:true,ticks:{color:'#00385f',font:{size:9,weight:'bold'},precision:0},grid:{display:false},title:{display:true,text:'Conferentes',color:'#00385f',font:{size:9,weight:'bold'}}}
       }}});
     destroyChart('horaCheckoutPsico');
     if(checkoutPsicoEnabled){
@@ -2195,7 +2199,7 @@ function renderDashCharts(day){
         ]},
         options:{...hourChartOptions(true),scales:{
           ...hourChartOptions(true).scales,
-          yConf:{beginAtZero:true,position:'right',offset:true,ticks:{color:'#ffd700',font:{size:9},precision:0},grid:{display:false},title:{display:true,text:'Conferentes',color:'#ffd700',font:{size:9}}}
+          yConf:{beginAtZero:true,position:'right',offset:true,ticks:{color:'#00385f',font:{size:9,weight:'bold'},precision:0},grid:{display:false},title:{display:true,text:'Conferentes',color:'#00385f',font:{size:9,weight:'bold'}}}
         }}});
     }
   }else{
