@@ -390,6 +390,41 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 #tb-adm .hora-tbl-wrap .delta-hint{background:rgba(0,0,0,.24)!important;border-left-color:#00e5ff!important}
 #tb-adm .hora-tbl-wrap .delta-label{color:#77b9dc!important}
 #tb-adm .hora-tbl-wrap .delta-val{color:#fff!important}
+/* STRONG TEXT FOR LIGHT AREAS */
+#tb-dash,#tb-hist,#tb-comp,#tb-rotas,#tb-preench{
+  color:#061a2f!important;
+  font-weight:600;
+}
+#tb-dash .chart-ttl,#tb-hist .chart-ttl,#tb-comp .chart-ttl,#tb-rotas .chart-ttl,#tb-preench .chart-ttl,
+#tb-dash .separator,#tb-hist .separator,#tb-comp .separator,#tb-rotas .separator,#tb-preench .separator,
+#tb-dash .tbl-wrap th,#tb-hist .tbl-wrap th,#tb-comp .tbl-wrap th,#tb-rotas .tbl-wrap th,#tb-preench .tbl-wrap th,
+#tb-dash .rotas-tbl th,#tb-rotas .rotas-tbl th,#tb-dash .checkout-conf-wrap th,#tb-dash .doca-routes-hour th{
+  color:#00385f!important;
+  font-weight:900!important;
+}
+#tb-dash .tbl-wrap td,#tb-hist .tbl-wrap td,#tb-comp .tbl-wrap td,#tb-rotas .tbl-wrap td,#tb-preench .tbl-wrap td,
+#tb-dash .rotas-tbl td,#tb-rotas .rotas-tbl td,#tb-dash .checkout-conf-wrap td,#tb-dash .doca-routes-hour td{
+  color:#071a2d!important;
+  font-weight:700!important;
+}
+#tb-dash .row-lbl,#tb-hist .row-lbl,#tb-comp .row-lbl,#tb-rotas .row-lbl,#tb-preench .row-lbl,
+#tb-dash .rotas-tbl .td-rota,#tb-dash .rotas-tbl .td-cidade,#tb-rotas .rotas-tbl .td-rota,#tb-rotas .rotas-tbl .td-cidade,
+#tb-dash .hist-day-title,#tb-hist .hist-day-title,#tb-comp .hist-day-title{
+  color:#06395f!important;
+  font-weight:900!important;
+}
+#tb-dash [style*="color:#6a9fc0"],#tb-hist [style*="color:#6a9fc0"],#tb-comp [style*="color:#6a9fc0"],#tb-rotas [style*="color:#6a9fc0"],#tb-preench [style*="color:#6a9fc0"],
+#tb-dash [style*="color:#89b4d4"],#tb-hist [style*="color:#89b4d4"],#tb-comp [style*="color:#89b4d4"],#tb-rotas [style*="color:#89b4d4"],#tb-preench [style*="color:#89b4d4"]{
+  color:#0a4774!important;
+  font-weight:800!important;
+}
+#tb-dash .day-nav-lbl,#tb-dash .rotas-kpi .l,#tb-rotas .rotas-kpi .l,#tb-hist .hist-kpi .l,#tb-comp .hist-kpi .l{
+  color:#0a4774!important;
+  font-weight:800!important;
+}
+#tb-dash .rotas-kpi .v,#tb-rotas .rotas-kpi .v,#tb-hist .hist-kpi .v,#tb-comp .hist-kpi .v{
+  font-weight:900!important;
+}
 </style>
 </head>
 <body>
@@ -1161,7 +1196,26 @@ const HORA_PRODUCTION_SERIES_NAME_LABEL_PLUGIN={
     ctx.restore();
   }
 };
-if(window.Chart)Chart.register(BAR_VALUE_LABEL_PLUGIN,EPM_SERIES_NAME_LABEL_PLUGIN,HORA_PRODUCTION_SERIES_NAME_LABEL_PLUGIN);
+const LIGHT_CHART_CONTRAST_PLUGIN={
+  id:'lightChartContrast',
+  beforeUpdate(chart){
+    const strong='#06233d';
+    const muted='#0a4774';
+    const grid='rgba(6,35,61,.13)';
+    const boldFont=font=>typeof font==='function'?font:{...(font||{}),weight:'bold'};
+    const plugins=chart.options.plugins||(chart.options.plugins={});
+    if(plugins.legend!==false){
+      plugins.legend=plugins.legend||{};
+      plugins.legend.labels={...(plugins.legend.labels||{}),color:strong,font:boldFont(plugins.legend.labels&&plugins.legend.labels.font)};
+    }
+    Object.values(chart.options.scales||{}).forEach(scale=>{
+      if(scale.ticks){scale.ticks.color=muted;scale.ticks.font=boldFont(scale.ticks.font);}
+      if(scale.title){scale.title.color=strong;scale.title.font=boldFont(scale.title.font);}
+      if(scale.grid&&scale.grid.display!==false)scale.grid.color=grid;
+    });
+  }
+};
+if(window.Chart)Chart.register(BAR_VALUE_LABEL_PLUGIN,EPM_SERIES_NAME_LABEL_PLUGIN,HORA_PRODUCTION_SERIES_NAME_LABEL_PLUGIN,LIGHT_CHART_CONTRAST_PLUGIN);
 
 // ── FIREBASE SYNC ──────────────────────────────────────────
 const FB_CONFIG={
