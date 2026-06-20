@@ -1196,26 +1196,7 @@ const HORA_PRODUCTION_SERIES_NAME_LABEL_PLUGIN={
     ctx.restore();
   }
 };
-const LIGHT_CHART_CONTRAST_PLUGIN={
-  id:'lightChartContrast',
-  beforeUpdate(chart){
-    const strong='#06233d';
-    const muted='#0a4774';
-    const grid='rgba(6,35,61,.13)';
-    const boldFont=font=>typeof font==='function'?font:{...(font||{}),weight:'bold'};
-    const plugins=chart.options.plugins||(chart.options.plugins={});
-    if(plugins.legend!==false){
-      plugins.legend=plugins.legend||{};
-      plugins.legend.labels={...(plugins.legend.labels||{}),color:strong,font:boldFont(plugins.legend.labels&&plugins.legend.labels.font)};
-    }
-    Object.values(chart.options.scales||{}).forEach(scale=>{
-      if(scale.ticks){scale.ticks.color=muted;scale.ticks.font=boldFont(scale.ticks.font);}
-      if(scale.title){scale.title.color=strong;scale.title.font=boldFont(scale.title.font);}
-      if(scale.grid&&scale.grid.display!==false)scale.grid.color=grid;
-    });
-  }
-};
-if(window.Chart)Chart.register(BAR_VALUE_LABEL_PLUGIN,EPM_SERIES_NAME_LABEL_PLUGIN,HORA_PRODUCTION_SERIES_NAME_LABEL_PLUGIN,LIGHT_CHART_CONTRAST_PLUGIN);
+if(window.Chart)Chart.register(BAR_VALUE_LABEL_PLUGIN,EPM_SERIES_NAME_LABEL_PLUGIN,HORA_PRODUCTION_SERIES_NAME_LABEL_PLUGIN);
 
 // ── FIREBASE SYNC ──────────────────────────────────────────
 const FB_CONFIG={
