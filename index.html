@@ -233,6 +233,102 @@ body.privacy-lock::after{content:attr(data-watermark);position:fixed;right:16px;
 .rpill-admin{background:#3d0a1a;color:#e94560;border:1px solid #e94560}
 .rpill-supervisor{background:#2d2800;color:#ffd700;border:1px solid #ffd700}
 .rpill-operador{background:#003d1a;color:#00e676;border:1px solid #00e676}
+/* LIGHT SYSTEM BACKGROUND */
+:root{
+  --light-bg:#ffffff;
+  --light-soft:#f6fbff;
+  --light-head:#eaf5ff;
+  --light-line:#c8dff2;
+  --light-line-strong:#8db8dc;
+  --light-text:#102033;
+  --light-muted:#315d83;
+}
+body{background:var(--light-bg)!important;color:var(--light-text)}
+body.privacy-lock::after{color:rgba(16,32,51,.18)}
+.hdr{background:var(--light-bg)!important;border-bottom-color:#e94560;box-shadow:0 1px 8px rgba(10,35,64,.12)}
+.hdr-title{color:#0a2340}
+.hdr-date{color:var(--light-muted)}
+.kpi-val{color:#0a2340}
+.kpi-val.g{color:#008d4f}.kpi-val.r{color:#d93025}.kpi-val.o{color:#b56b00}.kpi-val.c{color:#007da0}.kpi-val.w{color:var(--light-text)}
+.kpi-bar,.flow-bar,.north-bar,.tabs,.day-nav,.chart-grid,.hist-wrap{background:var(--light-bg)!important}
+.kpi,.north-card,.chart-box,.tbl-wrap,.hist-day-card,.adm-group,.prev-item,.hora-tbl-wrap,.real-auto-item,.media-hora-item,.rotas-wrap,.user-badge,.hist-kpi{
+  background:var(--light-bg)!important;
+  border-color:var(--light-line)!important;
+}
+.adm{background:var(--light-bg)!important;border-color:#e94560}
+.kpi-lbl,.kpi-subrow span:first-child,.flow-lbl,.north-label,.north-cap,.chart-ttl,.day-nav-lbl,.rotas-kpi .l,.hist-kpi .l,.adm-row label,.prev-item label,.media-hora-item .media-lbl,.media-hora-item .media-sub,.route-hour-label{
+  color:var(--light-muted)!important;
+}
+.kpi-val.w,.flow-val,.north-num,.hora-tbl-wrap .delta-val,.doca-routes-hour td,.rotas-tbl td,.checkout-conf-wrap td,.users-tbl td{color:var(--light-text)!important}
+.kpi-pbar,.kpi-pend-left,.pbar-mini,.north-pbar{background:#d8e9f7!important}
+.flow-stage.correia{background:#fff8ec!important;border-color:rgba(255,149,0,.45)!important}
+.flow-stage.checkout{background:#effcff!important;border-color:rgba(0,174,215,.35)!important}
+.flow-stage.expedicao{background:#edfff6!important;border-color:rgba(0,180,100,.35)!important}
+.flow-arrow{color:#8db8dc}
+.north-head,.north-card-h,.tbl-wrap th,.checkout-conf-wrap th,.doca-routes-hour th,.hora-tbl-wrap th,.rotas-tbl th,.users-tbl th,.hist-day-hdr,.separator{
+  background:var(--light-head)!important;
+  color:#1f5f8b!important;
+  border-color:var(--light-line)!important;
+}
+.north-head{color:#0a2340!important}
+.north-title,.row-lbl,.hora-tbl-wrap .hlbl,.rotas-tbl .td-rota,.rotas-tbl .td-cidade{
+  background:var(--light-soft)!important;
+  color:var(--light-muted)!important;
+}
+.north-row{border-bottom-color:#e3eef7}
+.tabs{border-bottom-color:var(--light-line-strong)!important}
+.tab{background:#f2f8ff!important;color:var(--light-muted)!important;border-color:var(--light-line)!important}
+.tab:hover{background:var(--light-head)!important;color:#0a2340!important}
+.tab.act{background:var(--light-bg)!important;color:#0a2340!important;border-color:#ffd700!important;border-bottom-color:var(--light-bg)!important}
+.chart-ttl{border-bottom-color:var(--light-line)!important}
+.tbl-wrap tr:nth-child(odd) td,.checkout-conf-wrap td,.doca-routes-hour td,.users-tbl tr:nth-child(odd) td{background:#fbfdff!important}
+.tbl-wrap tr:nth-child(even) td{background:var(--light-bg)!important}
+.tbl-wrap tr:hover td,.hist-day-hdr:hover,.rotas-tbl tr:hover td,.users-tbl tr:hover td{background:#eef6ff!important}
+.hist-day-title{color:#0a2340}
+.hist-day-body{background:var(--light-bg)}
+.hist-kpi .v{color:#0a2340}
+input,select,textarea,.linp,.adm-row input,.adm-row select,.prev-item input,.hora-tbl-wrap input,.lock-box input{
+  background:var(--light-bg)!important;
+  border-color:var(--light-line-strong)!important;
+  color:var(--light-text)!important;
+}
+input:focus,select:focus,textarea:focus,.adm-row input:focus,.prev-item input:focus,.hora-tbl-wrap input:focus,.linp:focus{
+  outline:none!important;
+  border-color:#ffd700!important;
+  background:#fffdf2!important;
+}
+input::placeholder,textarea::placeholder{color:#6f8fab}
+.hora-tbl-wrap .hora-acum-input,.route-total-hour-input{
+  background:#f7fbff!important;
+  border-color:var(--light-line-strong)!important;
+  color:#0a5e89!important;
+}
+.route-pending-input{color:#9a7600!important;border-color:#d8b700!important}
+.hora-tbl-wrap .delta-hint{background:#eef6ff!important;border-left-color:#00a8c8}
+.hora-tbl-wrap .delta-label{color:#36739b}
+.btn-lock{background:#555;color:#fff}
+.lock-ov{background:rgba(255,255,255,.92)!important}
+.lock-box,.login-box{background:var(--light-bg)!important;border-color:#e94560!important;box-shadow:0 10px 35px rgba(10,35,64,.18)!important}
+.login-ov{background:rgba(255,255,255,.96)!important}
+.login-box h2,.lock-box h3{color:#0a2340!important}
+.login-box .lsub,.lock-box p{color:var(--light-muted)!important}
+#syncStatus{background:#eef6ff!important;color:var(--light-muted)!important;border:1px solid var(--light-line)}
+#prevEncPanel{background:var(--light-bg)!important;border-color:rgba(155,89,182,.45)!important}
+#prevEncPanel>div:first-child{background:#f5ecfb!important;border-bottom-color:#dfc3ef!important}
+#prevEncGrid{background:#efe2f8!important}
+#prevEncObs{background:var(--light-bg)!important;color:var(--light-muted)!important}
+.st-pendente{background:#eef6ff!important;color:var(--light-muted)!important}
+.badge.c{background:#e8f9ff;color:#007da0}
+.badge.g{background:#e7fff3;color:#008d4f}
+.badge.o{background:#fff3db;color:#b56b00}
+.badge.r{background:#fff0f0;color:#c62828}
+.badge.y{background:#fff9db;color:#8a7100}
+.rotas-hdr{background:#edfff6!important;border-bottom-color:#bdebd4!important}
+.rotas-hdr-title{color:#008d4f!important}
+.doca-route-chart-inner{background:transparent}
+.real-auto-item,.media-hora-item{background:var(--light-soft)!important}
+.no-data{color:#7890a5}
+#usersPanelWrap{background:var(--light-bg)!important;border-color:#e9b5c0!important}
 </style>
 </head>
 <body>
@@ -4147,7 +4243,7 @@ function calcPrevisaoEncerramento(dayOverride,options){
     return`<div style="background:${bgCard};padding:8px 12px;border-right:1px solid rgba(155,89,182,.1);border-bottom:1px solid rgba(155,89,182,.1)">
       <div style="font-size:10px;font-weight:bold;color:#c39bd3;margin-bottom:4px">${s.nome}</div>
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:2px;font-size:10px;margin-bottom:5px">
-        <div><span style="color:#6a9fc0">Previsto:</span> <span style="color:#fff">${s.prev.toLocaleString('pt-BR')}</span></div>
+        <div><span style="color:#6a9fc0">Previsto:</span> <span style="color:#102033">${s.prev.toLocaleString('pt-BR')}</span></div>
         <div><span style="color:#6a9fc0">Realizado:</span> <span style="color:#00e676">${s.real.toLocaleString('pt-BR')}</span></div>
         <div><span style="color:#6a9fc0">Falta:</span> <span style="color:${s.falta>0?'#ff9500':'#00e676'};font-weight:bold">${s.falta.toLocaleString('pt-BR')}</span></div>
         <div><span style="color:#6a9fc0">Cap/h:</span> <span style="color:#89b4d4">${s.cap.toLocaleString('pt-BR')}</span></div>
