@@ -2280,10 +2280,10 @@ function renderDashCharts(day){
         }}
       },
       scales:{
-        x:{stacked:true,ticks:{color:'#6a9fc0',font:{size:8},callback:v=>v.toLocaleString('pt-BR')},
-           grid:{color:'rgba(255,255,255,0.07)'}},
-        y:{stacked:true,ticks:{color:'#c0d8f0',font:{size:10},padding:4},
-           grid:{color:'rgba(255,255,255,0.04)'}}
+        x:{stacked:true,ticks:{color:'#00385f',font:{size:9,weight:'bold'},callback:v=>v.toLocaleString('pt-BR')},
+           grid:{color:'rgba(6,35,61,0.12)'}},
+        y:{stacked:true,ticks:{color:'#00385f',font:{size:11,weight:'bold'},padding:4},
+           grid:{color:'rgba(6,35,61,0.08)'}}
       }
     }
   });
@@ -2333,11 +2333,11 @@ function renderDashCharts(day){
       ]},
       options:{responsive:true,maintainAspectRatio:false,
         layout:{padding:{bottom:10}},
-        plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},
+        plugins:{legend:{labels:{color:'#00385f',font:{size:10,weight:'bold'}}}},
         scales:{
-          x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false,padding:18},grid:{color:'rgba(255,255,255,0.04)'}},
-          y:{beginAtZero:true,ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'},title:{display:true,text:'Volumes/h',color:'#6a9fc0',font:{size:9}}},
-          y2:{beginAtZero:true,position:'right',ticks:{color:'#4da6ff',font:{size:9}},grid:{display:false},title:{display:true,text:'Acumulado',color:'#4da6ff',font:{size:9}},suggestedMax:170}
+          x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45,autoSkip:false,padding:18},grid:{color:'rgba(6,35,61,0.10)'}},
+          y:{beginAtZero:true,ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'},title:{display:true,text:'Volumes/h',color:'#00385f',font:{size:9,weight:'bold'}}},
+          y2:{beginAtZero:true,position:'right',ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{display:false},title:{display:true,text:'Acumulado',color:'#00385f',font:{size:9,weight:'bold'}},suggestedMax:170}
         }
       }
     });
@@ -2358,10 +2358,10 @@ function renderDashCharts(day){
     ]},
     options:{responsive:true,maintainAspectRatio:false,
       layout:{padding:{bottom:10}},
-      plugins:{legend:{labels:{color:'#89b4d4',font:{size:9}}}},
-      scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false,padding:18},grid:{color:'rgba(255,255,255,0.04)'}},
-              y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'},position:'left'},
-              y2:{ticks:{color:'#00e5ff',font:{size:9}},grid:{display:false},position:'right'}}}});
+      plugins:{legend:{labels:{color:'#00385f',font:{size:9,weight:'bold'}}}},
+      scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45,autoSkip:false,padding:18},grid:{color:'rgba(6,35,61,0.10)'}},
+              y:{ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'},position:'left'},
+              y2:{ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{display:false},position:'right'}}}});
   const alertEl=document.getElementById('rotaAlerta');
   const expImpactedRoutes=buildRotasMerged(day).filter(r=>{
     const st=calcRotaStatus(day,r);
@@ -2388,9 +2388,9 @@ function renderDashCharts(day){
       {label:'Prod. Acumulada',data:prodA,borderColor:'#00e676',borderWidth:2,pointRadius:3,fill:false,tension:.3}
     ]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},
-      scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false},grid:{color:'rgba(255,255,255,0.04)'}},
-              y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'}}}}});
+      plugins:{legend:{labels:{color:'#00385f',font:{size:10,weight:'bold'}}}},
+      scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45,autoSkip:false},grid:{color:'rgba(6,35,61,0.10)'}},
+              y:{ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'}}}}});
 
   // EPM e Vales
   const epm=epmSeriesFromHd(hd),vals=dv(hd,'Vales');
@@ -2403,10 +2403,10 @@ function renderDashCharts(day){
     ]},
     options:{responsive:true,maintainAspectRatio:false,
       layout:{padding:{bottom:10}},
-      plugins:{legend:{labels:{color:'#89b4d4',font:{size:9}}}},
-      scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45,autoSkip:false,padding:18},grid:{color:'rgba(255,255,255,0.04)'}},
-              y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'},position:'left'},
-              y2:{ticks:{color:'#ffd700',font:{size:9}},grid:{display:false},position:'right'}}}});
+      plugins:{legend:{labels:{color:'#00385f',font:{size:9,weight:'bold'}}}},
+      scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45,autoSkip:false,padding:18},grid:{color:'rgba(6,35,61,0.10)'}},
+              y:{ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'},position:'left'},
+              y2:{ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{display:false},position:'right'}}}});
 
   renderRouteClosure(day);
 }
@@ -2520,8 +2520,8 @@ function renderRouteClosure(day){
           afterBody:items=>{const i=items[0].dataIndex,r=rotas[i],st=statusRotas[i];return[`Horário previsto: ${r.hPrev}`,`Horário realizado: ${r.hReal||'Pendente'}`,`Status: ${st.stLabel.replace(/^[^A-ZÀ-Ú—]+/,'')}`];}
         }}},
       scales:{
-        x:{ticks:{color:'#89b4d4',font:{size:9,weight:'bold'},maxRotation:0,minRotation:0,autoSkip:false,padding:7},grid:{display:false},offset:true},
-        y:{beginAtZero:true,max:110,ticks:{color:'#89b4d4',font:{size:9},stepSize:20,callback:v=>v>100?'':v+'%'},grid:{color:'rgba(255,255,255,0.07)'},title:{display:true,text:'% Fechamento',color:'#6a9fc0',font:{size:9}}}
+        x:{ticks:{color:'#00385f',font:{size:10,weight:'bold'},maxRotation:0,minRotation:0,autoSkip:false,padding:7},grid:{display:false},offset:true},
+        y:{beginAtZero:true,max:110,ticks:{color:'#00385f',font:{size:9,weight:'bold'},stepSize:20,callback:v=>v>100?'':v+'%'},grid:{color:'rgba(6,35,61,0.12)'},title:{display:true,text:'% Fechamento',color:'#00385f',font:{size:9,weight:'bold'}}}
       }}
   });
 
