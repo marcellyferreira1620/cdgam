@@ -855,9 +855,9 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
         <div class="adm-row"><label>EPM máx /h <span style="color:#ff4c4c;font-size:9px">(máximo)</span></label><input type="number" id="iCapErros" value="2500" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>Vol. Checkout /h</label><input type="number" id="iCapVC" value="1280" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>Linhas Checkout /h</label><input type="number" id="iCapLC" value="6500" oninput="liveUpdate()"/></div>
-        <div class="adm-row"><label>Vol. Checkout Psico /h</label><input type="number" id="iCapVCPsi" value="1280" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Vol. Checkout Psico /h</label><input type="number" id="iCapVCPsi" value="216" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>Linhas Checkout Psico /h</label><input type="number" id="iCapLCPsi" oninput="liveUpdate()"/></div>
-        <div class="adm-row"><label>Unid. Checkout Psico /h</label><input type="number" id="iCapUCPsi" value="20800" oninput="liveUpdate()"/></div>
+        <div class="adm-row"><label>Unid. Checkout Psico /h</label><input type="number" id="iCapUCPsi" value="1383" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>Unid. Checkout /h</label><input type="number" id="iCapUC" value="20800" oninput="liveUpdate()"/></div>
         <div class="adm-row"><label>Vol. Geladeira /h</label><input type="number" id="iCapGel" value="28" oninput="liveUpdate()"/></div>
 
@@ -1050,9 +1050,14 @@ const NEW_RULES_FROM='2026-06-02';
 const SIMPLE_OPERATIONAL_FROM='2026-06-16';
 const SPLIT_INDICATORS_FROM='2026-06-09';
 const CHECKOUT_PSICO_FROM='2026-06-16';
+const CHECKOUT_PSICO_CAP_UPDATE_FROM='2026-06-21';
 const GELADEIRA_HORA_FROM='2026-06-17';
 const SYSTEM_FORECAST_EDITABLE_FROM='2026-06-19';
 const ROUTE_LIVE_DELAY_FROM='2026-06-19';
+const CHECKOUT_PSICO_VOL_H_OLD=1280;
+const CHECKOUT_PSICO_UNID_H_OLD=20800;
+const CHECKOUT_PSICO_VOL_H_NEW=216;
+const CHECKOUT_PSICO_UNID_H_NEW=1383;
 const CAPACITY_OK_COLOR='#00a8ff';
 const CAPACITY_LOW_COLOR='#ff4c4c';
 const CORREIA_DIRECT_HOUR_METRICS=['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.'];
@@ -1439,7 +1444,7 @@ function emptyDay(dt){
     cPer:'',cMed:'',ckOut:'',esp:'',frF:'',frFc:'',exp:'',
     cPerFim:'',cMedFim:'',ckOutFim:'',espFim:'',frFFim:'',frFcFim:'',expFim:'',
     capLM:3500,capVMed:575,capUMed:10000,capLP:3000,capVPerf:425,capUPerf:6666,
-    capErros:2500,capVC:1280,capLC:6500,capVCPsi:1280,capLCPsi:'',capUCPsi:20800,capUC:20800,capGel:28,
+    capErros:2500,capVC:1280,capLC:6500,capVCPsi:checkoutPsicoVolDefault(dt||today()),capLCPsi:'',capUCPsi:checkoutPsicoUnidDefault(dt||today()),capUC:20800,capGel:28,
     capVales:1,
     capEsp:340,capEspFrac:0,capEspMed:newRules?100:0,capEspPerf:0,capFrF:newRules?100:114,capFrFc:89,capVE:1303,
     rPsico:0,rGel:0,rOnco:0,rOncoT:0,rJuncao:0,rDoc:0,
@@ -1454,6 +1459,19 @@ function useNewRules(dt){return String(dt||currentFormDate())>=NEW_RULES_FROM;}
 function useSimpleOperational(dt){return String(dt||currentFormDate())>=SIMPLE_OPERATIONAL_FROM;}
 function useSplitIndicators(dt){return String(dt||currentFormDate())>=SPLIT_INDICATORS_FROM;}
 function useCheckoutPsico(dt){return String(dt||currentFormDate())>=CHECKOUT_PSICO_FROM;}
+function useCheckoutPsicoNewCapacity(dt){return String(dt||currentFormDate())>=CHECKOUT_PSICO_CAP_UPDATE_FROM;}
+function checkoutPsicoVolDefault(dt){return useCheckoutPsicoNewCapacity(dt)?CHECKOUT_PSICO_VOL_H_NEW:CHECKOUT_PSICO_VOL_H_OLD;}
+function checkoutPsicoUnidDefault(dt){return useCheckoutPsicoNewCapacity(dt)?CHECKOUT_PSICO_UNID_H_NEW:CHECKOUT_PSICO_UNID_H_OLD;}
+function checkoutPsicoVolCap(day){
+  const dt=day&&day.date?day.date:currentFormDate();
+  const v=day?Number(day.capVCPsi)||0:0;
+  return !v||useCheckoutPsicoNewCapacity(dt)&&v===CHECKOUT_PSICO_VOL_H_OLD?checkoutPsicoVolDefault(dt):v;
+}
+function checkoutPsicoUnidCap(day){
+  const dt=day&&day.date?day.date:currentFormDate();
+  const v=day?Number(day.capUCPsi)||0:0;
+  return !v||useCheckoutPsicoNewCapacity(dt)&&v===CHECKOUT_PSICO_UNID_H_OLD?checkoutPsicoUnidDefault(dt):v;
+}
 function useGeladeiraHora(dt){return String(dt||currentFormDate())>=GELADEIRA_HORA_FROM;}
 function useEditableSystemForecast(dt){return String(dt||currentFormDate())>=SYSTEM_FORECAST_EDITABLE_FROM;}
 function useRouteLiveDelay(dt){return String(dt||currentFormDate())>=ROUTE_LIVE_DELAY_FROM;}
@@ -1988,8 +2006,8 @@ function renderFlowBar(day){
       {lbl:'Unidades',real:sumH('Unid. Checkout'),capDia:124800,capHour:day.capUC||20800,target:day.pnUnid||0,noForecast:true}
     ]),
     cardHtml('Checkout Psico','#00e5ff',[
-      {lbl:'Volumes',real:sumH('Vol. Checkout Psico'),capDia:1300,capHour:day.capVCPsi||1280,target:sys.volCheckoutPsico||0},
-      {lbl:'Unidades',real:sumH('Unid. Checkout Psico'),capDia:8300,capHour:day.capUCPsi||20800,target:8300,noForecast:true}
+      {lbl:'Volumes',real:sumH('Vol. Checkout Psico'),capDia:1300,capHour:checkoutPsicoVolCap(day),target:sys.volCheckoutPsico||0},
+      {lbl:'Unidades',real:sumH('Unid. Checkout Psico'),capDia:8300,capHour:checkoutPsicoUnidCap(day),target:8300,noForecast:true}
     ]),
     cardHtml('Geladeira','#4da6ff',[
       {lbl:'Volumes',real:sumH('Vol. Geladeira'),capDia:170,capHour:day.capGel||28,target:sys.volGeladeira||0}
@@ -2101,7 +2119,7 @@ function renderDashCharts(day){
   const capLM=day.capLM||3500,capVMed=day.capVMed||575,capUMed=day.capUMed||10000;
   const capLP=day.capLP||3000,capVPerf=day.capVPerf||425,capUPerf=day.capUPerf||6666;
   const capVC=day.capVC||1280,capUC=day.capUC||20800;
-  const capVCPsi=day.capVCPsi||1280,capUCPsi=day.capUCPsi||20800;
+  const capVCPsi=checkoutPsicoVolCap(day),capUCPsi=checkoutPsicoUnidCap(day);
   const capGel=day.capGel||28;
   const splitIndicators=useSplitIndicators(day.date);
   const checkoutPsicoEnabled=splitIndicators&&useCheckoutPsico(day.date);
@@ -2706,7 +2724,7 @@ function renderDashTables(day){
   const CAP_VALS={'Linhas Med.':day.capLM,'Vol. Med.':day.capVMed||575,'Unid. Med.':day.capUMed||10000,
     'Linhas Perf.':day.capLP,'Vol. Perf.':day.capVPerf||425,'Unid. Perf.':day.capUPerf||6666,'Erros Sep. Med.':day.capErros,
     'Vol. Checkout':day.capVC,'Linhas Checkout':day.capLC,'Unid. Checkout':day.capUC,
-    'Vol. Checkout Psico':day.capVCPsi||1280,'Linhas Checkout Psico':day.capLCPsi||null,'Unid. Checkout Psico':day.capUCPsi||20800,
+    'Vol. Checkout Psico':checkoutPsicoVolCap(day),'Linhas Checkout Psico':day.capLCPsi||null,'Unid. Checkout Psico':checkoutPsicoUnidCap(day),
     'Vol. Psico CK':day.capVPsi,'Unid. Psico CK':day.capUPsi,'Vol. Gel. CK':day.capVGel,
     'Vales':day.capVales,'Vol. Expedição':day.capVE,'Vol. Especial':day.capEsp,
     'Vol. Fralda Frac.':day.capFrFc,'Vol. Fralda Fech.':day.capFrF};
@@ -3328,9 +3346,9 @@ function readFormAsDay(){
     capVPerf:+document.getElementById('iCapVPerf').value||425,capUPerf:+document.getElementById('iCapUPerf').value||6666,
     capErros:+document.getElementById('iCapErros').value||2500,capVC:+document.getElementById('iCapVC').value||1280,
     capLC:+document.getElementById('iCapLC').value||6500,
-    capVCPsi:+document.getElementById('iCapVCPsi').value||1280,
+    capVCPsi:+document.getElementById('iCapVCPsi').value||checkoutPsicoVolDefault(dt),
     capLCPsi:document.getElementById('iCapLCPsi').value===''?'':+document.getElementById('iCapLCPsi').value||0,
-    capUCPsi:+document.getElementById('iCapUCPsi').value||20800,
+    capUCPsi:+document.getElementById('iCapUCPsi').value||checkoutPsicoUnidDefault(dt),
     capUC:+document.getElementById('iCapUC').value||20800,
     capGel:+document.getElementById('iCapGel').value||28,
     capVales:+document.getElementById('iCapVales').value||1,
@@ -3383,7 +3401,7 @@ function loadFormFrom(day){
   s('iCapLP',day.capLP||3000);s('iCapVPerf',day.capVPerf||425);s('iCapUPerf',day.capUPerf||6666);
   s('iCapErros',day.capErros||2500);
   s('iCapVC',day.capVC||1280);s('iCapLC',day.capLC||6500);
-  s('iCapVCPsi',day.capVCPsi||1280);s('iCapLCPsi',day.capLCPsi||'');s('iCapUCPsi',day.capUCPsi||20800);
+  s('iCapVCPsi',checkoutPsicoVolCap(day));s('iCapLCPsi',day.capLCPsi||'');s('iCapUCPsi',checkoutPsicoUnidCap(day));
   s('iCapUC',day.capUC||20800);
   s('iCapGel',day.capGel||28);
   s('iCapVales',day.capVales||1);
@@ -4289,8 +4307,8 @@ function calcPrevisaoEncerramento(dayOverride,options){
     {lbl:'Unid. Checkout',prev:sys.unitCheckout,real:realizado('Unid. Checkout'),cap:day.capUC||20800,unidade:'unid.'}
   ]);
   if(useCheckoutPsico(day.date))setorFromDrivers('Checkout Psico','#00e5ff','ðŸ”µ',[
-    {lbl:'Vol. Checkout Psico',prev:sys.volCheckoutPsico,real:realizado('Vol. Checkout Psico'),cap:day.capVCPsi||1280,unidade:'vol'},
-    {lbl:'Unid. Checkout Psico',prev:sys.unitCheckoutPsico,real:realizado('Unid. Checkout Psico'),cap:day.capUCPsi||20800,unidade:'unid.'}
+    {lbl:'Vol. Checkout Psico',prev:sys.volCheckoutPsico,real:realizado('Vol. Checkout Psico'),cap:checkoutPsicoVolCap(day),unidade:'vol'},
+    {lbl:'Unid. Checkout Psico',prev:sys.unitCheckoutPsico,real:realizado('Unid. Checkout Psico'),cap:checkoutPsicoUnidCap(day),unidade:'unid.'}
   ]);
   setorFromDrivers('Especial','#9b59b6','ðŸŸ£',[
     {lbl:'Vol. Especial',prev:sys.volEspecial,real:realizado('Vol. Especial'),cap:day.capEsp||340,unidade:'vol'}
