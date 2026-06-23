@@ -1045,6 +1045,7 @@ const MEDIA_HORA_AUTO=[
 ];
 
 const SK='cdgam_v6';
+const SK_BACKUPS='cdgam_v6_backups';
 const PWD='gam2025';
 const NEW_RULES_FROM='2026-06-02';
 const SIMPLE_OPERATIONAL_FROM='2026-06-16';
@@ -1263,6 +1264,59 @@ function normalizeDay(day){
   return copy;
 }
 
+function storedDbSnapshot(){
+  try{
+    const raw=localStorage.getItem(SK);
+    const parsed=raw?JSON.parse(raw):null;
+    return parsed&&Array.isArray(parsed.days)?parsed:null;
+  }catch(e){return null;}
+}
+
+function simpleHash(str){
+  let h=0;
+  for(let i=0;i<str.length;i++)h=((h<<5)-h+str.charCodeAt(i))|0;
+  return String(h);
+}
+
+function saveLocalBackup(snapshot,label){
+  try{
+    if(!snapshot||!Array.isArray(snapshot.days)||!snapshot.days.length)return;
+    const payload={days:snapshot.days,savedAt:snapshot.savedAt||0,label:label||'auto'};
+    const encoded=JSON.stringify(payload);
+    const raw=localStorage.getItem(SK_BACKUPS);
+    const current=raw?JSON.parse(raw):null;
+    if(current&&current.hash===simpleHash(encoded))return;
+    localStorage.setItem(SK_BACKUPS,JSON.stringify({at:Date.now(),label:payload.label,hash:simpleHash(encoded),payload}));
+  }catch(e){}
+}
+
+function dataScoreValue(v,key){
+  if(key==='date'||key==='_updatedAt'||key==='_correiaDirectHour'||key==='cod'||key==='cidade'||key==='destino')return 0;
+  if(key&&key.startsWith('cap'))return 0;
+  if(v===null||v===undefined)return 0;
+  if(Array.isArray(v))return v.reduce((s,x)=>s+dataScoreValue(x,''),0);
+  if(typeof v==='object')return Object.keys(v).reduce((s,k)=>s+dataScoreValue(v[k],k),0);
+  if(typeof v==='number')return Number.isFinite(v)&&v!==0?1:0;
+  if(typeof v==='string'){
+    const t=v.trim();
+    return t&&t!=='0'?1:0;
+  }
+  if(typeof v==='boolean')return v?1:0;
+  return 0;
+}
+
+function dayDataScore(day){
+  if(!day||typeof day!=='object')return 0;
+  return Object.keys(day).reduce((s,k)=>s+dataScoreValue(day[k],k),0);
+}
+
+function isSparseReplacement(existing,candidate){
+  const existingScore=dayDataScore(existing);
+  const candidateScore=dayDataScore(candidate);
+  if(existingScore>0&&candidateScore===0)return true;
+  return existingScore>=12&&candidateScore<=2;
+}
+
 function mergeDays(remoteDays,localDays){
   const byDate={};
   const putDay=d=>{
@@ -1273,9 +1327,11 @@ function mergeDays(remoteDays,localDays){
     const curTs=+current._updatedAt||0;
     const nextTs=+normalized._updatedAt||0;
     if(curTs||nextTs){
-      byDate[normalized.date]=nextTs>=curTs?normalized:current;
+      const newer=nextTs>=curTs?normalized:current;
+      const older=nextTs>=curTs?current:normalized;
+      byDate[normalized.date]=isSparseReplacement(older,newer)?older:newer;
     }else{
-      byDate[normalized.date]=normalized;
+      byDate[normalized.date]=isSparseReplacement(current,normalized)?current:normalized;
     }
   };
   (Array.isArray(remoteDays)?remoteDays:[]).forEach(putDay);
@@ -1327,6 +1383,11 @@ function applyRemoteData(remote){
 }
 
 function save(replaceDays=false){
+  const stored=storedDbSnapshot();
+  saveLocalBackup(stored,replaceDays?'before-replace':'before-save');
+  if(!replaceDays&&stored&&Array.isArray(stored.days)){
+    db.days=mergeDays(stored.days,db.days);
+  }
   localStorage.setItem(SK,JSON.stringify(db));
   // Supabase tem prioridade
   if(typeof sbUrl!=='undefined'&&sbUrl&&sbKey&&sbConnected){
@@ -3431,7 +3492,17 @@ function prepNewDay(){
     const curIdx=db.days.findIndex(d=>d.date===current.date);
     if(curIdx>=0)db.days[curIdx]=current;else db.days.push(current);
   }
-  const day=emptyDay(dt);
+  const existingToday=getDay(dt);
+  if(existingToday&&dayDataScore(existingToday)>0){
+    curDate=dt;
+    buildDayNav();
+    renderCurrentDay(existingToday);
+    loadFormFrom(existingToday);
+    document.getElementById('liveBadge').style.display='none';
+    showSyncStatus('☁ Dia de hoje ja existia — dados mantidos',false);
+    return;
+  }
+  const day=existingToday||emptyDay(dt);
   day._updatedAt=Date.now();
   const idx=db.days.findIndex(d=>d.date===dt);
   if(idx>=0)db.days[idx]=day;else db.days.push(day);
@@ -3893,6 +3964,8 @@ async function sbSave(replaceDays=false){
         };
         const r=await sbWritePayload(payload,ts);
         if(r.ok){
+          db.days=payload.days;
+          localStorage.setItem(SK,JSON.stringify(db));
           sbConnected=true;
           showSyncStatus('☁ Salvo na nuvem ✓',false);
           setTimeout(()=>{if(sbConnected)showSyncStatus('☁ Nuvem ativa ✓',false);},2000);
