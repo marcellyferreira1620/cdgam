@@ -1218,12 +1218,12 @@ const EPM_SERIES_NAME_LABEL_PLUGIN={
     ctx.save();
     ctx.textAlign='center';
     ctx.textBaseline='top';
-    ctx.font='bold 8px Arial';
+    ctx.font='900 10px Arial';
     chart.data.datasets.forEach((dataset,datasetIndex)=>{
       const meta=chart.getDatasetMeta(datasetIndex);
       if(!meta||meta.hidden||meta.type!=='bar')return;
       const name=datasetIndex===0?'EPM':'VALE';
-      const color=datasetIndex===0?'#ff4c4c':'#00e676';
+      const color='#00385f';
       meta.data.forEach((bar,i)=>{
         const raw=Array.isArray(dataset.data)?dataset.data[i]:null;
         const n=Number(raw);
