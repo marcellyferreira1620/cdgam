@@ -429,6 +429,69 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
   color:#00385f!important;
   font-weight:900!important;
 }
+#rotaAlerta{
+  color:#000!important;
+  font-weight:900!important;
+}
+/* DARK ROUTE OUTPUT SECTION */
+#tb-dash .route-output-separator{
+  background:#0a2340!important;
+  color:#00e5ff!important;
+  border-color:#1e4a72!important;
+}
+#tb-dash .rotas-wrap,#tb-rotas .rotas-wrap{
+  background:#0a1825!important;
+  border-color:rgba(0,230,118,.3)!important;
+  color:#fff!important;
+}
+#tb-dash .rotas-hdr,#tb-rotas .rotas-hdr{
+  background:rgba(0,230,118,.1)!important;
+  border-bottom-color:rgba(0,230,118,.25)!important;
+}
+#tb-dash .rotas-hdr-title,#tb-rotas .rotas-hdr-title{
+  color:#00e676!important;
+}
+#tb-dash .rotas-kpi .l,#tb-rotas .rotas-kpi .l{
+  color:#6a9fc0!important;
+}
+#tb-dash .rotas-tbl th,#tb-rotas .rotas-tbl th{
+  background:#071525!important;
+  color:#6a9fc0!important;
+  border-color:#1a3550!important;
+}
+#tb-dash .rotas-tbl td,#tb-rotas .rotas-tbl td,
+#tb-dash .rotas-tbl tr:nth-child(odd) td,#tb-rotas .rotas-tbl tr:nth-child(odd) td,
+#tb-dash .rotas-tbl tr:nth-child(even) td,#tb-rotas .rotas-tbl tr:nth-child(even) td{
+  background:#081a2a!important;
+  color:#fff!important;
+  border-color:#122033!important;
+}
+#tb-dash .rotas-tbl tr:hover td,#tb-rotas .rotas-tbl tr:hover td{
+  background:#0d2035!important;
+}
+#tb-dash .rotas-tbl .td-rota,#tb-rotas .rotas-tbl .td-rota{
+  background:#071525!important;
+  color:#c0d8f0!important;
+}
+#tb-dash .rotas-tbl .td-cidade,#tb-rotas .rotas-tbl .td-cidade{
+  background:#071525!important;
+  color:#89b4d4!important;
+}
+#tb-dash .rotas-tbl tr[style*="background:rgba(180,20,20"] td,#tb-rotas .rotas-tbl tr[style*="background:rgba(180,20,20"] td{
+  background:rgba(180,20,20,.18)!important;
+}
+#tb-dash .rotas-tbl tr[style*="background:rgba(180,80,0"] td,#tb-rotas .rotas-tbl tr[style*="background:rgba(180,80,0"] td{
+  background:rgba(180,80,0,.18)!important;
+}
+#tb-dash .rotas-tbl tr[style*="background:#071525"] td,#tb-rotas .rotas-tbl tr[style*="background:#071525"] td{
+  background:#071525!important;
+}
+#tb-dash .rotas-wrap [style*="color:#89b4d4"],#tb-rotas .rotas-wrap [style*="color:#89b4d4"]{
+  color:#89b4d4!important;
+}
+#tb-dash .rotas-wrap [style*="color:#6a9fc0"],#tb-rotas .rotas-wrap [style*="color:#6a9fc0"]{
+  color:#6a9fc0!important;
+}
 </style>
 </head>
 <body>
@@ -665,7 +728,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
   </div>
   <div class="separator">Produção Hora a Hora — Todos os Indicadores</div>
   <div class="tbl-wrap" id="horaTbl"></div>
-  <div class="separator">🚛 Controle de Saída das Rotas — Eficiência da Expedição</div>
+  <div class="separator route-output-separator">🚛 Controle de Saída das Rotas — Eficiência da Expedição</div>
   <div class="rotas-wrap">
     <div class="rotas-hdr">
       <div class="rotas-hdr-title">🚛 Saída das Rotas por Caminhão</div>
