@@ -2541,8 +2541,8 @@ function renderDashCharts(day){
   if(CH.epm)CH.epm.destroy();
   CH.epm=new Chart(document.getElementById('cEPM'),{type:'bar',
     data:{labels:HOURS,datasets:[
-      {label:`EPM (máx ${capEPM.toLocaleString('pt-BR')})`,data:epm,backgroundColor:epm.map(v=>v===null?'transparent':v>capEPM?'#ff4c4c':v>capEPM*.8?'#ffd700':'#00e676'),borderRadius:3,yAxisID:'y'},
-      {label:`Vales (máx ${capVales})`,data:vals,backgroundColor:vals.map(v=>v===null?'transparent':v>capVales?'#ff4c4c':'#00e676'),borderRadius:3,yAxisID:'y2'}
+      {label:`EPM (máx ${capEPM.toLocaleString('pt-BR')})`,data:epm,backgroundColor:epm.map(v=>v===null?'transparent':v>capEPM?CAPACITY_LOW_COLOR:CAPACITY_OK_COLOR),borderRadius:3,yAxisID:'y'},
+      {label:`Vales (máx ${capVales})`,data:vals,backgroundColor:vals.map(v=>v===null?'transparent':v>capVales?CAPACITY_LOW_COLOR:CAPACITY_OK_COLOR),borderRadius:3,yAxisID:'y2'}
     ]},
     options:{responsive:true,maintainAspectRatio:false,
       layout:{padding:{bottom:10}},
