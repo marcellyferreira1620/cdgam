@@ -1243,15 +1243,15 @@ const HORA_PRODUCTION_SERIES_NAME_LABEL_PLUGIN={
     const {ctx,chartArea}=chart;
     if(!chartArea)return;
     const labelFor=label=>{
-      if(/^Linhas/i.test(label))return {txt:'LIN.',color:'#ffd700'};
-      if(/^(Volume|Vol\.)/i.test(label))return {txt:'VOL.',color:'#00e5ff'};
-      if(/^(Unidade|Unid\.)/i.test(label))return {txt:'UNID.',color:'#c39bd3'};
+      if(/^Linhas/i.test(label))return {txt:'LIN.',color:'#00385f'};
+      if(/^(Volume|Vol\.)/i.test(label))return {txt:'VOL.',color:'#00385f'};
+      if(/^(Unidade|Unid\.)/i.test(label))return {txt:'UNID.',color:'#00385f'};
       return null;
     };
     ctx.save();
     ctx.textAlign='center';
     ctx.textBaseline='top';
-    ctx.font='bold 8px Arial';
+    ctx.font='900 10px Arial';
     chart.data.datasets.forEach((dataset,datasetIndex)=>{
       const info=labelFor(dataset.label||'');
       if(!info)return;
