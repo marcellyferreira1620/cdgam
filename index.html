@@ -2506,8 +2506,9 @@ function renderDashCharts(day){
               y2:{ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{display:false},position:'right'}}}});
   const alertEl=document.getElementById('rotaAlerta');
   const expImpactedRoutes=buildRotasMerged(day).filter(r=>{
-    const st=calcRotaStatus(day,r);
-    return r.hReal&&st.stClass==='st-atrasado'&&st.exp&&st.exp.delayMin>0;
+    const realDelay=calcAtraso(r.hPrev,r.hReal);
+    const exp=calcExpRotaImpact(day,r.hPrev);
+    return r.hReal&&realDelay>0&&exp&&exp.delayMin>0;
   }).length;
   if(totalExp>0){
     alertEl.style.display='block';
@@ -3829,15 +3830,14 @@ function calcExpRotaImpact(day,hPrev){
 function calcRotaStatus(day,r){
   const realDelay=calcAtraso(r.hPrev,r.hReal);
   if(!r.hReal){
-    const liveDelay=calcAtrasoAoVivo(day,r.hPrev);
+    const liveDelay=null;
     if(liveDelay!==null)return{delay:liveDelay,realDelay:null,liveDelay,exp:null,stClass:'st-atrasado',stLabel:'✖ FORA DO HORÁRIO'};
     return{delay:null,realDelay,liveDelay:null,exp:null,stClass:'st-pendente',stLabel:'— PENDENTE'};
   }
   const baseDelay=realDelay===null?0:realDelay;
   if(baseDelay<=0)return{delay:baseDelay,realDelay,exp:null,stClass:'st-ok',stLabel:'✔ DENTRO DO HORÁRIO'};
   const exp=calcExpRotaImpact(day,r.hPrev);
-  const expDelay=exp&&exp.delayMin>0?exp.delayMin:0;
-  const delay=Math.max(baseDelay,expDelay);
+  const delay=baseDelay;
   if(delay>0)return{delay,realDelay,exp,stClass:'st-atrasado',stLabel:'✖ FORA DO HORÁRIO'};
   return{delay:baseDelay,realDelay,exp,stClass:'st-ok',stLabel:'✔ DENTRO DO HORÁRIO'};
 }
