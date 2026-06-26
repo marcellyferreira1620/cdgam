@@ -692,8 +692,8 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
       <div id="rotaAlerta" style="margin-top:5px;font-size:10px;padding:5px 10px;border-radius:3px;display:none;font-weight:bold"></div>
     </div>
     <div class="chart-box">
-      <div class="chart-ttl">Meta Acumulada vs Produção Acumulada (Linhas Med.)</div>
-      <div style="position:relative;height:200px"><canvas id="cAcum" role="img" aria-label="Meta vs producao acumulada"></canvas></div>
+      <div class="chart-ttl">Produção hora a hora — Especial</div>
+      <div style="position:relative;height:200px"><canvas id="cAcum" role="img" aria-label="Especial hora a hora"></canvas></div>
     </div>
   </div>
   <!-- DOCA BALANCE ROW -->
@@ -1239,7 +1239,7 @@ const EPM_SERIES_NAME_LABEL_PLUGIN={
 const HORA_PRODUCTION_SERIES_NAME_LABEL_PLUGIN={
   id:'horaProductionSeriesNameLabels',
   afterDraw(chart){
-    if(!chart.canvas||!['cHoraMed','cHoraPerf','cHoraCheckout','cHoraCheckoutPsico','cExp','cGeladeira'].includes(chart.canvas.id))return;
+    if(!chart.canvas||!['cHoraMed','cHoraPerf','cHoraCheckout','cHoraCheckoutPsico','cExp','cGeladeira','cAcum'].includes(chart.canvas.id))return;
     const {ctx,chartArea}=chart;
     if(!chartArea)return;
     const labelFor=label=>{
@@ -2520,20 +2520,20 @@ function renderDashCharts(day){
     else{alertEl.style.background='rgba(180,30,30,.3)';alertEl.style.color='#ff4c4c';alertEl.textContent=`🚨 Expedição crítica (${expPct}%) — risco de atraso nas rotas!`;}
   }else{alertEl.style.display='none';}
 
-  // Meta acumulada
-  const meta=HOURS.map((_,i)=>day.meta?Math.round(day.meta*Math.min(i+1,H_EX)/H_EX):null);
-  const prodA=[];let run=0;
-  lm.forEach(v=>{if(v!==null){run+=v;prodA.push(run);}else prodA.push(run>0?run:null);});
+  // Especial hora a hora
+  const espHora=dv(hd,'Vol. Especial');
+  const capEspH=day.capEsp||340;
   if(CH.acum)CH.acum.destroy();
-  CH.acum=new Chart(document.getElementById('cAcum'),{type:'line',
+  CH.acum=new Chart(document.getElementById('cAcum'),{type:'bar',
     data:{labels:HOURS,datasets:[
-      {label:'Meta Acumulada',data:meta,borderColor:'#e94560',borderDash:[5,3],borderWidth:2,pointRadius:2,fill:false,tension:.3},
-      {label:'Prod. Acumulada',data:prodA,borderColor:'#00e676',borderWidth:2,pointRadius:3,fill:false,tension:.3}
+      {label:'Meta do período',data:HOURS.map((_,i)=>capForHour('Vol. Especial',capEspH,i,day.date)),type:'line',borderColor:CAPACITY_OK_COLOR,borderDash:[5,3],borderWidth:1.5,pointRadius:0,fill:false},
+      {label:'Vol. Especial/h',data:espHora,backgroundColor:espHora.map((v,i)=>v===null?'transparent':v>=capForHour('Vol. Especial',capEspH,i,day.date)?CAPACITY_OK_COLOR:CAPACITY_LOW_COLOR),borderRadius:3}
     ]},
     options:{responsive:true,maintainAspectRatio:false,
-      plugins:{legend:{labels:{color:'#00385f',font:{size:10,weight:'bold'}}}},
-      scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45,autoSkip:false},grid:{color:'rgba(6,35,61,0.10)'}},
-              y:{ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'}}}}});
+      layout:{padding:{bottom:10}},
+      plugins:{legend:{labels:{color:'#00385f',font:{size:9,weight:'bold'}}}},
+      scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45,autoSkip:false,padding:18},grid:{color:'rgba(6,35,61,0.10)'}},
+              y:{beginAtZero:true,ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'}}}}});
 
   // EPM e Vales
   const epm=epmSeriesFromHd(hd),vals=dv(hd,'Vales');
