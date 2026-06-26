@@ -1380,6 +1380,95 @@ function isSparseReplacement(existing,candidate){
   return existingScore>=12&&candidateScore<=2;
 }
 
+const ROUTE_DATA_FIELDS=['tipo','placa','vol','paletes','hReal','obs'];
+function routeFieldHasValue(field,value){
+  if(value===null||value===undefined)return false;
+  if(field==='vol'||field==='paletes')return Number.isFinite(+value)&&+value!==0;
+  return String(value).trim()!=='';
+}
+
+function mergeRouteRecords(current,next){
+  const a=current||{};
+  const b=next||{};
+  const aTs=+a._updatedAt||0;
+  const bTs=+b._updatedAt||0;
+  const newer=bTs>=aTs?b:a;
+  const older=bTs>=aTs?a:b;
+  const out={...older,...newer,cod:normalizeRouteCode(newer.cod||older.cod)};
+  const fields=new Set([...ROUTE_DATA_FIELDS,...Object.keys(a),...Object.keys(b)]);
+  fields.delete('cod');
+  fields.delete('cidade');
+  fields.delete('hPrev');
+  fields.delete('_updatedAt');
+  fields.delete('_fieldUpdatedAt');
+  fields.forEach(field=>{
+    const av=a[field],bv=b[field];
+    const aFieldTs=+(a._fieldUpdatedAt&&a._fieldUpdatedAt[field])||0;
+    const bFieldTs=+(b._fieldUpdatedAt&&b._fieldUpdatedAt[field])||0;
+    if(aFieldTs||bFieldTs){
+      out[field]=bFieldTs>=aFieldTs?bv:av;
+      return;
+    }
+    const hasA=routeFieldHasValue(field,av);
+    const hasB=routeFieldHasValue(field,bv);
+    if(hasA&&hasB){
+      out[field]=(aTs||bTs)?(bTs>=aTs?bv:av):bv;
+    }else if(hasB){
+      out[field]=bv;
+    }else if(hasA){
+      out[field]=av;
+    }else if((aTs||bTs)&&(field in older||field in newer)){
+      out[field]=bTs>=aTs?bv:av;
+    }else if(field in b){
+      out[field]=bv;
+    }else if(field in a){
+      out[field]=av;
+    }
+  });
+  const ts=Math.max(aTs,bTs);
+  if(ts)out._updatedAt=ts;
+  else delete out._updatedAt;
+  const fieldUpdatedAt={...(a._fieldUpdatedAt||{})};
+  Object.entries(b._fieldUpdatedAt||{}).forEach(([field,ts])=>{
+    fieldUpdatedAt[field]=Math.max(+fieldUpdatedAt[field]||0,+ts||0);
+  });
+  if(Object.keys(fieldUpdatedAt).length)out._fieldUpdatedAt=fieldUpdatedAt;
+  else delete out._fieldUpdatedAt;
+  return out;
+}
+
+function mergeRotas(current,next){
+  const byCod={};
+  (Array.isArray(current)?current:[]).forEach(r=>{
+    if(!r||r.cod===undefined||r.cod===null)return;
+    const cod=normalizeRouteCode(r.cod);
+    byCod[cod]={...r,cod};
+  });
+  (Array.isArray(next)?next:[]).forEach(r=>{
+    if(!r||r.cod===undefined||r.cod===null)return;
+    const cod=normalizeRouteCode(r.cod);
+    byCod[cod]=mergeRouteRecords(byCod[cod],{...r,cod});
+  });
+  return Object.values(byCod);
+}
+
+function mergeDayRecords(current,next){
+  if(!current)return next;
+  if(!next)return current;
+  const curTs=+current._updatedAt||0;
+  const nextTs=+next._updatedAt||0;
+  let chosen;
+  if(curTs||nextTs){
+    const newer=nextTs>=curTs?next:current;
+    const older=nextTs>=curTs?current:next;
+    chosen=isSparseReplacement(older,newer)?older:newer;
+  }else{
+    chosen=isSparseReplacement(current,next)?current:next;
+  }
+  const rotas=mergeRotas(current.rotas,next.rotas);
+  return rotas.length?{...chosen,rotas}:chosen;
+}
+
 function mergeDays(remoteDays,localDays){
   const byDate={};
   const putDay=d=>{
@@ -1387,15 +1476,7 @@ function mergeDays(remoteDays,localDays){
     const normalized=normalizeDay(d);
     const current=byDate[normalized.date];
     if(!current){byDate[normalized.date]=normalized;return;}
-    const curTs=+current._updatedAt||0;
-    const nextTs=+normalized._updatedAt||0;
-    if(curTs||nextTs){
-      const newer=nextTs>=curTs?normalized:current;
-      const older=nextTs>=curTs?current:normalized;
-      byDate[normalized.date]=isSparseReplacement(older,newer)?older:newer;
-    }else{
-      byDate[normalized.date]=isSparseReplacement(current,normalized)?current:normalized;
-    }
+    byDate[normalized.date]=mergeDayRecords(current,normalized);
   };
   (Array.isArray(remoteDays)?remoteDays:[]).forEach(putDay);
   (Array.isArray(localDays)?localDays:[]).forEach(putDay);
@@ -1438,8 +1519,11 @@ function applyRemoteData(remote){
   const day=getDay(curDate)||latestDay();
   if(day){
     if(!curDate)curDate=day.date;
+    const tab=activeTab();
+    const editing=isEditingDataField();
     renderKPIs(day);renderFlowBar(day);renderDashCharts(day);
-    renderDashTables(day);renderRotasTbl(day,'rotasTblFull');
+    renderDashTables(day);renderRotasTbl(day,'rotasTbl');
+    if(!(tab==='rotas'&&editing))renderRotasTbl(day,'rotasTblFull');
     updateRotasKPIs(day);
     refreshOpenPrevisaoEncerramento(day);
   }
@@ -3334,7 +3418,10 @@ function syncRouteCurrentTotal(cod,total){
   let route=day.rotas.find(r=>normalizeRouteCode(r.cod)===cod);
   if(!route){route={cod};day.rotas.push(route);}
   route.vol=Math.max(+total||0,0);
-  day._updatedAt=Date.now();
+  const ts=Date.now();
+  route._updatedAt=ts;
+  route._fieldUpdatedAt={...(route._fieldUpdatedAt||{}),vol:ts};
+  day._updatedAt=ts;
 }
 
 function colorCellByDelta(inp,m,delta){
@@ -3698,7 +3785,10 @@ function saveRotaField(cod,field,val){
   let r=day.rotas.find(x=>normalizeRouteCode(x.cod)===cod);
   if(!r){r={cod};day.rotas.push(r);}
   r[field]=field==='vol'||field==='paletes'?+val:val;
-  day._updatedAt=Date.now();
+  const ts=Date.now();
+  r._updatedAt=ts;
+  r._fieldUpdatedAt={...(r._fieldUpdatedAt||{}),[field]:ts};
+  day._updatedAt=ts;
   save();
   updateRotasKPIs(day);
   renderRotasTbl(day,'rotasTbl');
