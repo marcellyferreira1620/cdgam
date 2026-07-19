@@ -620,8 +620,11 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 
 <!-- DAY NAV -->
 <div class="day-nav">
-  <div class="day-nav-lbl">📅 DIAS SALVOS:</div>
-  <div id="dayBtns" style="display:flex;gap:4px;flex-wrap:wrap"></div>
+  <div class="day-nav-lbl">📅 DIA NA TELA:</div>
+  <div id="dayPickerWrap" style="display:flex;align-items:center;gap:6px;flex-wrap:wrap">
+    <select id="daySelect" onchange="selectDay(this.value)" style="background:#ffd700;border:1px solid #ffd700;color:#000;font-weight:bold;border-radius:4px;padding:4px 28px 4px 10px;font-size:11px"></select>
+    <span id="dayCurrentInfo" style="font-size:10px;color:#6a9fc0;font-weight:bold"></span>
+  </div>
   <button onclick="calcPrevisaoEncerramento()" style="margin-left:auto;background:#9b59b6;color:#fff;border:none;padding:4px 14px;border-radius:4px;cursor:pointer;font-size:11px;font-weight:bold;white-space:nowrap">
     🕐 Previsão de Encerramento
   </button>
@@ -2123,16 +2126,35 @@ function switchTab(id){
 
 // ── DAY NAV ───────────────────────────────────────────────
 function buildDayNav(){
-  const days=sortedDays();const btns=document.getElementById('dayBtns');btns.innerHTML='';
-  if(!days.length){btns.innerHTML='<span style="color:#445;font-size:11px">Sem dias salvos</span>';return;}
-  days.forEach(d=>{
-    const b=document.createElement('button');
-    b.className='day-btn'+(d.date===curDate?' cur':'');
-    b.innerHTML=fmtDateShort(d.date)+(d.date===today()?'<span class="today-badge">HOJE</span>':'');
-    b.onclick=()=>selectDay(d.date);btns.appendChild(b);
+  const days=sortedDays();
+  const sel=document.getElementById('daySelect');
+  const info=document.getElementById('dayCurrentInfo');
+  if(!sel)return;
+  sel.innerHTML='';
+  if(!days.length){
+    sel.disabled=true;
+    sel.innerHTML='<option value="">Sem dias salvos</option>';
+    if(info)info.textContent='';
+    return;
+  }
+  sel.disabled=false;
+  const latest=days[days.length-1];
+  const hasCurrent=days.some(d=>d.date===curDate);
+  if(!hasCurrent)curDate=latest.date;
+  [...days].reverse().forEach(d=>{
+    const opt=document.createElement('option');
+    opt.value=d.date;
+    opt.textContent=fmtDateShort(d.date)+(d.date===today()?' — HOJE':'');
+    sel.appendChild(opt);
   });
+  sel.value=curDate;
+  if(info){
+    const current=getDay(curDate);
+    info.textContent=current?`${days.length} dia(s) salvos · mostrando ${fmtDate(current.date)}`:`${days.length} dia(s) salvos`;
+  }
 }
 function selectDay(dt){
+  if(!dt)return;
   curDate=dt;buildDayNav();
   const day=getDay(dt);
   if(day){renderKPIs(day);renderFlowBar(day);renderDashCharts(day);renderDashTables(day);renderRotasTbl(day,'rotasTblFull');updateRotasKPIs(day);refreshOpenPrevisaoEncerramento(day);}
