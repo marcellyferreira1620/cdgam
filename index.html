@@ -782,7 +782,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
   </div>
   <div class="separator" id="compMonthTitle">Comparativo mensal — média realizada por hora</div>
   <div class="chart-grid" style="grid-template-columns:1fr">
-    <div class="chart-box"><div class="chart-ttl">Média do mês — todos os indicadores</div><div style="position:relative;height:260px"><canvas id="cCompResumo" role="img" aria-label="Media mensal de todos os indicadores"></canvas></div></div>
+    <div class="chart-box"><div class="chart-ttl">Média do mês — todos os indicadores</div><div style="position:relative;height:260px"><canvas id="cCompResumo" role="img" aria-label="Media mensal de todos os indicadores"></canvas></div><div class="tbl-wrap" id="compFinishPanel" style="margin:8px 0 0"></div></div>
   </div>
   <div class="chart-grid" id="compIndicatorGrid">
     <div class="chart-box"><div class="chart-ttl">Correia Medicamento — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompMed" role="img" aria-label="Media hora correia medicamento por dia"></canvas></div></div>
@@ -1228,6 +1228,46 @@ const BAR_VALUE_LABEL_PLUGIN={
     ctx.restore();
   }
 };
+const COMP_SUMMARY_META_LABEL_PLUGIN={
+  id:'compSummaryMetaLabels',
+  afterDatasetsDraw(chart){
+    if(!chart.canvas||chart.canvas.id!=='cCompResumo')return;
+    const {ctx,chartArea}=chart;
+    if(!chartArea)return;
+    const dataset=(chart.data.datasets||[]).find(ds=>Array.isArray(ds.metaLabels));
+    if(!dataset)return;
+    const meta=chart.getDatasetMeta((chart.data.datasets||[]).indexOf(dataset));
+    if(!meta||meta.hidden||meta.type!=='line')return;
+    ctx.save();
+    ctx.textAlign='center';
+    ctx.textBaseline='middle';
+    ctx.font='900 9px Arial';
+    meta.data.forEach((point,i)=>{
+      const label=dataset.metaLabels[i];
+      if(!label)return;
+      const props=point.getProps(['x','y'],true);
+      const textW=ctx.measureText(label).width;
+      const boxW=textW+8,boxH=14,r=3;
+      const x=Math.min(Math.max(props.x,chartArea.left+boxW/2),chartArea.right-boxW/2);
+      const y=Math.max(props.y-14,chartArea.top+boxH/2);
+      ctx.fillStyle='rgba(255,255,255,.96)';
+      ctx.beginPath();
+      ctx.moveTo(x-boxW/2+r,y-boxH/2);
+      ctx.lineTo(x+boxW/2-r,y-boxH/2);
+      ctx.quadraticCurveTo(x+boxW/2,y-boxH/2,x+boxW/2,y-boxH/2+r);
+      ctx.lineTo(x+boxW/2,y+boxH/2-r);
+      ctx.quadraticCurveTo(x+boxW/2,y+boxH/2,x+boxW/2-r,y+boxH/2);
+      ctx.lineTo(x-boxW/2+r,y+boxH/2);
+      ctx.quadraticCurveTo(x-boxW/2,y+boxH/2,x-boxW/2,y+boxH/2-r);
+      ctx.lineTo(x-boxW/2,y-boxH/2+r);
+      ctx.quadraticCurveTo(x-boxW/2,y-boxH/2,x-boxW/2+r,y-boxH/2);
+      ctx.fill();
+      ctx.fillStyle='#00385f';
+      ctx.fillText(label,x,y);
+    });
+    ctx.restore();
+  }
+};
 const EPM_SERIES_NAME_LABEL_PLUGIN={
   id:'epmSeriesNameLabels',
   afterDraw(chart){
@@ -1288,7 +1328,7 @@ const HORA_PRODUCTION_SERIES_NAME_LABEL_PLUGIN={
     ctx.restore();
   }
 };
-if(window.Chart)Chart.register(BAR_VALUE_LABEL_PLUGIN,EPM_SERIES_NAME_LABEL_PLUGIN,HORA_PRODUCTION_SERIES_NAME_LABEL_PLUGIN);
+if(window.Chart)Chart.register(BAR_VALUE_LABEL_PLUGIN,COMP_SUMMARY_META_LABEL_PLUGIN,EPM_SERIES_NAME_LABEL_PLUGIN,HORA_PRODUCTION_SERIES_NAME_LABEL_PLUGIN);
 
 // ── FIREBASE SYNC ──────────────────────────────────────────
 const FB_CONFIG={
@@ -3225,6 +3265,36 @@ function compFmtAvg(def,v){
   if(def.key==='vale')return n.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1});
   return Math.round(n).toLocaleString('pt-BR');
 }
+const COMP_FINISH_FIELDS=[
+  {label:'Correia Medicamento',field:'cMedFim'},
+  {label:'Correia Perfumaria',field:'cPerFim'},
+  {label:'Checkout',field:'ckOutFim'},
+  {label:'Especial',field:'espFim'},
+  {label:'Fraldas Cx Fech.',field:'frFFim'},
+  {label:'Fralda Fracionada',field:'frFcFim'},
+  {label:'Expedição',field:'expFim'}
+];
+function compAvgFinishTime(days,field){
+  const mins=days.map(day=>horaToShiftMin(day[field])).filter(v=>v!==null&&Number.isFinite(v));
+  if(!mins.length)return{avg:null,count:0};
+  const total=mins.reduce((s,v)=>s+v,0);
+  return{avg:shiftMinToHora(total/mins.length),count:mins.length};
+}
+function renderCompFinishPanel(days){
+  const el=document.getElementById('compFinishPanel');
+  if(!el)return;
+  const rows=COMP_FINISH_FIELDS.map(def=>({def,...compAvgFinishTime(days,def.field)}));
+  if(!rows.some(r=>r.count)){
+    el.innerHTML='<div class="no-data">Sem horários de finalização preenchidos neste mês.</div>';
+    return;
+  }
+  let html='<table><thead><tr><th style="text-align:left">Setor</th><th>Média de finalização</th><th>Dias considerados</th></tr></thead><tbody>';
+  rows.forEach(r=>{
+    html+=`<tr><td style="text-align:left;font-weight:bold;color:#00385f">${r.def.label}</td><td style="font-weight:bold;color:${r.count?CAPACITY_OK_COLOR:'#6a9fc0'}">${r.avg||'—'}</td><td>${r.count}</td></tr>`;
+  });
+  html+='</tbody></table>';
+  el.innerHTML=html;
+}
 function compChartOptions({yTitle='Média/h',percent=false,secondAxis=false}={}){
   return{
     responsive:true,
@@ -3286,6 +3356,7 @@ function renderComp(){
   if(!days.length){
     document.getElementById('compTbl').innerHTML='<div class="no-data">Sem dados para este mês</div>';
     const delayEl=document.getElementById('compDelayTbl');if(delayEl)delayEl.innerHTML='';
+    const finishEl=document.getElementById('compFinishPanel');if(finishEl)finishEl.innerHTML='';
     return;
   }
   const labels=days.map(d=>fmtDateShort(d.date));
@@ -3310,10 +3381,11 @@ function renderComp(){
   CH.compResumo=new Chart(document.getElementById('cCompResumo'),{type:'bar',
     data:{labels:resumoLabels,datasets:[
       {label:'% da meta mensal',data:resumoData,backgroundColor:resumoColors,borderRadius:4,valueLabels:resumoValueLabels,tooltipLabels:resumoTooltips},
-      {label:'Meta',data:monthly.map(()=>100),type:'line',borderColor:'#ffd700',borderDash:[5,3],borderWidth:2,pointRadius:0,fill:false}
+      {label:'Meta',data:monthly.map(()=>100),type:'line',borderColor:'#ffd700',borderDash:[5,3],borderWidth:2,pointRadius:0,fill:false,metaLabels:monthly.map(m=>`Meta ${compFmtAvg(m.def,m.cap)}/h`)}
     ]},
     options:compChartOptions({yTitle:'% da meta',percent:true})
   });
+  renderCompFinishPanel(days);
   const delayRows=[];
   const delayStats=days.map(day=>{
     let count=0,totalMin=0;
