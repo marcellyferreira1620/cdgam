@@ -3338,10 +3338,12 @@ function renderCompIndicatorChart(def,labels,days){
     compGapLabel(r.avg,r.cap,def.inverse),
     `Horas preenchidas: ${r.hours.toLocaleString('pt-BR',{maximumFractionDigits:1})}`
   ]);
+  const metaCaps=rows.map(r=>+r.cap||0).filter(v=>v>0);
+  const metaCap=metaCaps.length?metaCaps.reduce((s,v)=>s+v,0)/metaCaps.length:def.cap({});
   CH[key]=new Chart(canvas,{type:'bar',
     data:{labels,datasets:[
       {label:`Média/h ${def.short}`,data,backgroundColor:colors,borderRadius:4,valueLabels,tooltipLabels:tooltips},
-      {label:'Meta/h',data:rows.map(r=>Math.round(r.cap||0)),type:'line',borderColor:'#ffd700',borderDash:[5,3],borderWidth:2,pointRadius:2,fill:false}
+      {label:`Meta/h ${compFmtAvg(def,metaCap)}`,data:rows.map(r=>Math.round(r.cap||0)),type:'line',borderColor:'#ffd700',borderDash:[5,3],borderWidth:2,pointRadius:2,fill:false}
     ]},
     options:compChartOptions({yTitle:def.inverse?'Média/h (máximo)':'Média/h'})
   });
