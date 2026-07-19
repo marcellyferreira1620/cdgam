@@ -3390,8 +3390,8 @@ function renderCompVolumeDelay(days,delayStats,labels){
   options.scales.y2.title.text='Rotas atrasadas';
   CH.compVolAtraso=new Chart(canvas,{type:'bar',
     data:{labels,datasets:[
-      {label:'Volume expedido',data:vols,backgroundColor:CAPACITY_OK_COLOR,borderRadius:4,valueLabels:vols.map(v=>v?Math.round(v).toLocaleString('pt-BR'):'')},
-      {label:'Rotas atrasadas',data:counts,type:'line',borderColor:CAPACITY_LOW_COLOR,backgroundColor:CAPACITY_LOW_COLOR,borderWidth:2,pointRadius:3,fill:false,yAxisID:'y2'}
+      {label:'Volume expedido',data:vols,backgroundColor:CAPACITY_OK_COLOR,borderRadius:4,valueLabels:vols.map(v=>v?Math.round(v).toLocaleString('pt-BR'):''),order:2},
+      {label:'Rotas atrasadas',data:counts,type:'line',borderColor:CAPACITY_LOW_COLOR,backgroundColor:CAPACITY_LOW_COLOR,borderWidth:3,pointRadius:5,pointHoverRadius:7,fill:false,yAxisID:'y2',valueLabels:counts.map(v=>v?String(v):''),order:0}
     ]},
     options
   });
