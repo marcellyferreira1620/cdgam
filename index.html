@@ -563,15 +563,15 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 
 <!-- KPI BAR 1: indicadores gerais -->
 <div class="kpi-bar" id="kpiBar1" style="grid-template-columns:repeat(10,1fr)">
-  <div class="kpi" style="border-color:#ffd700"><div class="kpi-lbl" style="color:#ffd700">Prev. Noturna (vol)</div><div class="kpi-val" style="color:#ffd700" id="kPN">—</div></div>
-  <div class="kpi" style="border-color:#ffd700"><div class="kpi-lbl" style="color:#ffd700">Prev. Noturna (unid)</div><div class="kpi-val" style="color:#ffd700" id="kPNU">—</div></div>
-  <div class="kpi"><div class="kpi-lbl">Venda (unid.)</div><div class="kpi-val o" id="kVenda">—</div></div>
-  <div class="kpi"><div class="kpi-lbl">Acumulado</div><div class="kpi-val g" id="kAcum">—</div></div>
-  <div class="kpi"><div class="kpi-lbl">À Processar</div><div class="kpi-val r" id="kProc">—</div></div>
-  <div class="kpi"><div class="kpi-lbl">Meta Proj. Unid.</div><div class="kpi-val c" id="kMeta">—</div></div>
-  <div class="kpi"><div class="kpi-lbl">O.S. Impressas</div><div class="kpi-val w" id="kOsImp">—</div></div>
-  <div class="kpi"><div class="kpi-lbl">O.S. Finalizadas</div><div class="kpi-val g" id="kOsFin">—</div></div>
-  <div class="kpi"><div class="kpi-lbl">O.S. À Produzir</div><div class="kpi-val r" id="kOsProd">—</div></div>
+  <div class="kpi" style="border-color:#ffd700"><div class="kpi-lbl" style="color:#ffd700">Venda: Volume</div><div class="kpi-val" style="color:#ffd700" id="kPN">—</div></div>
+  <div class="kpi" style="border-color:#ffd700"><div class="kpi-lbl" style="color:#ffd700">Venda: Unidade (Correia)</div><div class="kpi-val" style="color:#ffd700" id="kPNU">—</div></div>
+  <div class="kpi"><div class="kpi-lbl">Volumes Expedidos</div><div class="kpi-val o" id="kVenda">—</div></div>
+  <div class="kpi"><div class="kpi-lbl">Linhas Realizadas</div><div class="kpi-val g" id="kAcum">—</div></div>
+  <div class="kpi"><div class="kpi-lbl">Volume Pendente de Finalização</div><div class="kpi-val r" id="kProc">—</div></div>
+  <div class="kpi"><div class="kpi-lbl">Vol. Finalizado</div><div class="kpi-val c" id="kMeta">—</div></div>
+  <div class="kpi"><div class="kpi-lbl">Linhas Realizadas</div><div class="kpi-val w" id="kOsImp">—</div></div>
+  <div class="kpi"><div class="kpi-lbl">Linhas Ainda Não Processadas</div><div class="kpi-val g" id="kOsFin">—</div></div>
+  <div class="kpi"><div class="kpi-lbl">Linhas Total</div><div class="kpi-val r" id="kOsProd">—</div></div>
   <div class="kpi"><div class="kpi-lbl">% Produzido</div><div class="kpi-val o" id="kPerc">—</div><div class="kpi-pbar"><div class="kpi-pfill" id="kPercBar" style="width:0%;background:#ff9500"></div></div></div>
 </div>
 
@@ -2125,10 +2125,10 @@ function renderKPIs(day){
   const perc=volBase>0?Math.round(volFinalizado/volBase*100):0;
   document.getElementById('hdrDate').textContent=fmtDate(day.date||today());
   setKpiLabel('kPN','Venda: Volume');
-  setKpiLabel('kPNU','Venda: Unidade');
-  setKpiLabel('kVenda','Volumes Impressos');
-  setKpiLabel('kAcum','Acumulado (Linhas)');
-  setKpiLabel('kProc','Vol. Pend. Finalização');
+  setKpiLabel('kPNU','Venda: Unidade (Correia)');
+  setKpiLabel('kVenda','Volumes Expedidos');
+  setKpiLabel('kAcum','Linhas Realizadas');
+  setKpiLabel('kProc','Volume Pendente de Finalização');
   setKpiLabel('kMeta','Vol. Finalizado');
   document.getElementById('kPN').textContent=(day.pnVol||0).toLocaleString('pt-BR');
   document.getElementById('kPNU').textContent=(day.pnUnid||0).toLocaleString('pt-BR');
@@ -2136,8 +2136,9 @@ function renderKPIs(day){
   setSplitKpi('kAcum',acumSplit);
   document.getElementById('kProc').textContent=volPendente.toLocaleString('pt-BR');
   document.getElementById('kMeta').textContent=volFinalizado.toLocaleString('pt-BR');
-  setKpiLabel('kOsFin',simpleOp?'O.S. Não Impressas':'O.S. Finalizadas');
-  setKpiLabel('kOsProd',simpleOp?'O.S. Total':'O.S. À Produzir');
+  setKpiLabel('kOsImp','Linhas Realizadas');
+  setKpiLabel('kOsFin',simpleOp?'Linhas Ainda Não Processadas':'Linhas Finalizadas');
+  setKpiLabel('kOsProd',simpleOp?'Linhas Total':'Linhas A Produzir');
   setSplitKpi('kOsImp',osImpSplit);
   setSplitKpi('kOsFin',osFinSplit);
   setSplitKpi('kOsProd',osProdSplit);
