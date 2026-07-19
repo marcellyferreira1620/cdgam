@@ -797,6 +797,10 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
   <div class="chart-grid" style="grid-template-columns:1fr">
     <div class="chart-box"><div class="chart-ttl">Rotas expedidas com atraso no mês</div><div style="position:relative;height:250px"><canvas id="cCompAtrasos" role="img" aria-label="Rotas atrasadas por dia"></canvas></div></div>
   </div>
+  <div class="chart-grid">
+    <div class="chart-box"><div class="chart-ttl">Melhor horário por setor no mês</div><div class="tbl-wrap" id="compBestHoursTbl" style="margin:8px 0 0"></div></div>
+    <div class="chart-box"><div class="chart-ttl">Volume expedido x rotas atrasadas</div><div style="position:relative;height:250px"><canvas id="cCompVolAtraso" role="img" aria-label="Relação entre volume expedido e rotas atrasadas"></canvas></div><div class="tbl-wrap" id="compVolDelayResumo" style="margin:8px 0 0"></div></div>
+  </div>
   <div class="separator">Resumo mensal — médias por hora</div>
   <div class="tbl-wrap" id="compTbl"></div>
   <div class="separator">Detalhe dos atrasos — rotas expedidas com atraso</div>
@@ -3295,6 +3299,110 @@ function renderCompFinishPanel(days){
   html+='</tbody></table>';
   el.innerHTML=html;
 }
+function compHourlyRate(day,def,i){
+  const hd=day.hd||{};
+  let v=null;
+  if(def.kind==='epm'){
+    const vals=epmSeriesFromHd(hd);
+    v=vals[i];
+  }else{
+    const arr=hd[def.metric]||[];
+    v=arr[i];
+  }
+  if(!compFilledValue(v))return null;
+  const factor=def.kind==='epm'?1:hourTargetFactor(def.metric,i,day.date);
+  return factor>0?(+v||0)/factor:null;
+}
+function renderCompBestHours(days,defs){
+  const el=document.getElementById('compBestHoursTbl');
+  if(!el)return;
+  const rows=defs.map(def=>{
+    const totals=new Array(HOURS.length).fill(0),counts=new Array(HOURS.length).fill(0);
+    days.forEach(day=>{
+      HOURS.forEach((_,i)=>{
+        const rate=compHourlyRate(day,def,i);
+        if(rate===null||!Number.isFinite(rate))return;
+        totals[i]+=rate;
+        counts[i]++;
+      });
+    });
+    let bestIdx=-1,bestAvg=null;
+    HOURS.forEach((_,i)=>{
+      if(!counts[i])return;
+      const avg=totals[i]/counts[i];
+      if(bestAvg===null||(def.inverse?avg<bestAvg:avg>bestAvg)){
+        bestAvg=avg;
+        bestIdx=i;
+      }
+    });
+    const capDays=days.map(day=>def.cap(day)).filter(v=>v>0);
+    const cap=capDays.length?capDays.reduce((s,v)=>s+v,0)/capDays.length:def.cap({});
+    return{def,bestIdx,bestAvg,cap,count:bestIdx>=0?counts[bestIdx]:0};
+  });
+  if(!rows.some(r=>r.bestIdx>=0)){
+    el.innerHTML='<div class="no-data">Sem hora a hora preenchido para calcular melhores horários.</div>';
+    return;
+  }
+  let html='<table><thead><tr><th style="text-align:left">Setor</th><th>Melhor horário</th><th>Média/h no horário</th><th>Meta/h</th><th>Status</th><th>Dias</th></tr></thead><tbody>';
+  rows.forEach(r=>{
+    const ok=r.bestAvg!==null&&compInMeta(r.bestAvg,r.cap,r.def.inverse);
+    const color=r.bestAvg===null?'#6a9fc0':ok?CAPACITY_OK_COLOR:CAPACITY_LOW_COLOR;
+    const status=r.bestAvg===null?'—':ok?'Dentro da meta':compGapLabel(r.bestAvg,r.cap,r.def.inverse);
+    html+=`<tr><td style="text-align:left;font-weight:bold;color:#00385f">${r.def.label}</td><td style="font-weight:bold;color:#00385f">${r.bestIdx>=0?HOURS[r.bestIdx]:'—'}</td><td style="font-weight:bold;color:${color}">${compFmtAvg(r.def,r.bestAvg)}</td><td>${compFmtAvg(r.def,r.cap)}</td><td style="font-weight:bold;color:${color}">${status}</td><td>${r.count||0}</td></tr>`;
+  });
+  html+='</tbody></table>';
+  el.innerHTML=html;
+}
+function compPearson(xs,ys){
+  const pairs=xs.map((x,i)=>({x:+x,y:+ys[i]})).filter(p=>Number.isFinite(p.x)&&Number.isFinite(p.y));
+  if(pairs.length<2)return null;
+  const mx=pairs.reduce((s,p)=>s+p.x,0)/pairs.length;
+  const my=pairs.reduce((s,p)=>s+p.y,0)/pairs.length;
+  let num=0,dx=0,dy=0;
+  pairs.forEach(p=>{
+    const vx=p.x-mx,vy=p.y-my;
+    num+=vx*vy;
+    dx+=vx*vx;
+    dy+=vy*vy;
+  });
+  return dx&&dy?num/Math.sqrt(dx*dy):null;
+}
+function compCorrText(r){
+  if(r===null)return'Dados insuficientes para medir relação.';
+  const abs=Math.abs(r);
+  const strength=abs>=0.7?'forte':abs>=0.4?'moderada':abs>=0.2?'fraca':'muito baixa';
+  if(abs<0.2)return`Relação ${strength}: volume maior não mostrou ligação clara com atraso.`;
+  return r>0?`Relação ${strength}: nos dias de maior volume, o atraso tende a subir.`:`Relação ${strength}: volume maior não acompanhou aumento de atrasos.`;
+}
+function renderCompVolumeDelay(days,delayStats,labels){
+  const canvas=document.getElementById('cCompVolAtraso');
+  const resumo=document.getElementById('compVolDelayResumo');
+  if(CH.compVolAtraso){CH.compVolAtraso.destroy();delete CH.compVolAtraso;}
+  if(!canvas)return;
+  const rows=days.map(day=>{
+    const vol=sumActiveHoraField('Vol. Doca',day.hd||{},day.date)||+day.pnDoca||0;
+    const stat=delayStats.find(s=>s.day.date===day.date)||{count:0,totalMin:0};
+    return{day,vol,count:stat.count,totalMin:stat.totalMin};
+  });
+  const vols=rows.map(r=>r.vol),counts=rows.map(r=>r.count);
+  const corr=compPearson(vols,counts);
+  const options=compChartOptions({yTitle:'Volume expedido',secondAxis:true});
+  options.scales.y2.title.text='Rotas atrasadas';
+  CH.compVolAtraso=new Chart(canvas,{type:'bar',
+    data:{labels,datasets:[
+      {label:'Volume expedido',data:vols,backgroundColor:CAPACITY_OK_COLOR,borderRadius:4,valueLabels:vols.map(v=>v?Math.round(v).toLocaleString('pt-BR'):'')},
+      {label:'Rotas atrasadas',data:counts,type:'line',borderColor:CAPACITY_LOW_COLOR,backgroundColor:CAPACITY_LOW_COLOR,borderWidth:2,pointRadius:3,fill:false,yAxisID:'y2'}
+    ]},
+    options
+  });
+  if(!resumo)return;
+  const delayed=rows.filter(r=>r.count>0),onTime=rows.filter(r=>r.count===0);
+  const avg=arr=>arr.length?arr.reduce((s,r)=>s+r.vol,0)/arr.length:null;
+  const avgDelayed=avg(delayed),avgOnTime=avg(onTime);
+  const diff=avgDelayed!==null&&avgOnTime!==null?avgDelayed-avgOnTime:null;
+  const corrTxt=compCorrText(corr);
+  resumo.innerHTML=`<table><thead><tr><th>Correlação</th><th>Leitura</th><th>Média volume dias com atraso</th><th>Média volume dias sem atraso</th><th>Diferença</th></tr></thead><tbody><tr><td style="font-weight:bold;color:#00385f">${corr===null?'—':corr.toFixed(2).replace('.',',')}</td><td style="text-align:left;font-weight:bold;color:#00385f">${corrTxt}</td><td>${avgDelayed===null?'—':Math.round(avgDelayed).toLocaleString('pt-BR')}</td><td>${avgOnTime===null?'—':Math.round(avgOnTime).toLocaleString('pt-BR')}</td><td style="font-weight:bold;color:${diff!==null&&diff>0?CAPACITY_LOW_COLOR:CAPACITY_OK_COLOR}">${diff===null?'—':(diff>0?'+':'')+Math.round(diff).toLocaleString('pt-BR')}</td></tr></tbody></table>`;
+}
 function compChartOptions({yTitle='Média/h',percent=false,secondAxis=false}={}){
   return{
     responsive:true,
@@ -3316,7 +3424,7 @@ function compChartOptions({yTitle='Média/h',percent=false,secondAxis=false}={})
   };
 }
 function destroyCompCharts(){
-  ['cPerc','cVA','cOS','cFlt','compResumo','compMed','compPerf','compCheckout','compCheckoutPsico','compEspecial','compExpedicao','compEpm','compVale','compAtrasos']
+  ['cPerc','cVA','cOS','cFlt','compResumo','compMed','compPerf','compCheckout','compCheckoutPsico','compEspecial','compExpedicao','compEpm','compVale','compAtrasos','compVolAtraso']
     .forEach(k=>{if(CH[k]){CH[k].destroy();delete CH[k];}});
 }
 function renderCompIndicatorChart(def,labels,days){
@@ -3359,6 +3467,8 @@ function renderComp(){
     document.getElementById('compTbl').innerHTML='<div class="no-data">Sem dados para este mês</div>';
     const delayEl=document.getElementById('compDelayTbl');if(delayEl)delayEl.innerHTML='';
     const finishEl=document.getElementById('compFinishPanel');if(finishEl)finishEl.innerHTML='';
+    const bestEl=document.getElementById('compBestHoursTbl');if(bestEl)bestEl.innerHTML='';
+    const relEl=document.getElementById('compVolDelayResumo');if(relEl)relEl.innerHTML='';
     return;
   }
   const labels=days.map(d=>fmtDateShort(d.date));
@@ -3388,6 +3498,7 @@ function renderComp(){
     options:compChartOptions({yTitle:'% da meta',percent:true})
   });
   renderCompFinishPanel(days);
+  renderCompBestHours(days,defs);
   const delayRows=[];
   const delayStats=days.map(day=>{
     let count=0,totalMin=0;
@@ -3408,6 +3519,7 @@ function renderComp(){
     ]},
     options:compChartOptions({yTitle:'Qtd. rotas atrasadas',secondAxis:true})
   });
+  renderCompVolumeDelay(days,delayStats,labels);
   const cols=['Data',...defs.map(d=>d.short),'Atrasos'];
   let t=`<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>`;
   [...days].reverse().forEach(day=>{
