@@ -776,16 +776,27 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 
 <!-- TAB COMPARATIVO -->
 <div class="tab-body" id="tb-comp">
-  <div class="chart-grid">
-    <div class="chart-box"><div class="chart-ttl">% Expedido por Dia</div><div style="position:relative;height:220px"><canvas id="cCompPerc" role="img" aria-label="Percentual expedido por dia"></canvas></div></div>
-    <div class="chart-box"><div class="chart-ttl">Previsto Doca vs Expedido</div><div style="position:relative;height:220px"><canvas id="cCompVA" role="img" aria-label="Previsto doca vs expedido"></canvas></div></div>
+  <div class="separator" id="compMonthTitle">Comparativo mensal — média realizada por hora</div>
+  <div class="chart-grid" style="grid-template-columns:1fr">
+    <div class="chart-box"><div class="chart-ttl">Média do mês — todos os indicadores</div><div style="position:relative;height:260px"><canvas id="cCompResumo" role="img" aria-label="Media mensal de todos os indicadores"></canvas></div></div>
   </div>
-  <div class="chart-grid">
-    <div class="chart-box"><div class="chart-ttl">Correia Med. vs Correia Perf.</div><div style="position:relative;height:200px"><canvas id="cCompOS" role="img" aria-label="Correia medicamentos vs perfumaria"></canvas></div></div>
-    <div class="chart-box"><div class="chart-ttl">Checkout vs Doca</div><div style="position:relative;height:200px"><canvas id="cCompFlt" role="img" aria-label="Checkout vs doca"></canvas></div></div>
+  <div class="chart-grid" id="compIndicatorGrid">
+    <div class="chart-box"><div class="chart-ttl">Correia Medicamento — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompMed" role="img" aria-label="Media hora correia medicamento por dia"></canvas></div></div>
+    <div class="chart-box"><div class="chart-ttl">Correia Perfumaria — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompPerf" role="img" aria-label="Media hora correia perfumaria por dia"></canvas></div></div>
+    <div class="chart-box"><div class="chart-ttl">Checkout — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompCheckout" role="img" aria-label="Media hora checkout por dia"></canvas></div></div>
+    <div class="chart-box"><div class="chart-ttl">Checkout Psico — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompCheckoutPsico" role="img" aria-label="Media hora checkout psico por dia"></canvas></div></div>
+    <div class="chart-box"><div class="chart-ttl">Especial — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompEspecial" role="img" aria-label="Media hora especial por dia"></canvas></div></div>
+    <div class="chart-box"><div class="chart-ttl">Expedição — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompExpedicao" role="img" aria-label="Media hora expedicao por dia"></canvas></div></div>
+    <div class="chart-box"><div class="chart-ttl">EPM — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompEpm" role="img" aria-label="Media hora EPM por dia"></canvas></div></div>
+    <div class="chart-box"><div class="chart-ttl">Vale — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompVale" role="img" aria-label="Media hora vale por dia"></canvas></div></div>
   </div>
-  <div class="separator">Tabela Resumo — Todos os Dias</div>
+  <div class="chart-grid" style="grid-template-columns:1fr">
+    <div class="chart-box"><div class="chart-ttl">Rotas expedidas com atraso no mês</div><div style="position:relative;height:250px"><canvas id="cCompAtrasos" role="img" aria-label="Rotas atrasadas por dia"></canvas></div></div>
+  </div>
+  <div class="separator">Resumo mensal — médias por hora</div>
   <div class="tbl-wrap" id="compTbl"></div>
+  <div class="separator">Detalhe dos atrasos — rotas expedidas com atraso</div>
+  <div class="tbl-wrap" id="compDelayTbl"></div>
 </div>
 
 <!-- TAB PREENCHER — operador -->
@@ -1160,10 +1171,11 @@ const BAR_VALUE_LABEL_PLUGIN={
         const raw=Array.isArray(dataset.data)?dataset.data[i]:null;
         const n=Number(raw);
         if(!Number.isFinite(n)||n===0)return;
-        const label=Math.round(n).toLocaleString('pt-BR');
+        const label=String(dataset.valueLabels&&dataset.valueLabels[i]?dataset.valueLabels[i]:Math.round(n).toLocaleString('pt-BR'));
+        const lines=label.split('\n');
         const props=bar.getProps(['x','y','base','width','height'],true);
-        const textW=ctx.measureText(label).width;
-        const boxW=textW+8,boxH=14,r=3;
+        const textW=Math.max(...lines.map(line=>ctx.measureText(line).width));
+        const boxW=textW+8,boxH=4+(lines.length*11),r=3;
         const horizontal=chart.options&&chart.options.indexAxis==='y';
         let x=props.x;
         let y=props.y;
@@ -1204,7 +1216,8 @@ const BAR_VALUE_LABEL_PLUGIN={
         ctx.quadraticCurveTo(x-boxW/2,y-boxH/2,x-boxW/2+r,y-boxH/2);
         ctx.fill();
         ctx.fillStyle='#06111f';
-        ctx.fillText(label,x,y);
+        const firstY=y-((lines.length-1)*5.5);
+        lines.forEach((line,lineIdx)=>ctx.fillText(line,x,firstY+(lineIdx*11)));
       });
     });
     ctx.restore();
@@ -3109,61 +3122,225 @@ function buildHistContent(day){
 }
 
 // ── COMPARATIVO ───────────────────────────────────────────
-function renderComp(){
+function compReferenceMonth(){
+  const cur=curDate&&getDay(curDate)?curDate:null;
+  const now=today();
   const days=sortedDays();
-  if(!days.length){document.getElementById('compTbl').innerHTML='<div class="no-data">Sem dados</div>';return;}
+  if(days.some(d=>String(d.date).slice(0,7)===now.slice(0,7)))return now.slice(0,7);
+  if(cur)return cur.slice(0,7);
+  const latest=latestDay();
+  return latest?latest.date.slice(0,7):now.slice(0,7);
+}
+function compMonthLabel(ym){
+  const [y,m]=String(ym).split('-').map(Number);
+  const dt=new Date(y,(m||1)-1,1);
+  return dt.toLocaleDateString('pt-BR',{month:'long',year:'numeric'});
+}
+function compIndicators(){
+  return [
+    {key:'med',label:'Correia Medicamento',short:'Correia Med.',metric:'Linhas Med.',canvas:'cCompMed',cap:d=>+d.capLM||3500},
+    {key:'perf',label:'Correia Perfumaria',short:'Correia Perf.',metric:'Linhas Perf.',canvas:'cCompPerf',cap:d=>+d.capLP||3000},
+    {key:'checkout',label:'Checkout',short:'Checkout',metric:'Vol. Checkout',canvas:'cCompCheckout',cap:d=>+d.capVC||1280},
+    {key:'checkoutPsico',label:'Checkout Psico',short:'CK Psico',metric:'Vol. Checkout Psico',canvas:'cCompCheckoutPsico',cap:d=>checkoutPsicoVolCap(d)},
+    {key:'especial',label:'Especial',short:'Especial',metric:'Vol. Especial',canvas:'cCompEspecial',cap:d=>+d.capEsp||340},
+    {key:'expedicao',label:'Expedição',short:'Expedição',metric:'Vol. Doca',canvas:'cCompExpedicao',cap:d=>+d.capVE||1303},
+    {key:'epm',label:'EPM',short:'EPM',metric:'Erros Sep. Med.',canvas:'cCompEpm',cap:d=>+d.capErros||2500,inverse:true,kind:'epm'},
+    {key:'vale',label:'Vale',short:'Vale',metric:'Vales',canvas:'cCompVale',cap:d=>+d.capVales||1,inverse:true}
+  ];
+}
+function compFilledValue(v){
+  return v!==''&&v!==null&&v!==undefined&&Number.isFinite(+v);
+}
+function compDailyMetric(day,def){
+  const hd=day.hd||{};
+  if(def.kind==='epm'){
+    const vals=epmSeriesFromHd(hd).filter(v=>v!==null&&Number.isFinite(+v));
+    const total=vals.reduce((s,v)=>s+(+v||0),0);
+    return{avg:vals.length?total/vals.length:null,total,hours:vals.length,cap:def.cap(day)};
+  }
+  const arr=hd[def.metric]||[];
+  let total=0,hours=0;
+  HOURS.forEach((_,i)=>{
+    const v=arr[i];
+    if(!compFilledValue(v))return;
+    total+=+v||0;
+    hours+=hourTargetFactor(def.metric,i,day.date);
+  });
+  return{avg:hours>0?total/hours:null,total,hours,cap:def.cap(day)};
+}
+function compMonthlyMetric(days,def){
+  let total=0,hours=0;
+  days.forEach(day=>{
+    const d=compDailyMetric(day,def);
+    if(d.avg===null)return;
+    if(def.kind==='epm'){
+      total+=d.avg*d.hours;
+      hours+=d.hours;
+    }else{
+      total+=d.total;
+      hours+=d.hours;
+    }
+  });
+  const capDays=days.map(day=>def.cap(day)).filter(v=>v>0);
+  const cap=capDays.length?capDays.reduce((s,v)=>s+v,0)/capDays.length:def.cap({});
+  return{avg:hours>0?total/hours:null,total,hours,cap};
+}
+function compInMeta(avg,cap,inverse){
+  if(avg===null||!cap)return false;
+  return inverse?avg<=cap:avg>=cap;
+}
+function compGapLabel(avg,cap,inverse){
+  if(avg===null||!cap)return'';
+  if(compInMeta(avg,cap,inverse))return'in meta';
+  const pct=inverse?Math.round(((avg-cap)/cap)*100):Math.round(((cap-avg)/cap)*100);
+  return inverse?`${pct}% acima`:`falta ${pct}%`;
+}
+function compScorePct(avg,cap,inverse){
+  if(avg===null||!cap)return 0;
+  if(inverse)return avg<=cap?100:Math.max(0,Math.round(cap/avg*100));
+  return Math.round(avg/cap*100);
+}
+function compFmtAvg(def,v){
+  if(v===null||!Number.isFinite(+v))return'—';
+  const n=+v;
+  if(def.key==='vale')return n.toLocaleString('pt-BR',{minimumFractionDigits:1,maximumFractionDigits:1});
+  return Math.round(n).toLocaleString('pt-BR');
+}
+function compChartOptions({yTitle='Média/h',percent=false,secondAxis=false}={}){
+  return{
+    responsive:true,
+    maintainAspectRatio:false,
+    plugins:{
+      legend:{labels:{color:'#00385f',font:{size:10,weight:'bold'}}},
+      tooltip:{callbacks:{label:ctx=>{
+        const ds=ctx.dataset||{};
+        const raw=ctx.parsed&&ctx.parsed.y!==undefined?ctx.parsed.y:ctx.raw;
+        if(ds.tooltipLabels&&ds.tooltipLabels[ctx.dataIndex])return ds.tooltipLabels[ctx.dataIndex];
+        return `${ds.label||''}: ${percent?raw+'%':Number(raw||0).toLocaleString('pt-BR')}`;
+      }}}
+    },
+    scales:{
+      x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45},grid:{color:'rgba(6,35,61,0.08)'}},
+      y:{beginAtZero:true,ticks:{color:'#00385f',font:{size:9,weight:'bold'},callback:v=>percent?v+'%':Number(v).toLocaleString('pt-BR')},grid:{color:'rgba(6,35,61,0.12)'},title:{display:true,text:yTitle,color:'#00385f',font:{size:9,weight:'bold'}}},
+      ...(secondAxis?{y2:{beginAtZero:true,position:'right',ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{display:false},title:{display:true,text:'Minutos de atraso',color:'#00385f',font:{size:9,weight:'bold'}}}}:{})
+    }
+  };
+}
+function destroyCompCharts(){
+  ['cPerc','cVA','cOS','cFlt','compResumo','compMed','compPerf','compCheckout','compCheckoutPsico','compEspecial','compExpedicao','compEpm','compVale','compAtrasos']
+    .forEach(k=>{if(CH[k]){CH[k].destroy();delete CH[k];}});
+}
+function renderCompIndicatorChart(def,labels,days){
+  const canvas=document.getElementById(def.canvas);
+  if(!canvas)return;
+  const key='comp'+def.key.charAt(0).toUpperCase()+def.key.slice(1);
+  if(CH[key])CH[key].destroy();
+  const rows=days.map(day=>({day,...compDailyMetric(day,def)}));
+  const data=rows.map(r=>r.avg===null?0:Math.round(r.avg));
+  const colors=rows.map(r=>r.avg===null?'rgba(0,0,0,.08)':compInMeta(r.avg,r.cap,def.inverse)?CAPACITY_OK_COLOR:CAPACITY_LOW_COLOR);
+  const valueLabels=rows.map(r=>{
+    if(r.avg===null)return'';
+    const gap=compGapLabel(r.avg,r.cap,def.inverse);
+    return compInMeta(r.avg,r.cap,def.inverse)?compFmtAvg(def,r.avg):`${compFmtAvg(def,r.avg)}\n${gap}`;
+  });
+  const tooltips=rows.map(r=>r.avg===null?'Sem preenchimento':[
+    `${def.label}: ${compFmtAvg(def,r.avg)} por hora`,
+    `Meta: ${compFmtAvg(def,r.cap)} por hora`,
+    compGapLabel(r.avg,r.cap,def.inverse),
+    `Horas preenchidas: ${r.hours.toLocaleString('pt-BR',{maximumFractionDigits:1})}`
+  ]);
+  CH[key]=new Chart(canvas,{type:'bar',
+    data:{labels,datasets:[
+      {label:`Média/h ${def.short}`,data,backgroundColor:colors,borderRadius:4,valueLabels,tooltipLabels:tooltips},
+      {label:'Meta/h',data:rows.map(r=>Math.round(r.cap||0)),type:'line',borderColor:'#ffd700',borderDash:[5,3],borderWidth:2,pointRadius:2,fill:false}
+    ]},
+    options:compChartOptions({yTitle:def.inverse?'Média/h (máximo)':'Média/h'})
+  });
+}
+function renderComp(){
+  destroyCompCharts();
+  const ym=compReferenceMonth();
+  const days=sortedDays().filter(d=>String(d.date||'').slice(0,7)===ym);
+  const title=document.getElementById('compMonthTitle');
+  if(title)title.textContent=`Comparativo mensal — média realizada por hora — ${compMonthLabel(ym)}`;
+  if(!days.length){
+    document.getElementById('compTbl').innerHTML='<div class="no-data">Sem dados para este mês</div>';
+    const delayEl=document.getElementById('compDelayTbl');if(delayEl)delayEl.innerHTML='';
+    return;
+  }
   const labels=days.map(d=>fmtDateShort(d.date));
-  const stats=days.map(day=>{
-    const hd=day.hd||{};
-    const sumH=metric=>sumHoraField(metric,hd);
-    const prevDoca=+day.pnDoca||+day.pnVol||0;
-    const doca=Math.max(sumH('Vol. Doca'),+day.rDoc||0);
-    return {
-      day,prevDoca,doca,
-      perc:prevDoca>0?Math.round(doca/prevDoca*100):0,
-      med:sumH('Linhas Med.'),
-      perf:sumH('Linhas Perf.'),
-      checkout:sumH('Vol. Checkout'),
-      especial:sumH('Vol. Especial'),
-      fraldaFech:sumH('Vol. Fraldas Cx Fech.'),
-      fraldaFrac:sumH('Vol. Fraldas Frac.')
-    };
+  const defs=compIndicators();
+  defs.forEach(def=>renderCompIndicatorChart(def,labels,days));
+  const monthly=defs.map(def=>({def,...compMonthlyMetric(days,def)}));
+  const resumoLabels=monthly.map(m=>m.def.short);
+  const resumoData=monthly.map(m=>compScorePct(m.avg,m.cap,m.def.inverse));
+  const resumoColors=monthly.map(m=>m.avg===null?'rgba(0,0,0,.08)':compInMeta(m.avg,m.cap,m.def.inverse)?CAPACITY_OK_COLOR:CAPACITY_LOW_COLOR);
+  const resumoValueLabels=monthly.map(m=>{
+    if(m.avg===null)return'';
+    const gap=compGapLabel(m.avg,m.cap,m.def.inverse);
+    return compInMeta(m.avg,m.cap,m.def.inverse)?`${Math.min(compScorePct(m.avg,m.cap,m.def.inverse),999)}%`:`${compScorePct(m.avg,m.cap,m.def.inverse)}%\n${gap}`;
   });
-  const percs=stats.map(s=>s.perc);
-  if(CH.cPerc)CH.cPerc.destroy();
-  CH.cPerc=new Chart(document.getElementById('cCompPerc'),{type:'bar',
-    data:{labels,datasets:[{label:'% Expedido',data:percs,backgroundColor:percs.map(p=>p>=90?'#00e676':p>=70?'#ff9500':'#ff4c4c'),borderRadius:4}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},
-      scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'}},y:{suggestedMax:110,ticks:{color:'#6a9fc0',font:{size:9},callback:v=>v+'%'},grid:{color:'rgba(255,255,255,0.07)'}}}}});
-  if(CH.cVA)CH.cVA.destroy();
-  CH.cVA=new Chart(document.getElementById('cCompVA'),{type:'line',
-    data:{labels,datasets:[{label:'Prev. Doca',data:stats.map(s=>s.prevDoca),borderColor:'#ffd700',borderWidth:2,pointRadius:3,fill:false,tension:.3},{label:'Expedido',data:stats.map(s=>s.doca),borderColor:'#00e676',borderWidth:2,pointRadius:3,fill:false,tension:.3}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'}}}}});
-  if(CH.cOS)CH.cOS.destroy();
-  CH.cOS=new Chart(document.getElementById('cCompOS'),{type:'bar',
-    data:{labels,datasets:[{label:'Correia Med.',data:stats.map(s=>s.med),backgroundColor:'rgba(255,149,0,.35)',borderColor:'#ff9500',borderWidth:1},{label:'Correia Perf.',data:stats.map(s=>s.perf),backgroundColor:'#00e5ff',borderRadius:3}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'}}}}});
-  if(CH.cFlt)CH.cFlt.destroy();
-  CH.cFlt=new Chart(document.getElementById('cCompFlt'),{type:'bar',
-    data:{labels,datasets:[{label:'Vol. Checkout',data:stats.map(s=>s.checkout),backgroundColor:'rgba(77,166,255,.45)',borderColor:'#4da6ff',borderWidth:1},{label:'Vol. Doca',data:stats.map(s=>s.doca),backgroundColor:'#00e676',borderRadius:3}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#89b4d4',font:{size:10}}}},scales:{x:{ticks:{color:'#6a9fc0',font:{size:9},maxRotation:45},grid:{color:'rgba(255,255,255,0.04)'}},y:{ticks:{color:'#6a9fc0',font:{size:9}},grid:{color:'rgba(255,255,255,0.07)'}}}}});
-  const cols=['Data','Prev. Doca','Expedido','% Exp.','Correia Med.','Correia Perf.','Vol. Checkout','Vol. Especial','Fraldas Fech.','Fraldas Frac.','O.S.Imp.','O.S.Fin.','Faltas','Obs'];
+  const resumoTooltips=monthly.map(m=>[
+    `${m.def.label}: ${compFmtAvg(m.def,m.avg)} por hora`,
+    `Meta: ${compFmtAvg(m.def,m.cap)} por hora`,
+    compGapLabel(m.avg,m.cap,m.def.inverse)
+  ]);
+  CH.compResumo=new Chart(document.getElementById('cCompResumo'),{type:'bar',
+    data:{labels:resumoLabels,datasets:[
+      {label:'% da meta mensal',data:resumoData,backgroundColor:resumoColors,borderRadius:4,valueLabels:resumoValueLabels,tooltipLabels:resumoTooltips},
+      {label:'Meta',data:monthly.map(()=>100),type:'line',borderColor:'#ffd700',borderDash:[5,3],borderWidth:2,pointRadius:0,fill:false}
+    ]},
+    options:compChartOptions({yTitle:'% da meta',percent:true})
+  });
+  const delayRows=[];
+  const delayStats=days.map(day=>{
+    let count=0,totalMin=0;
+    buildRotasMerged(day).forEach(r=>{
+      const delay=calcAtraso(r.hPrev,r.hReal);
+      if(r.hReal&&delay>0){
+        count++;
+        totalMin+=delay;
+        delayRows.push({date:day.date,cod:r.cod,cidade:r.cidade,hPrev:r.hPrev,hReal:r.hReal,delay});
+      }
+    });
+    return{day,count,totalMin};
+  });
+  CH.compAtrasos=new Chart(document.getElementById('cCompAtrasos'),{type:'bar',
+    data:{labels,datasets:[
+      {label:'Rotas atrasadas',data:delayStats.map(s=>s.count),backgroundColor:delayStats.map(s=>s.count?CAPACITY_LOW_COLOR:CAPACITY_OK_COLOR),borderRadius:4,valueLabels:delayStats.map(s=>s.count?String(s.count):'')},
+      {label:'Minutos de atraso',data:delayStats.map(s=>s.totalMin),type:'line',borderColor:'#ff9500',borderWidth:2,pointRadius:3,fill:false,yAxisID:'y2'}
+    ]},
+    options:compChartOptions({yTitle:'Qtd. rotas atrasadas',secondAxis:true})
+  });
+  const cols=['Data',...defs.map(d=>d.short),'Atrasos'];
   let t=`<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>`;
-  [...stats].reverse().forEach(s=>{
-    const d=s.day;const pc=s.perc>=90?'#00e676':s.perc>=70?'#ffd700':'#ff4c4c';
-    t+=`<tr><td style="white-space:nowrap;font-weight:bold;color:#ffd700">${fmtDateShort(d.date)}</td>
-      <td>${s.prevDoca.toLocaleString('pt-BR')}</td>
-      <td style="color:#00e676">${s.doca.toLocaleString('pt-BR')}</td>
-      <td style="color:${pc};font-weight:bold">${s.perc}%</td>
-      <td>${s.med.toLocaleString('pt-BR')}</td><td>${s.perf.toLocaleString('pt-BR')}</td>
-      <td>${s.checkout.toLocaleString('pt-BR')}</td><td>${s.especial.toLocaleString('pt-BR')}</td>
-      <td>${s.fraldaFech.toLocaleString('pt-BR')}</td><td>${s.fraldaFrac.toLocaleString('pt-BR')}</td>
-      <td>${d.osImp||0}</td><td>${d.osFin||0}</td>
-      <td style="color:${(d.faltas||0)>3?'#ff4c4c':(d.faltas||0)>0?'#ffd700':'#00e676'}">${d.faltas||0}</td>
-      <td style="font-size:10px;color:#6a9fc0;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${d.obs||''}</td>
-    </tr>`;
+  [...days].reverse().forEach(day=>{
+    const dayDelay=delayStats.find(s=>s.day.date===day.date)||{count:0};
+    t+=`<tr><td style="white-space:nowrap;font-weight:bold;color:#ffd700">${fmtDateShort(day.date)}</td>`;
+    defs.forEach(def=>{
+      const d=compDailyMetric(day,def);
+      const ok=compInMeta(d.avg,d.cap,def.inverse);
+      const color=d.avg===null?'#6a9fc0':ok?CAPACITY_OK_COLOR:CAPACITY_LOW_COLOR;
+      const gap=d.avg===null?'':compGapLabel(d.avg,d.cap,def.inverse);
+      t+=`<td style="color:${color};font-weight:bold">${compFmtAvg(def,d.avg)}${gap&&gap!=='in meta'?`<div style="font-size:9px;color:${color}">${gap}</div>`:''}</td>`;
+    });
+    t+=`<td style="color:${dayDelay.count?CAPACITY_LOW_COLOR:CAPACITY_OK_COLOR};font-weight:bold">${dayDelay.count}</td></tr>`;
   });
-  t+='</tbody></table>';document.getElementById('compTbl').innerHTML=t;
+  t+='</tbody></table>';
+  document.getElementById('compTbl').innerHTML=t;
+  const delayEl=document.getElementById('compDelayTbl');
+  if(delayEl){
+    if(!delayRows.length){
+      delayEl.innerHTML='<div class="no-data">Nenhuma rota expedida com atraso neste mês.</div>';
+    }else{
+      let dhtml='<table><thead><tr><th>Data</th><th>Cód.</th><th>Rota</th><th>Previsto</th><th>Realizado</th><th>Atraso</th></tr></thead><tbody>';
+      delayRows.reverse().forEach(r=>{
+        dhtml+=`<tr><td style="font-weight:bold;color:#ffd700">${fmtDateShort(r.date)}</td><td>${r.cod}</td><td style="text-align:left">${r.cidade}</td><td>${r.hPrev}</td><td>${r.hReal}</td><td style="color:${CAPACITY_LOW_COLOR};font-weight:bold">${fmtAtraso(r.delay)}</td></tr>`;
+      });
+      dhtml+='</tbody></table>';
+      delayEl.innerHTML=dhtml;
+    }
+  }
 }
 
 // ── ADMIN FORM ────────────────────────────────────────────
