@@ -25,7 +25,7 @@ body.privacy-lock::after{content:attr(data-watermark);position:fixed;right:16px;
 .kpi-bar{background:#0b1d2e;display:grid;gap:2px;padding:4px 8px;border-bottom:1px solid #1e4a72}
 .kpi{background:#122033;padding:4px 5px;text-align:center;border-radius:3px;border:1px solid #1a3550;min-width:0}
 .kpi-lbl{font-size:9px;color:#6a9fc0;text-transform:uppercase;letter-spacing:.3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#kpiBar1 .kpi-lbl{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.08;min-height:20px;display:flex;align-items:flex-start;justify-content:center}
+#kpiBar1 .kpi-lbl{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.08;min-height:22px;display:block;text-align:center}
 .kpi-val{font-size:13px;font-weight:bold;line-height:1.3;color:#ffd700}
 .kpi-val.g{color:#00e676}.kpi-val.r{color:#ff4c4c}.kpi-val.o{color:#ff9500}.kpi-val.c{color:#00e5ff}.kpi-val.w{color:#fff}
 .op-new{display:none}
@@ -568,10 +568,10 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
   <div class="kpi" style="border-color:#ffd700"><div class="kpi-lbl" style="color:#ffd700">Venda: Unidade (Correia)</div><div class="kpi-val" style="color:#ffd700" id="kPNU">—</div></div>
   <div class="kpi"><div class="kpi-lbl">Volumes Expedidos</div><div class="kpi-val o" id="kVenda">—</div></div>
   <div class="kpi"><div class="kpi-lbl">Linhas Realizadas</div><div class="kpi-val g" id="kAcum">—</div></div>
-  <div class="kpi"><div class="kpi-lbl">Volume Pendente de Finalização</div><div class="kpi-val r" id="kProc">—</div></div>
+  <div class="kpi"><div class="kpi-lbl">Volume Pendente de<br>Finalização</div><div class="kpi-val r" id="kProc">—</div></div>
   <div class="kpi"><div class="kpi-lbl">Vol. Finalizado</div><div class="kpi-val c" id="kMeta">—</div></div>
   <div class="kpi"><div class="kpi-lbl">Linhas Realizadas</div><div class="kpi-val w" id="kOsImp">—</div></div>
-  <div class="kpi"><div class="kpi-lbl">Linhas Ainda Não Processadas</div><div class="kpi-val g" id="kOsFin">—</div></div>
+  <div class="kpi"><div class="kpi-lbl">Linhas Ainda Não<br>Processadas</div><div class="kpi-val g" id="kOsFin">—</div></div>
   <div class="kpi"><div class="kpi-lbl">Linhas Total</div><div class="kpi-val r" id="kOsProd">—</div></div>
   <div class="kpi"><div class="kpi-lbl">% Produzido</div><div class="kpi-val o" id="kPerc">—</div><div class="kpi-pbar"><div class="kpi-pfill" id="kPercBar" style="width:0%;background:#ff9500"></div></div></div>
 </div>
@@ -1793,7 +1793,13 @@ function setSplitKpi(id,values){
 function setKpiLabel(valueId,label){
   const val=document.getElementById(valueId);
   const lbl=val&&val.previousElementSibling;
-  if(lbl)lbl.textContent=label;
+  if(!lbl)return;
+  const safe=String(label??'')
+    .replace(/&/g,'&amp;')
+    .replace(/</g,'&lt;')
+    .replace(/>/g,'&gt;')
+    .replace(/\s*\|\s*/g,'<br>');
+  lbl.innerHTML=safe;
 }
 function orderCutoffClosed(dt){
   const d=String(dt||today());
@@ -2129,7 +2135,7 @@ function renderKPIs(day){
   setKpiLabel('kPNU','Venda: Unidade (Correia)');
   setKpiLabel('kVenda','Volumes Expedidos');
   setKpiLabel('kAcum','Linhas Realizadas');
-  setKpiLabel('kProc','Volume Pendente de Finalização');
+  setKpiLabel('kProc','Volume Pendente de|Finalização');
   setKpiLabel('kMeta','Vol. Finalizado');
   document.getElementById('kPN').textContent=(day.pnVol||0).toLocaleString('pt-BR');
   document.getElementById('kPNU').textContent=(day.pnUnid||0).toLocaleString('pt-BR');
@@ -2138,7 +2144,7 @@ function renderKPIs(day){
   document.getElementById('kProc').textContent=volPendente.toLocaleString('pt-BR');
   document.getElementById('kMeta').textContent=volFinalizado.toLocaleString('pt-BR');
   setKpiLabel('kOsImp','Linhas Realizadas');
-  setKpiLabel('kOsFin',simpleOp?'Linhas Ainda Não Processadas':'Linhas Finalizadas');
+  setKpiLabel('kOsFin',simpleOp?'Linhas Ainda Não|Processadas':'Linhas Finalizadas');
   setKpiLabel('kOsProd',simpleOp?'Linhas Total':'Linhas A Produzir');
   setSplitKpi('kOsImp',osImpSplit);
   setSplitKpi('kOsFin',osFinSplit);
