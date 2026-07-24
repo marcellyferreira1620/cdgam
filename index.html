@@ -136,7 +136,7 @@ body.privacy-lock::after{content:attr(data-watermark);position:fixed;right:16px;
 .prev-item input:focus{outline:none;border-color:#ffd700}
 .hora-tbl-wrap{margin-top:10px;background:#122033;border-radius:4px;padding:8px;border:1px solid #1a3550;overflow-x:auto}
 .hora-tbl-wrap h4{color:#ffd700;font-size:11px;margin-bottom:6px;text-transform:uppercase}
-.hora-tbl-wrap table{border-collapse:collapse;font-size:10px;min-width:1280px}
+.hora-tbl-wrap table{border-collapse:collapse;font-size:10px;min-width:1400px}
 .hora-tbl-wrap th{background:#0a2340;color:#6a9fc0;padding:3px 6px;text-align:center;border:1px solid #1a3550;white-space:nowrap}
 .hora-tbl-wrap td{border:1px solid #1a3550;padding:1px 2px}
 .hora-tbl-wrap .hlbl{color:#89b4d4;background:#0a1825;padding:3px 6px;white-space:nowrap;font-weight:bold}
@@ -982,7 +982,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 
     <!-- TABELA HORA A HORA -->
     <div class="hora-tbl-wrap">
-      <h4>⏱️ PRODUÇÃO HORA A HORA — CORREIA/CHECKOUT: turno normal 17:30→23:00 <span style='color:rgba(255,149,0,.8);font-size:9px'>⚡ colunas laranja = hora extra (preencher se necessário)</span> | EXPEDIÇÃO: base até 04:00, extensão até 06:00
+      <h4>⏱️ PRODUÇÃO HORA A HORA — CORREIA/CHECKOUT: turno normal 17:30→23:00 <span style='color:rgba(255,149,0,.8);font-size:9px'>⚡ colunas laranja = hora extra (preencher se necessário)</span> | EXPEDIÇÃO: base até 04:00, extensão até 07:00
         <span style="margin-left:10px;font-size:9px;font-weight:normal">
           <span style="background:rgba(0,180,80,.35);padding:1px 6px;border-radius:2px;color:#00e676">▲ Acima</span>
           <span style="background:rgba(0,120,60,.3);padding:1px 6px;border-radius:2px;color:#7ddc9f;margin-left:3px">✔ Meta</span>
@@ -1049,9 +1049,9 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 
 <script>
 // ── CONSTANTES ────────────────────────────────────────────
-// 13 períodos: turno base até 04:00 e duas colunas opcionais de extensão até 06:00
-const HOURS=['17:30→18h','18→19h','19→20h','20→21h','21→22h','22→23h','23→00h','00→01h','01→02h','02→03h','03→04h','04→05h','05→06h'];
-const HOURS_LABEL=['17:30','18:00','19:00','20:00','21:00','22:00','23:00','00:00','01:00','02:00','03:00','04:00','05:00','06:00']; // início e fim dos slots
+// 14 períodos: turno base até 04:00 e três colunas opcionais de extensão até 07:00
+const HOURS=['17:30→18h','18→19h','19→20h','20→21h','21→22h','22→23h','23→00h','00→01h','01→02h','02→03h','03→04h','04→05h','05→06h','06→07h'];
+const HOURS_LABEL=['17:30','18:00','19:00','20:00','21:00','22:00','23:00','00:00','01:00','02:00','03:00','04:00','05:00','06:00','07:00']; // início e fim dos slots
 const SHIFT_START_DEC=17.5;
 const SHIFT_END_DEC=28;
 const FORECAST_CUTOFF_DEC=21.5;
@@ -1067,7 +1067,7 @@ const MHORA=[
   'Vol. Checkout','Linhas Checkout',
   'Vol. Checkout Psico','Linhas Checkout Psico','Unid. Checkout Psico',
   'Unid. Checkout',
-  // EXPEDIÇÃO (DOCA) — base até 04:00, com extensão opcional até 06:00
+  // EXPEDIÇÃO (DOCA) — base até 04:00, com extensão opcional até 07:00
   'Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.',
   'Vol. Geladeira','Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.',
   'Vol. Doca',
@@ -3054,7 +3054,7 @@ function renderDashTables(day){
      metrics:correiaMetrics},
     {title:'🔵 CHECKOUT — Conferência', bg:'rgba(0,229,255,.08)',
      metrics:['Vol. Checkout','Linhas Checkout','Unid. Checkout']},
-    {title:'🟢 EXPEDIÇÃO — DOCA (base até 04:00 | extensão até 06:00)', bg:'rgba(0,230,118,.1)',
+    {title:'🟢 EXPEDIÇÃO — DOCA (base até 04:00 | extensão até 07:00)', bg:'rgba(0,230,118,.1)',
      metrics:expedicaoMetrics},
     {title:'📋 CONTROLE',               bg:'rgba(100,100,180,.08)',
      metrics:['Vales','Conf. Planejado','Conf. Ativo']},
@@ -3722,7 +3722,7 @@ function buildHoraTable(hd){
      metrics:correiaMetrics},
     {title:'🔵 CHECKOUT — Conferência', color:'rgba(0,229,255,.1)',
      metrics:['Vol. Checkout','Linhas Checkout',...(useCheckoutPsico(formDate)?CHECKOUT_PSICO_METRICS:[]),'Unid. Checkout']},
-    {title:'🟢 EXPEDIÇÃO — DOCA (base até 04:00 | extensão até 06:00)', color:'rgba(0,230,118,.12)',
+    {title:'🟢 EXPEDIÇÃO — DOCA (base até 04:00 | extensão até 07:00)', color:'rgba(0,230,118,.12)',
      metrics:expedicaoMetrics},
     {title:'📋 CONTROLE', color:'rgba(100,100,180,.1)',
      metrics:['Vales','Conf. Planejado','Conf. Ativo',...(useCheckoutPsico(formDate)?CHECKOUT_PSICO_CONTROL_METRICS:[])]},
