@@ -1415,13 +1415,21 @@ function saveLocalBackup(snapshot,label){
     const encoded=JSON.stringify(payload);
     const raw=localStorage.getItem(SK_BACKUPS);
     const current=raw?JSON.parse(raw):null;
-    if(current&&current.hash===simpleHash(encoded))return;
-    localStorage.setItem(SK_BACKUPS,JSON.stringify({at:Date.now(),label:payload.label,hash:simpleHash(encoded),payload}));
+    const hash=simpleHash(encoded);
+    const entry={at:Date.now(),label:payload.label,hash,payload};
+    const list=Array.isArray(current?.items)
+      ?current.items
+      :(current&&current.payload?[current]:[]);
+    if(list.some(item=>item&&item.hash===hash))return;
+    const items=[entry,...list].slice(0,5);
+    localStorage.setItem(SK_BACKUPS,JSON.stringify({...entry,items}));
   }catch(e){}
 }
 
+const DATA_SCORE_IGNORED_KEYS=new Set(['date','savedAt','_updatedAt','_fieldUpdatedAt','_correiaDirectHour','cod','cidade','destino','hPrev']);
+
 function dataScoreValue(v,key){
-  if(key==='date'||key==='_updatedAt'||key==='_correiaDirectHour'||key==='cod'||key==='cidade'||key==='destino')return 0;
+  if(DATA_SCORE_IGNORED_KEYS.has(key))return 0;
   if(key&&key.startsWith('cap'))return 0;
   if(v===null||v===undefined)return 0;
   if(Array.isArray(v))return v.reduce((s,x)=>s+dataScoreValue(x,''),0);
@@ -1438,6 +1446,10 @@ function dataScoreValue(v,key){
 function dayDataScore(day){
   if(!day||typeof day!=='object')return 0;
   return Object.keys(day).reduce((s,k)=>s+dataScoreValue(day[k],k),0);
+}
+
+function maxDayUpdatedAt(days){
+  return (Array.isArray(days)?days:[]).reduce((max,day)=>Math.max(max,+day?._updatedAt||0),0);
 }
 
 function isSparseReplacement(existing,candidate){
@@ -4641,6 +4653,9 @@ async function sbLoad(){
     const remoteTs=remote.savedAt||0;
     // Sempre aplicar se remoto tem dados e é diferente do que temos
     const localTs=sbLastTs||0;
+    const remoteDays=Array.isArray(remote.days)?remote.days:[];
+    const localNewest=maxDayUpdatedAt(db.days);
+    const remoteNewest=maxDayUpdatedAt(remoteDays);
     let changed=false;
     if(remote.users&&typeof remote.users==='object'&&!Array.isArray(remote.users)){
       const localUsers=getLocalUsersCache();
@@ -4650,10 +4665,14 @@ async function sbLoad(){
         if(currentUser&&currentUser.role==='admin')setTimeout(renderUsersList,0);
       }
     }
-    if(remote.days&&Array.isArray(remote.days)&&(remoteTs>localTs||remote.days.length>db.days.length)){
-      db.days=mergeDays(db.days,remote.days);
+    if(remoteDays.length&&(remoteTs>localTs||remoteDays.length>db.days.length||remoteNewest>localNewest)){
+      db.days=mergeDays(db.days,remoteDays);
       localStorage.setItem(SK,JSON.stringify(db));
       changed=true;
+    }
+    if(localNewest>remoteNewest+1500){
+      showSyncStatus('â˜ Dados locais mais novos â€” reenviando',false);
+      setTimeout(()=>{if(!sbSaveRunning)sbSave();},50);
     }
     if(remoteTs>sbLastTs)sbLastTs=remoteTs;
     return changed;
