@@ -791,6 +791,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
     <div class="chart-box"><div class="chart-ttl">Correia Medicamento — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompMed" role="img" aria-label="Media hora correia medicamento por dia"></canvas></div></div>
     <div class="chart-box"><div class="chart-ttl">Correia Perfumaria — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompPerf" role="img" aria-label="Media hora correia perfumaria por dia"></canvas></div></div>
     <div class="chart-box"><div class="chart-ttl">Checkout — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompCheckout" role="img" aria-label="Media hora checkout por dia"></canvas></div></div>
+    <div class="chart-box"><div class="chart-ttl">Checkout Unidade — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompCheckoutUnid" role="img" aria-label="Media hora unidade checkout por dia"></canvas></div></div>
     <div class="chart-box"><div class="chart-ttl">Checkout Psico — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompCheckoutPsico" role="img" aria-label="Media hora checkout psico por dia"></canvas></div></div>
     <div class="chart-box"><div class="chart-ttl">Especial — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompEspecial" role="img" aria-label="Media hora especial por dia"></canvas></div></div>
     <div class="chart-box"><div class="chart-ttl">Expedição — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompExpedicao" role="img" aria-label="Media hora expedicao por dia"></canvas></div></div>
@@ -3313,6 +3314,7 @@ function compIndicators(){
     {key:'med',label:'Correia Medicamento',short:'Correia Med.',metric:'Linhas Med.',canvas:'cCompMed',cap:d=>+d.capLM||3500},
     {key:'perf',label:'Correia Perfumaria',short:'Correia Perf.',metric:'Linhas Perf.',canvas:'cCompPerf',cap:d=>+d.capLP||3000},
     {key:'checkout',label:'Checkout',short:'Checkout',metric:'Vol. Checkout',canvas:'cCompCheckout',cap:d=>+d.capVC||1280},
+    {key:'checkoutUnid',label:'Checkout Unidade',short:'CK Unid.',metric:'Unid. Checkout',canvas:'cCompCheckoutUnid',cap:d=>+d.capUC||20800},
     {key:'checkoutPsico',label:'Checkout Psico',short:'CK Psico',metric:'Vol. Checkout Psico',canvas:'cCompCheckoutPsico',cap:d=>checkoutPsicoVolCap(d)},
     {key:'especial',label:'Especial',short:'Especial',metric:'Vol. Especial',canvas:'cCompEspecial',cap:d=>+d.capEsp||340},
     {key:'expedicao',label:'Expedição',short:'Expedição',metric:'Vol. Doca',canvas:'cCompExpedicao',cap:d=>+d.capVE||1303},
@@ -3533,7 +3535,7 @@ function compChartOptions({yTitle='Média/h',percent=false,secondAxis=false}={})
   };
 }
 function destroyCompCharts(){
-  ['cPerc','cVA','cOS','cFlt','compResumo','compMed','compPerf','compCheckout','compCheckoutPsico','compEspecial','compExpedicao','compEpm','compVale','compAtrasos','compVolAtraso']
+  ['cPerc','cVA','cOS','cFlt','compResumo','compMed','compPerf','compCheckout','compCheckoutUnid','compCheckoutPsico','compEspecial','compExpedicao','compEpm','compVale','compAtrasos','compVolAtraso']
     .forEach(k=>{if(CH[k]){CH[k].destroy();delete CH[k];}});
 }
 function renderCompIndicatorChart(def,labels,days){
