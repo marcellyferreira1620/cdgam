@@ -1597,6 +1597,43 @@ function ensureFirebase(){
   return true;
 }
 
+async function saveToFirebase(replaceDays=false){
+  if(!ensureFirebase())return Promise.reject(new Error('Firebase indisponivel'));
+  isSaving=true;
+  const ts=Date.now();
+  lastSaveTs=ts;
+  let daysToSave=[...db.days].sort((a,b)=>a.date.localeCompare(b.date));
+  if(!replaceDays){
+    const snap=await fbDb.ref(FB_PATH).once('value').catch(()=>null);
+    const remote=snap?snap.val():null;
+    daysToSave=mergeDays(remote&&remote.days,db.days);
+    db.days=daysToSave;
+    localStorage.setItem(SK,JSON.stringify(db));
+  }
+  return fbDb.ref(FB_PATH).set({days:daysToSave,savedAt:ts})
+    .then(()=>{
+      fbConnected=true;
+      showSyncStatus('☁ Nuvem ativa',false);
+      setTimeout(()=>{isSaving=false;},1000);
+    })
+    .catch(e=>{
+      isSaving=false;
+      showSyncStatus('⚠ Erro: '+e.message,true);
+      console.error('Firebase save error:',e);
+      throw e;
+    });
+}
+
+function startFirebaseFallback(reason,pushLocal=false,replaceDays=false){
+  sbConnected=false;
+  if(sbPollTimer){clearInterval(sbPollTimer);sbPollTimer=null;}
+  if(reason)console.warn('Supabase fallback:',reason);
+  if(!fbConnected)initFirebase();
+  if(pushLocal&&db.days&&db.days.length){
+    setTimeout(()=>saveToFirebase(replaceDays).catch(()=>{}),800);
+  }
+}
+
 function showSyncStatus(msg,isErr){
   const el=document.getElementById('syncStatus');if(!el)return;
   el.textContent=msg;
@@ -1647,19 +1684,7 @@ function save(replaceDays=false){
   if(typeof sbUrl!=='undefined'&&sbUrl&&sbKey&&sbConnected){
     sbSave(replaceDays);
   } else if(fbConnected&&fbDb){
-    isSaving=true;
-    const ts=Date.now();
-    lastSaveTs=ts;
-    fbDb.ref(FB_PATH).set({days:db.days,savedAt:ts})
-      .then(()=>{
-        showSyncStatus('☁ Nuvem ativa',false);
-        setTimeout(()=>{isSaving=false;},1000);
-      })
-      .catch(e=>{
-        isSaving=false;
-        showSyncStatus('⚠ Erro: '+e.message,true);
-        console.error('Firebase save error:',e);
-      });
+    saveToFirebase(replaceDays).catch(()=>{});
   }
 }
 
@@ -4675,7 +4700,7 @@ async function sbReadPayload(){
   if(!sbUrl||!sbKey)return null;
   const r=await fetch(`${sbUrl}/rest/v1/${SB_TABLE}?id=eq.${SB_ROW_ID}&select=payload,updated_at`,
     {headers:sbHeaders()});
-  if(!r.ok)return null;
+  if(!r.ok)throw new Error(`Supabase HTTP ${r.status}`);
   const rows=await r.json();
   if(!rows||!rows.length||!rows[0].payload)return null;
   return typeof rows[0].payload==='string'?JSON.parse(rows[0].payload):rows[0].payload;
@@ -4715,15 +4740,18 @@ async function sbSave(replaceDays=false){
         if(r.ok){
           db.days=payload.days;
           localStorage.setItem(SK,JSON.stringify(db));
+          lastSyncHash=simpleHash(JSON.stringify({days:db.days,users:payload.users||{}}));
           sbConnected=true;
           showSyncStatus('☁ Salvo na nuvem ✓',false);
           setTimeout(()=>{if(sbConnected)showSyncStatus('☁ Nuvem ativa ✓',false);},2000);
         } else {
           const err=await r.json().catch(()=>({}));
           showSyncStatus('⚠ Erro ao salvar: '+(err.message||r.status),true);
+          startFirebaseFallback(`save HTTP ${r.status}`,true,replaceDaysNow);
         }
       }catch(e){
         showSyncStatus('⚠ Sem internet — salvo local',true);
+        startFirebaseFallback(e.message,true,replaceDaysNow);
       }
     }
     while(sbSaveQueued||sbReplaceDaysQueued);
@@ -4744,6 +4772,7 @@ async function sbLoad(){
     const remoteDays=Array.isArray(remote.days)?remote.days:[];
     const localNewest=maxDayUpdatedAt(db.days);
     const remoteNewest=maxDayUpdatedAt(remoteDays);
+    const remoteHash=simpleHash(JSON.stringify({days:remoteDays,users:remote.users||{}}));
     let changed=false;
     if(remote.users&&typeof remote.users==='object'&&!Array.isArray(remote.users)){
       const localUsers=getLocalUsersCache();
@@ -4753,7 +4782,7 @@ async function sbLoad(){
         if(currentUser&&currentUser.role==='admin')setTimeout(renderUsersList,0);
       }
     }
-    if(remoteDays.length&&(remoteTs>localTs||remoteDays.length>db.days.length||remoteNewest>localNewest)){
+    if(remoteDays.length&&(remoteTs>localTs||remoteDays.length>db.days.length||remoteNewest>localNewest||remoteHash!==lastSyncHash)){
       db.days=mergeDays(db.days,remoteDays);
       localStorage.setItem(SK,JSON.stringify(db));
       changed=true;
@@ -4763,8 +4792,12 @@ async function sbLoad(){
       setTimeout(()=>{if(!sbSaveRunning)sbSave();},50);
     }
     if(remoteTs>sbLastTs)sbLastTs=remoteTs;
+    if(changed||remoteHash!==lastSyncHash)lastSyncHash=remoteHash;
     return changed;
-  }catch(e){return false;}
+  }catch(e){
+    startFirebaseFallback(e.message,true);
+    return false;
+  }
 }
 
 async function sbLoadUsers(){
@@ -4846,9 +4879,11 @@ async function sbConnect(){
       const err=await r.json().catch(()=>({}));
       if(r.status===404||r.status===400){
         showSyncStatus('⚠ Tabela não encontrada — ver guia',true);
+        startFirebaseFallback(`connect HTTP ${r.status}`,true);
         return;
       }
       showSyncStatus('⚠ Erro '+r.status,true);
+      startFirebaseFallback(`connect HTTP ${r.status}`,true);
       return;
     }
     sbConnected=true;
@@ -4869,6 +4904,7 @@ async function sbConnect(){
   }catch(e){
     sbConnected=false;
     showSyncStatus('⚠ Sem conexão — dados locais OK',true);
+    startFirebaseFallback(e.message,true);
     // Tentar reconectar em 1 minuto
     setTimeout(sbConnect,60000);
   }
