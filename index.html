@@ -801,6 +801,8 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
   <div class="chart-grid" style="grid-template-columns:1fr">
     <div class="chart-box"><div class="chart-ttl">Rotas expedidas com atraso no mês</div><div style="position:relative;height:250px"><canvas id="cCompAtrasos" role="img" aria-label="Rotas atrasadas por dia"></canvas></div></div>
   </div>
+  <div class="separator">Comparativo mensal por rota - volume diario e atraso</div>
+  <div class="chart-grid" id="compRouteCharts"></div>
   <div class="chart-grid">
     <div class="chart-box"><div class="chart-ttl">Melhor horário por setor no mês</div><div class="tbl-wrap" id="compBestHoursTbl" style="margin:8px 0 0"></div></div>
     <div class="chart-box"><div class="chart-ttl">Volume expedido x rotas atrasadas</div><div style="position:relative;height:250px"><canvas id="cCompVolAtraso" role="img" aria-label="Relação entre volume expedido e rotas atrasadas"></canvas></div><div class="tbl-wrap" id="compVolDelayResumo" style="margin:8px 0 0"></div></div>
@@ -1232,6 +1234,31 @@ const BAR_VALUE_LABEL_PLUGIN={
         ctx.fillStyle='#06111f';
         const firstY=y-((lines.length-1)*5.5);
         lines.forEach((line,lineIdx)=>ctx.fillText(line,x,firstY+(lineIdx*11)));
+        const bottomLabel=dataset.bottomValueLabels&&dataset.bottomValueLabels[i]?String(dataset.bottomValueLabels[i]):'';
+        if(bottomLabel&&!horizontal){
+          const bottomLines=bottomLabel.split('\n');
+          const bottomTextW=Math.max(...bottomLines.map(line=>ctx.measureText(line).width));
+          const bottomBoxW=bottomTextW+8,bottomBoxH=4+(bottomLines.length*11),bottomR=3;
+          let bottomY=props.base+bottomBoxH/2+8;
+          bottomY=Math.min(bottomY,chart.height-bottomBoxH/2-2);
+          bottomY=Math.max(bottomY,chartArea.bottom-bottomBoxH/2);
+          ctx.fillStyle='rgba(255,255,255,.94)';
+          ctx.beginPath();
+          ctx.moveTo(x-bottomBoxW/2+bottomR,bottomY-bottomBoxH/2);
+          ctx.lineTo(x+bottomBoxW/2-bottomR,bottomY-bottomBoxH/2);
+          ctx.quadraticCurveTo(x+bottomBoxW/2,bottomY-bottomBoxH/2,x+bottomBoxW/2,bottomY-bottomBoxH/2+bottomR);
+          ctx.lineTo(x+bottomBoxW/2,bottomY+bottomBoxH/2-bottomR);
+          ctx.quadraticCurveTo(x+bottomBoxW/2,bottomY+bottomBoxH/2,x+bottomBoxW/2-bottomR,bottomY+bottomBoxH/2);
+          ctx.lineTo(x-bottomBoxW/2+bottomR,bottomY+bottomBoxH/2);
+          ctx.quadraticCurveTo(x-bottomBoxW/2,bottomY+bottomBoxH/2,x-bottomBoxW/2,bottomY+bottomBoxH/2-bottomR);
+          ctx.lineTo(x-bottomBoxW/2,bottomY-bottomBoxH/2+bottomR);
+          ctx.quadraticCurveTo(x-bottomBoxW/2,bottomY-bottomBoxH/2,x-bottomBoxW/2+bottomR,bottomY-bottomBoxH/2);
+          ctx.fill();
+          const bottomColor=Array.isArray(dataset.bottomValueLabelColors)?dataset.bottomValueLabelColors[i]:dataset.bottomValueLabelColor;
+          ctx.fillStyle=bottomColor||'#06111f';
+          const bottomFirstY=bottomY-((bottomLines.length-1)*5.5);
+          bottomLines.forEach((line,lineIdx)=>ctx.fillText(line,x,bottomFirstY+(lineIdx*11)));
+        }
       });
     });
     ctx.restore();
@@ -3537,6 +3564,7 @@ function compChartOptions({yTitle='Média/h',percent=false,secondAxis=false}={})
 function destroyCompCharts(){
   ['cPerc','cVA','cOS','cFlt','compResumo','compMed','compPerf','compCheckout','compCheckoutUnid','compCheckoutPsico','compEspecial','compExpedicao','compEpm','compVale','compAtrasos','compVolAtraso']
     .forEach(k=>{if(CH[k]){CH[k].destroy();delete CH[k];}});
+  Object.keys(CH).filter(k=>k.startsWith('compRoute_')).forEach(k=>{CH[k].destroy();delete CH[k];});
 }
 function renderCompIndicatorChart(def,labels,days){
   const canvas=document.getElementById(def.canvas);
@@ -3567,6 +3595,62 @@ function renderCompIndicatorChart(def,labels,days){
     options:compChartOptions({yTitle:def.inverse?'Média/h (máximo)':'Média/h'})
   });
 }
+function compRouteChartId(idx){
+  return`cCompRoute_${idx}`;
+}
+function compRouteChartKey(idx){
+  return`compRoute_${idx}`;
+}
+function compRouteDailyRow(day,routeDef){
+  const route=(buildRotasMerged(day).find(r=>normalizeRouteCode(r.cod)===normalizeRouteCode(routeDef.cod)))||{...routeDef,vol:0,hReal:''};
+  const snap=routeProgressSnapshot(day,route,day.hd||{});
+  const volume=Math.max(+route.vol||0,+snap.total||0);
+  const delay=calcAtraso(route.hPrev,route.hReal);
+  const finished=!!route.hReal;
+  const late=finished&&delay>0;
+  const bottomLabel=!volume?'':finished?(late?fmtAtraso(delay):'00:00:00'):'Pendente';
+  const status=finished?(late?'Atraso':'No horario'):(volume?'Pendente':'Sem volume');
+  return{day,route,volume,delay:finished?Math.max(delay||0,0):null,finished,late,bottomLabel,status};
+}
+function renderCompRouteCharts(days,labels){
+  const host=document.getElementById('compRouteCharts');
+  if(!host)return;
+  Object.keys(CH).filter(k=>k.startsWith('compRoute_')).forEach(k=>{CH[k].destroy();delete CH[k];});
+  host.innerHTML=ROTAS_FIXAS.map((route,idx)=>`
+    <div class="chart-box">
+      <div class="chart-ttl">Rota ${escAttr(route.cod)} - ${escAttr(route.cidade)} <span style="font-size:9px;font-weight:normal;color:#6a9fc0">Prev. ${escAttr(route.hPrev)}</span></div>
+      <div style="position:relative;height:230px"><canvas id="${compRouteChartId(idx)}" role="img" aria-label="Volume diario e atraso da rota ${escAttr(route.cod)}"></canvas></div>
+    </div>`).join('');
+  ROTAS_FIXAS.forEach((route,idx)=>{
+    const canvas=document.getElementById(compRouteChartId(idx));
+    if(!canvas)return;
+    const rows=days.map(day=>compRouteDailyRow(day,route));
+    const values=rows.map(r=>Math.round(r.volume||0));
+    const options=compChartOptions({yTitle:'Volume diario'});
+    options.layout={padding:{top:18,bottom:28}};
+    options.plugins.legend.display=false;
+    options.scales.x.ticks.maxRotation=45;
+    CH[compRouteChartKey(idx)]=new Chart(canvas,{type:'bar',
+      data:{labels,datasets:[{
+        label:`Rota ${route.cod}`,
+        data:values,
+        backgroundColor:rows.map(r=>!r.volume?'rgba(0,0,0,.08)':r.late?CAPACITY_LOW_COLOR:CAPACITY_OK_COLOR),
+        borderRadius:4,
+        valueLabels:rows.map(r=>r.volume?Math.round(r.volume).toLocaleString('pt-BR'):''),
+        bottomValueLabels:rows.map(r=>r.bottomLabel),
+        bottomValueLabelColors:rows.map(r=>r.late?CAPACITY_LOW_COLOR:CAPACITY_OK_COLOR),
+        tooltipLabels:rows.map(r=>[
+          `Volume: ${Math.round(r.volume||0).toLocaleString('pt-BR')}`,
+          `Previsto: ${r.route.hPrev||'--'}`,
+          `Realizado: ${r.route.hReal||'Pendente'}`,
+          `Status: ${r.status}`,
+          `Atraso: ${r.finished?fmtAtraso(r.delay||0):'Pendente'}`
+        ])
+      }]},
+      options
+    });
+  });
+}
 function renderComp(){
   destroyCompCharts();
   const ym=compReferenceMonth();
@@ -3580,6 +3664,7 @@ function renderComp(){
     const finishEl=document.getElementById('compFinishPanel');if(finishEl)finishEl.innerHTML='';
     const bestEl=document.getElementById('compBestHoursTbl');if(bestEl)bestEl.innerHTML='';
     const relEl=document.getElementById('compVolDelayResumo');if(relEl)relEl.innerHTML='';
+    const routeEl=document.getElementById('compRouteCharts');if(routeEl)routeEl.innerHTML='';
     return;
   }
   const labels=days.map(d=>fmtDateShort(d.date));
@@ -3631,6 +3716,7 @@ function renderComp(){
     options:compChartOptions({yTitle:'Qtd. rotas atrasadas',secondAxis:true})
   });
   renderCompVolumeDelay(days,delayStats,labels);
+  renderCompRouteCharts(days,labels);
   const cols=['Data',...defs.map(d=>d.short),'Atrasos'];
   let t=`<table><thead><tr>${cols.map(c=>`<th>${c}</th>`).join('')}</tr></thead><tbody>`;
   [...days].reverse().forEach(day=>{
