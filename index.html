@@ -1375,10 +1375,18 @@ const FB_CONFIG={
   appId:"1:444201184007:web:27194758b5528dfd7973a2"
 };
 const FB_PATH='cdgam/data';
+const FB_REST_URL=FB_CONFIG.databaseURL+'/'+FB_PATH+'.json';
+const FB_REST_POLL_MS=2000;
 let fbDb=null;
 let fbConnected=false;
 let isSaving=false;
 let lastSaveTs=0;
+let fbRestTimer=null;
+let fbRestLastHash='';
+let fbRestLoadRunning=false;
+let fbRestSaveRunning=false;
+let fbRestSaveQueued=false;
+let fbRestReplaceQueued=false;
 
 function load(){
   try{
@@ -1484,7 +1492,9 @@ function isSparseReplacement(existing,candidate){
   const existingScore=dayDataScore(existing);
   const candidateScore=dayDataScore(candidate);
   if(existingScore>0&&candidateScore===0)return true;
-  return existingScore>=12&&candidateScore<=2;
+  if(existingScore>=12&&candidateScore<=2)return true;
+  if(existingScore>=16&&existingScore-candidateScore>=10&&candidateScore<=existingScore*0.5)return true;
+  return false;
 }
 
 const ROUTE_DATA_FIELDS=['tipo','placa','vol','paletes','hReal','obs'];
@@ -1597,8 +1607,126 @@ function ensureFirebase(){
   return true;
 }
 
+function cloudPayloadHash(payload){
+  return simpleHash(JSON.stringify({days:(payload&&payload.days)||[],users:(payload&&payload.users)||{}}));
+}
+
+async function fbRestReadPayload(){
+  const r=await fetch(FB_REST_URL+'?t='+Date.now(),{cache:'no-store'});
+  if(!r.ok)throw new Error(`Firebase REST HTTP ${r.status}`);
+  return await r.json();
+}
+
+async function fbRestWritePayload(payload){
+  const r=await fetch(FB_REST_URL,{
+    method:'PUT',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(payload)
+  });
+  if(!r.ok)throw new Error(`Firebase REST HTTP ${r.status}`);
+  return await r.json().catch(()=>null);
+}
+
+async function saveToFirebaseRest(replaceDays=false){
+  if(replaceDays)fbRestReplaceQueued=true;
+  if(fbRestSaveRunning){fbRestSaveQueued=true;return;}
+  fbRestSaveRunning=true;
+  isSaving=true;
+  try{
+    do{
+      fbRestSaveQueued=false;
+      const replaceDaysNow=fbRestReplaceQueued;
+      fbRestReplaceQueued=false;
+      const ts=Date.now();
+      lastSaveTs=ts;
+      let remote={};
+      try{remote=await fbRestReadPayload()||{};}catch(e){remote={};}
+      const daysToSave=replaceDaysNow
+        ?[...db.days].sort((a,b)=>a.date.localeCompare(b.date))
+        :mergeDays(remote.days,db.days);
+      const payload={
+        ...remote,
+        days:daysToSave,
+        users:remote.users||getLocalUsersCache(),
+        savedAt:ts
+      };
+      await fbRestWritePayload(payload);
+      db.days=daysToSave;
+      localStorage.setItem(SK,JSON.stringify(db));
+      fbConnected=true;
+      fbRestLastHash=cloudPayloadHash(payload);
+      showSyncStatus('Nuvem ativa',false);
+      const lb=document.getElementById('liveBadge');if(lb)lb.style.display='inline';
+    }while(fbRestSaveQueued||fbRestReplaceQueued);
+  }catch(e){
+    fbConnected=false;
+    showSyncStatus('Erro Firebase: '+e.message,true);
+    console.error('Firebase REST save error:',e);
+    throw e;
+  }finally{
+    fbRestSaveRunning=false;
+    setTimeout(()=>{isSaving=false;},800);
+  }
+}
+
+async function syncFromFirebaseRest(showOk){
+  if(fbRestLoadRunning||fbRestSaveRunning)return false;
+  fbRestLoadRunning=true;
+  try{
+    const remote=await fbRestReadPayload();
+    fbConnected=true;
+    const lb=document.getElementById('liveBadge');if(lb)lb.style.display='inline';
+    if(!remote||!Array.isArray(remote.days)||!remote.days.length){
+      if(db.days&&db.days.length)await saveToFirebaseRest(false);
+      else if(showOk)showSyncStatus('Nuvem ativa',false);
+      return false;
+    }
+    const remoteDays=remote.days;
+    const localNewest=maxDayUpdatedAt(db.days);
+    const remoteNewest=maxDayUpdatedAt(remoteDays);
+    const remoteHash=cloudPayloadHash(remote);
+    const shouldApply=remoteHash!==fbRestLastHash||remoteDays.length>db.days.length||remoteNewest>localNewest;
+    let updated=false;
+    if(!isSaving&&shouldApply){
+      const beforeHash=cloudPayloadHash({days:db.days,users:getLocalUsersCache()});
+      applyRemoteData(remote);
+      const afterHash=cloudPayloadHash({days:db.days,users:getLocalUsersCache()});
+      updated=beforeHash!==afterHash;
+      fbRestLastHash=remoteHash;
+      if(updated)refreshFromDb();
+    }
+    if(localNewest>remoteNewest+1500){
+      setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),50);
+    }
+    if(showOk)showSyncStatus(updated?'Sincronizado':'Nuvem ativa',false);
+    return updated;
+  }catch(e){
+    fbConnected=false;
+    if(showOk)showSyncStatus('Firebase offline',true);
+    console.error('Firebase REST sync error:',e);
+    return false;
+  }finally{
+    fbRestLoadRunning=false;
+  }
+}
+
+function startFirebaseRestPolling(pushLocal=false,replaceDays=false){
+  if(!fbRestTimer){
+    fbRestTimer=setInterval(()=>syncFromFirebaseRest(true),FB_REST_POLL_MS);
+    window.addEventListener('focus',()=>syncFromFirebaseRest(true));
+    document.addEventListener('visibilitychange',()=>{
+      if(!document.hidden)syncFromFirebaseRest(true);
+    });
+  }
+  if(pushLocal&&db.days&&db.days.length){
+    setTimeout(()=>saveToFirebaseRest(replaceDays).catch(()=>{}),100);
+  }else{
+    setTimeout(()=>syncFromFirebaseRest(true).catch(()=>{}),100);
+  }
+}
+
 async function saveToFirebase(replaceDays=false){
-  if(!ensureFirebase())return Promise.reject(new Error('Firebase indisponivel'));
+  if(!ensureFirebase())return saveToFirebaseRest(replaceDays);
   isSaving=true;
   const ts=Date.now();
   lastSaveTs=ts;
@@ -1613,6 +1741,7 @@ async function saveToFirebase(replaceDays=false){
   return fbDb.ref(FB_PATH).set({days:daysToSave,savedAt:ts})
     .then(()=>{
       fbConnected=true;
+      fbRestLastHash=cloudPayloadHash({days:daysToSave,users:getLocalUsersCache()});
       showSyncStatus('☁ Nuvem ativa',false);
       setTimeout(()=>{isSaving=false;},1000);
     })
@@ -1620,7 +1749,7 @@ async function saveToFirebase(replaceDays=false){
       isSaving=false;
       showSyncStatus('⚠ Erro: '+e.message,true);
       console.error('Firebase save error:',e);
-      throw e;
+      return saveToFirebaseRest(replaceDays);
     });
 }
 
@@ -1628,6 +1757,7 @@ function startFirebaseFallback(reason,pushLocal=false,replaceDays=false){
   sbConnected=false;
   if(sbPollTimer){clearInterval(sbPollTimer);sbPollTimer=null;}
   if(reason)console.warn('Supabase fallback:',reason);
+  startFirebaseRestPolling(pushLocal,replaceDays);
   if(!fbConnected)initFirebase();
   if(pushLocal&&db.days&&db.days.length){
     setTimeout(()=>saveToFirebase(replaceDays).catch(()=>{}),800);
@@ -1683,8 +1813,13 @@ function save(replaceDays=false){
   // Supabase tem prioridade
   if(typeof sbUrl!=='undefined'&&sbUrl&&sbKey&&sbConnected){
     sbSave(replaceDays);
+    startFirebaseRestPolling(false);
+    saveToFirebaseRest(replaceDays).catch(()=>{});
   } else if(fbConnected&&fbDb){
     saveToFirebase(replaceDays).catch(()=>{});
+    startFirebaseRestPolling(false);
+  } else {
+    startFirebaseRestPolling(true,replaceDays);
   }
 }
 
@@ -1721,6 +1856,7 @@ function initFirebase(){
           if(db.days&&db.days.length>0)save();
           return;
         }
+        fbRestLastHash=cloudPayloadHash(remote);
         const remoteTs=remote.savedAt||0;
         if(!isSaving&&remoteTs>lastSaveTs){
           lastSaveTs=remoteTs;
@@ -4860,9 +4996,15 @@ function startSbPolling(){
 function installFastSyncTriggers(){
   if(sbFastSyncReady)return;
   sbFastSyncReady=true;
-  window.addEventListener('focus',()=>syncFromCloud(true));
+  window.addEventListener('focus',()=>{
+    syncFromCloud(true);
+    syncFromFirebaseRest(true);
+  });
   document.addEventListener('visibilitychange',()=>{
-    if(!document.hidden)syncFromCloud(true);
+    if(!document.hidden){
+      syncFromCloud(true);
+      syncFromFirebaseRest(true);
+    }
   });
 }
 
@@ -5568,6 +5710,7 @@ function init(){
   }
   // loginOv já está visível por CSS (display:flex) quando não há sessão
   startRouteLiveDelayClock();
+  startFirebaseRestPolling(true);
 
   // 6. Iniciar sync completo em background
   setTimeout(async()=>{
