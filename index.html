@@ -1673,17 +1673,37 @@ function cloudPayloadHash(payload){
   return simpleHash(JSON.stringify({days:(payload&&payload.days)||[],users:(payload&&payload.users)||{}}));
 }
 
+function decodeFirebasePayload(raw){
+  if(!raw)return null;
+  if(typeof raw.payload==='string'){
+    try{
+      const parsed=JSON.parse(raw.payload);
+      return parsed&&typeof parsed==='object'?{...parsed,savedAt:raw.savedAt||parsed.savedAt||0}:null;
+    }catch(e){return null;}
+  }
+  return raw;
+}
+
+function encodeFirebasePayload(payload){
+  const safePayload={
+    days:Array.isArray(payload&&payload.days)?payload.days:[],
+    users:(payload&&payload.users)||{},
+    savedAt:(payload&&payload.savedAt)||Date.now()
+  };
+  return {payload:JSON.stringify(safePayload),savedAt:safePayload.savedAt};
+}
+
 async function fbRestReadPayload(){
   const r=await fetch(FB_REST_URL+'?t='+Date.now(),{cache:'no-store'});
   if(!r.ok)throw new Error(`Firebase REST HTTP ${r.status}`);
-  return await r.json();
+  return decodeFirebasePayload(await r.json());
 }
 
 async function fbRestWritePayload(payload){
   const r=await fetch(FB_REST_URL,{
     method:'PUT',
     headers:{'Content-Type':'application/json'},
-    body:JSON.stringify(payload)
+    body:JSON.stringify(encodeFirebasePayload(payload))
   });
   if(!r.ok)throw new Error(`Firebase REST HTTP ${r.status}`);
   return await r.json().catch(()=>null);
@@ -1796,15 +1816,16 @@ async function saveToFirebase(replaceDays=false){
   let daysToSave=[...db.days].sort((a,b)=>a.date.localeCompare(b.date));
   if(!replaceDays){
     const snap=await fbDb.ref(FB_PATH).once('value').catch(()=>null);
-    const remote=snap?snap.val():null;
+    const remote=decodeFirebasePayload(snap?snap.val():null);
     daysToSave=mergeDays(remote&&remote.days,db.days);
     db.days=daysToSave;
     localStorage.setItem(SK,JSON.stringify(db));
   }
-  return fbDb.ref(FB_PATH).set({days:daysToSave,savedAt:ts})
+  const payload={days:daysToSave,users:getLocalUsersCache(),savedAt:ts};
+  return fbDb.ref(FB_PATH).set(encodeFirebasePayload(payload))
     .then(()=>{
       fbConnected=true;
-      fbRestLastHash=cloudPayloadHash({days:daysToSave,users:getLocalUsersCache()});
+      fbRestLastHash=cloudPayloadHash(payload);
       showSyncStatus('☁ Nuvem ativa',false);
       setTimeout(()=>{isSaving=false;},1000);
     })
@@ -1911,7 +1932,7 @@ function initFirebase(){
 
     fbDb.ref(FB_PATH).on('value',
       (snapshot)=>{
-        const remote=snapshot.val();
+        const remote=decodeFirebasePayload(snapshot.val());
         fbConnected=true;
         const liveBadge=document.getElementById('liveBadge');
         if(liveBadge)liveBadge.style.display='inline';
