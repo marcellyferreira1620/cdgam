@@ -1399,6 +1399,7 @@ function load(){
   }
   db.days=db.days.map(normalizeDay);
   db.days.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  restoreBestLocalBackupIfNeeded('load');
 }
 
 function getLocalUsersCache(){
@@ -1460,6 +1461,67 @@ function saveLocalBackup(snapshot,label){
     const items=[entry,...list].slice(0,5);
     localStorage.setItem(SK_BACKUPS,JSON.stringify({...entry,items}));
   }catch(e){}
+}
+
+function maxDayDate(days){
+  return (Array.isArray(days)?days:[])
+    .map(d=>d&&d.date)
+    .filter(Boolean)
+    .sort()
+    .pop()||'';
+}
+
+function bestBackupSnapshot(){
+  try{
+    const raw=localStorage.getItem(SK_BACKUPS);
+    const current=raw?JSON.parse(raw):null;
+    const items=Array.isArray(current?.items)
+      ?current.items
+      :(current&&current.payload?[current]:[]);
+    let best=null;
+    items.forEach(item=>{
+      const payload=item&&item.payload;
+      if(!payload||!Array.isArray(payload.days)||!payload.days.length)return;
+      const score=(payload.days.length*1000000)+Number(maxDayDate(payload.days).replaceAll('-','')||0)+maxDayUpdatedAt(payload.days);
+      if(!best||score>best.score)best={payload,score};
+    });
+    return best&&best.payload;
+  }catch(e){return null;}
+}
+
+function restoreBestLocalBackupIfNeeded(reason){
+  const backup=bestBackupSnapshot();
+  if(!backup||!Array.isArray(backup.days)||!backup.days.length)return false;
+  const localLen=Array.isArray(db.days)?db.days.length:0;
+  const backupLatest=maxDayDate(backup.days);
+  const localLatest=maxDayDate(db.days);
+  if(backup.days.length>localLen||backupLatest>localLatest){
+    db.days=mergeDays(db.days,backup.days);
+    db.days.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+    localStorage.setItem(SK,JSON.stringify(db));
+    console.warn('Backup local restaurado:',reason,backup.days.length,backupLatest);
+    return true;
+  }
+  return false;
+}
+
+function shouldRejectOlderCloud(remoteDays,source){
+  if(!Array.isArray(remoteDays)||!remoteDays.length)return false;
+  restoreBestLocalBackupIfNeeded(source+'-check');
+  const localDays=Array.isArray(db.days)?db.days:[];
+  const localLatest=maxDayDate(localDays);
+  const remoteLatest=maxDayDate(remoteDays);
+  if(localDays.length>=2&&remoteLatest&&localLatest&&remoteLatest<localLatest){
+    console.warn('Nuvem ignorada por estar atrasada:',source,remoteLatest,localLatest);
+    setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),250);
+    return true;
+  }
+  if(localDays.length>=5&&remoteDays.length+3<localDays.length&&remoteLatest<=localLatest){
+    console.warn('Nuvem ignorada por ter menos datas:',source,remoteDays.length,localDays.length);
+    setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),250);
+    return true;
+  }
+  return false;
 }
 
 const DATA_SCORE_IGNORED_KEYS=new Set(['date','savedAt','_updatedAt','_fieldUpdatedAt','_correiaDirectHour','cod','cidade','destino','hPrev']);
@@ -1682,6 +1744,7 @@ async function syncFromFirebaseRest(showOk){
       return false;
     }
     const remoteDays=remote.days;
+    if(shouldRejectOlderCloud(remoteDays,'firebase-rest'))return false;
     const localNewest=maxDayUpdatedAt(db.days);
     const remoteNewest=maxDayUpdatedAt(remoteDays);
     const remoteHash=cloudPayloadHash(remote);
@@ -1786,6 +1849,7 @@ function applyRemoteData(remote){
     setLocalUsersCache(remote.users);
   }
   if(!remote.days||!Array.isArray(remote.days))return;
+  if(shouldRejectOlderCloud(remote.days,'remote-apply'))return;
   db.days=mergeDays(db.days,JSON.parse(JSON.stringify(remote.days)));
   db.days.sort((a,b)=>a.date.localeCompare(b.date));
   localStorage.setItem(SK,JSON.stringify(db));
@@ -1860,7 +1924,7 @@ function initFirebase(){
         const remoteTs=remote.savedAt||0;
         if(!isSaving&&remoteTs>lastSaveTs){
           lastSaveTs=remoteTs;
-          applyRemoteData(remote);
+          if(!shouldRejectOlderCloud(remote.days,'firebase-sdk'))applyRemoteData(remote);
           showSyncStatus('☁ Sincronizado ✓',false);
           setTimeout(()=>showSyncStatus('☁ Nuvem ativa ✓',false),2500);
         } else if(isSaving){
@@ -4918,7 +4982,7 @@ async function sbLoad(){
         if(currentUser&&currentUser.role==='admin')setTimeout(renderUsersList,0);
       }
     }
-    if(remoteDays.length&&(remoteTs>localTs||remoteDays.length>db.days.length||remoteNewest>localNewest||remoteHash!==lastSyncHash)){
+    if(remoteDays.length&&!shouldRejectOlderCloud(remoteDays,'supabase')&&(remoteTs>localTs||remoteDays.length>db.days.length||remoteNewest>localNewest||remoteHash!==lastSyncHash)){
       db.days=mergeDays(db.days,remoteDays);
       localStorage.setItem(SK,JSON.stringify(db));
       changed=true;
@@ -5710,7 +5774,7 @@ function init(){
   }
   // loginOv já está visível por CSS (display:flex) quando não há sessão
   startRouteLiveDelayClock();
-  startFirebaseRestPolling(true);
+  startFirebaseRestPolling(false);
 
   // 6. Iniciar sync completo em background
   setTimeout(async()=>{
