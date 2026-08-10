@@ -787,6 +787,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
   <div class="chart-grid" style="grid-template-columns:1fr">
     <div class="chart-box"><div class="chart-ttl">Média do mês — todos os indicadores</div><div style="position:relative;height:260px"><canvas id="cCompResumo" role="img" aria-label="Media mensal de todos os indicadores"></canvas></div><div class="tbl-wrap" id="compFinishPanel" style="margin:8px 0 0"></div></div>
   </div>
+  <div class="chart-grid" id="compMonthSummaryGrid" style="grid-template-columns:repeat(auto-fit,minmax(180px,1fr))"></div>
   <div class="chart-grid" id="compIndicatorGrid">
     <div class="chart-box"><div class="chart-ttl">Correia Medicamento — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompMed" role="img" aria-label="Media hora correia medicamento por dia"></canvas></div></div>
     <div class="chart-box"><div class="chart-ttl">Correia Perfumaria — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompPerf" role="img" aria-label="Media hora correia perfumaria por dia"></canvas></div></div>
@@ -3632,6 +3633,77 @@ function compMonthlyMetric(days,def){
   const cap=capDays.length?capDays.reduce((s,v)=>s+v,0)/capDays.length:def.cap({});
   return{avg:hours>0?total/hours:null,total,hours,cap};
 }
+function compHourlyRawValue(day,def,i){
+  const hd=day.hd||{};
+  if(def.kind==='epm'){
+    const vals=epmSeriesFromHd(hd);
+    const v=vals[i];
+    return compFilledValue(v)?+v:null;
+  }
+  const arr=hd[def.metric]||[];
+  const v=arr[i];
+  return compFilledValue(v)?+v:null;
+}
+function compMonthlyHourFinal(days,def){
+  let totalMonth=0,filledSlots=0,daysWithValue=0;
+  const hourlyAverages=HOURS.map((_,i)=>{
+    let sum=0,count=0;
+    days.forEach(day=>{
+      const v=compHourlyRawValue(day,def,i);
+      if(v===null)return;
+      sum+=v;
+      count++;
+    });
+    totalMonth+=sum;
+    filledSlots+=count;
+    return count?sum/count:null;
+  });
+  days.forEach(day=>{
+    if(HOURS.some((_,i)=>compHourlyRawValue(day,def,i)!==null))daysWithValue++;
+  });
+  const finalAvg=hourlyAverages.reduce((s,v)=>s+(v===null?0:v),0);
+  const capDays=days.map(day=>{
+    const cap=def.cap(day);
+    if(!cap)return 0;
+    return HOURS.reduce((s,_,i)=>s+(def.kind==='epm'?cap:cap*hourTargetFactor(def.metric,i,day.date)),0);
+  }).filter(v=>v>0);
+  const target=capDays.length?capDays.reduce((s,v)=>s+v,0)/capDays.length:0;
+  return{finalAvg,totalMonth,filledSlots,daysWithValue,target,hourlyAverages};
+}
+function renderCompMonthSummary(days,defs,ym){
+  const el=document.getElementById('compMonthSummaryGrid');
+  if(!el)return;
+  const monthLabel=compMonthLabel(ym);
+  const rows=defs.map(def=>({def,...compMonthlyHourFinal(days,def)}));
+  if(!rows.some(r=>r.filledSlots)){
+    el.innerHTML='<div class="chart-box"><div class="no-data">Sem médias hora preenchidas neste mês.</div></div>';
+    return;
+  }
+  el.innerHTML=rows.map(r=>{
+    const ok=r.finalAvg!==null&&r.filledSlots&&compInMeta(r.finalAvg,r.target,r.def.inverse);
+    const color=!r.filledSlots?'#6a9fc0':ok?CAPACITY_OK_COLOR:CAPACITY_LOW_COLOR;
+    const pct=r.target?compScorePct(r.finalAvg,r.target,r.def.inverse):0;
+    const status=!r.filledSlots?'Sem dados':ok?'Dentro da meta':compGapLabel(r.finalAvg,r.target,r.def.inverse);
+    const finalTxt=r.filledSlots?compFmtAvg(r.def,r.finalAvg):'—';
+    const totalTxt=r.filledSlots?compFmtAvg(r.def,r.totalMonth):'—';
+    return `<div class="chart-box" style="min-height:112px">
+      <div class="chart-ttl">Média hora do mês — ${escAttr(r.def.short)}</div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:4px 2px">
+        <div style="background:#071525;border:1px solid rgba(0,229,255,.25);border-radius:4px;padding:7px">
+          <div style="font-size:9px;color:#89b4d4;text-transform:uppercase;font-weight:bold">${escAttr(monthLabel)}</div>
+          <div style="font-size:17px;font-weight:900;color:${color};line-height:1.2">${finalTxt}</div>
+        </div>
+        <div style="background:#071525;border:1px solid rgba(255,215,0,.25);border-radius:4px;padding:7px">
+          <div style="font-size:9px;color:#89b4d4;text-transform:uppercase;font-weight:bold">Total realizado</div>
+          <div style="font-size:17px;font-weight:900;color:#ffd700;line-height:1.2">${totalTxt}</div>
+        </div>
+      </div>
+      <div style="display:flex;justify-content:space-between;gap:8px;font-size:9px;color:#00385f;font-weight:bold;padding:2px 2px 0">
+        <span>${pct}% da meta</span><span>${escAttr(status)}</span><span>${r.daysWithValue} dias</span>
+      </div>
+    </div>`;
+  }).join('');
+}
 function compInMeta(avg,cap,inverse){
   if(avg===null||!cap)return false;
   return inverse?avg<=cap:avg>=cap;
@@ -3911,12 +3983,14 @@ function renderComp(){
     const bestEl=document.getElementById('compBestHoursTbl');if(bestEl)bestEl.innerHTML='';
     const relEl=document.getElementById('compVolDelayResumo');if(relEl)relEl.innerHTML='';
     const routeEl=document.getElementById('compRouteCharts');if(routeEl)routeEl.innerHTML='';
+    const monthSummaryEl=document.getElementById('compMonthSummaryGrid');if(monthSummaryEl)monthSummaryEl.innerHTML='';
     return;
   }
   const labels=days.map(d=>fmtDateShort(d.date));
   const defs=compIndicators();
   defs.forEach(def=>renderCompIndicatorChart(def,labels,days));
   const monthly=defs.map(def=>({def,...compMonthlyMetric(days,def)}));
+  renderCompMonthSummary(days,defs,ym);
   const resumoLabels=monthly.map(m=>m.def.short);
   const resumoData=monthly.map(m=>compScorePct(m.avg,m.cap,m.def.inverse));
   const resumoColors=monthly.map(m=>m.avg===null?'rgba(0,0,0,.08)':compInMeta(m.avg,m.cap,m.def.inverse)?CAPACITY_OK_COLOR:CAPACITY_LOW_COLOR);
