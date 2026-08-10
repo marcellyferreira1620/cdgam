@@ -3617,21 +3617,18 @@ function compDailyMetric(day,def){
   return{avg:hours>0?total/hours:null,total,hours,cap:def.cap(day)};
 }
 function compMonthlyMetric(days,def){
-  let total=0,hours=0;
+  let total=0,hours=0,avgSum=0,daysCount=0;
   days.forEach(day=>{
     const d=compDailyMetric(day,def);
     if(d.avg===null)return;
-    if(def.kind==='epm'){
-      total+=d.avg*d.hours;
-      hours+=d.hours;
-    }else{
-      total+=d.total;
-      hours+=d.hours;
-    }
+    avgSum+=d.avg;
+    daysCount++;
+    total+=d.total;
+    hours+=d.hours;
   });
   const capDays=days.map(day=>def.cap(day)).filter(v=>v>0);
   const cap=capDays.length?capDays.reduce((s,v)=>s+v,0)/capDays.length:def.cap({});
-  return{avg:hours>0?total/hours:null,total,hours,cap};
+  return{avg:daysCount?avgSum/daysCount:null,total,hours,cap,daysCount};
 }
 function compHourlyRawValue(day,def,i){
   const hd=day.hd||{};
@@ -3674,16 +3671,18 @@ function renderCompMonthSummary(days,defs,ym){
   const el=document.getElementById('compMonthSummaryGrid');
   if(!el)return;
   const monthLabel=compMonthLabel(ym);
-  const rows=defs.map(def=>({def,...compMonthlyHourFinal(days,def)}));
-  if(!rows.some(r=>r.filledSlots)){
+  const rows=defs.map(def=>({def,...compMonthlyMetric(days,def)}));
+  if(!rows.some(r=>r.daysCount)){
     el.innerHTML='<div class="chart-box"><div class="no-data">Sem médias hora preenchidas neste mês.</div></div>';
     return;
   }
   el.innerHTML=rows.map(r=>{
-    const ok=r.finalAvg!==null&&r.filledSlots&&compInMeta(r.finalAvg,r.target,r.def.inverse);
-    const color=!r.filledSlots?'#6a9fc0':ok?CAPACITY_OK_COLOR:CAPACITY_LOW_COLOR;
-    const pct=r.target?compScorePct(r.finalAvg,r.target,r.def.inverse):0;
-    const status=!r.filledSlots?'Sem dados':ok?'Dentro da meta':compGapLabel(r.finalAvg,r.target,r.def.inverse);
+    const ok=r.avg!==null&&r.daysCount&&compInMeta(r.avg,r.cap,r.def.inverse);
+    const color=!r.daysCount?'#6a9fc0':ok?CAPACITY_OK_COLOR:CAPACITY_LOW_COLOR;
+    const pct=r.cap?compScorePct(r.avg,r.cap,r.def.inverse):0;
+    const status=!r.daysCount?'Sem dados':ok?'Dentro da meta':compGapLabel(r.avg,r.cap,r.def.inverse);
+    const dailyAvgTxt=r.daysCount?compFmtAvg(r.def,r.avg):'—';
+    const monthTotalTxt=r.daysCount?compFmtAvg(r.def,r.total):'—';
     const finalTxt=r.filledSlots?compFmtAvg(r.def,r.finalAvg):'—';
     const totalTxt=r.filledSlots?compFmtAvg(r.def,r.totalMonth):'—';
     return `<div class="chart-box" style="min-height:112px">
@@ -3691,15 +3690,15 @@ function renderCompMonthSummary(days,defs,ym){
       <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:4px 2px">
         <div style="background:#071525;border:1px solid rgba(0,229,255,.25);border-radius:4px;padding:7px">
           <div style="font-size:9px;color:#89b4d4;text-transform:uppercase;font-weight:bold">${escAttr(monthLabel)}</div>
-          <div style="font-size:17px;font-weight:900;color:${color};line-height:1.2">${finalTxt}</div>
+          <div style="font-size:17px;font-weight:900;color:${color};line-height:1.2">${dailyAvgTxt}</div>
         </div>
         <div style="background:#071525;border:1px solid rgba(255,215,0,.25);border-radius:4px;padding:7px">
           <div style="font-size:9px;color:#89b4d4;text-transform:uppercase;font-weight:bold">Total realizado</div>
-          <div style="font-size:17px;font-weight:900;color:#ffd700;line-height:1.2">${totalTxt}</div>
+          <div style="font-size:17px;font-weight:900;color:#ffd700;line-height:1.2">${monthTotalTxt}</div>
         </div>
       </div>
       <div style="display:flex;justify-content:space-between;gap:8px;font-size:9px;color:#00385f;font-weight:bold;padding:2px 2px 0">
-        <span>${pct}% da meta</span><span>${escAttr(status)}</span><span>${r.daysWithValue} dias</span>
+        <span>${pct}% da meta</span><span>${escAttr(status)}</span><span>${r.daysCount} dias</span>
       </div>
     </div>`;
   }).join('');
