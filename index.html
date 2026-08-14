@@ -1691,6 +1691,61 @@ function mergeRotas(current,next){
   return Object.values(byCod);
 }
 
+const PROD_DATA_FIELDS=['caixa','acesso','tempo'];
+function prodFieldHasValue(value){
+  if(value===null||value===undefined||value==='')return false;
+  return Number.isFinite(+value);
+}
+
+function mergeProdRow(current,next){
+  const a=current||{};
+  const b=next||{};
+  const out={...a,...b};
+  PROD_DATA_FIELDS.forEach(field=>{
+    const av=a[field],bv=b[field];
+    const aTs=+(a._fieldUpdatedAt&&a._fieldUpdatedAt[field])||0;
+    const bTs=+(b._fieldUpdatedAt&&b._fieldUpdatedAt[field])||0;
+    if(aTs||bTs){
+      out[field]=bTs>=aTs?bv:av;
+      return;
+    }
+    const hasA=prodFieldHasValue(av);
+    const hasB=prodFieldHasValue(bv);
+    if(hasA&&hasB)out[field]=bv;
+    else if(hasA)out[field]=av;
+    else if(hasB)out[field]=bv;
+    else out[field]=bv!==undefined?bv:av;
+  });
+  const fieldUpdatedAt={...(a._fieldUpdatedAt||{})};
+  Object.entries(b._fieldUpdatedAt||{}).forEach(([field,ts])=>{
+    fieldUpdatedAt[field]=Math.max(+fieldUpdatedAt[field]||0,+ts||0);
+  });
+  if(Object.keys(fieldUpdatedAt).length)out._fieldUpdatedAt=fieldUpdatedAt;
+  else delete out._fieldUpdatedAt;
+  return out;
+}
+
+function mergeProdSetores(current,next){
+  if(!current&&!next)return null;
+  const out=JSON.parse(JSON.stringify(current||next||{}));
+  const incoming=next||{};
+  const sectors=new Set([PROD_SETORES_DEFAULT,...Object.keys(out),...Object.keys(incoming)]);
+  sectors.forEach(setor=>{
+    const a=(current&&current[setor])||{};
+    const b=(next&&next[setor])||{};
+    const bySection={...((a&&a.bySection)||{})};
+    Object.entries((b&&b.bySection)||{}).forEach(([sec,rows])=>{
+      if(!Array.isArray(rows))return;
+      if(!Array.isArray(bySection[sec]))bySection[sec]=[];
+      rows.forEach((row,i)=>{
+        bySection[sec][i]=mergeProdRow(bySection[sec]&&bySection[sec][i],row);
+      });
+    });
+    out[setor]={...a,...b,bySection};
+  });
+  return out;
+}
+
 function mergeDayRecords(current,next){
   if(!current)return next;
   if(!next)return current;
@@ -1705,7 +1760,8 @@ function mergeDayRecords(current,next){
     chosen=isSparseReplacement(current,next)?current:next;
   }
   const rotas=mergeRotas(current.rotas,next.rotas);
-  return rotas.length?{...chosen,rotas}:chosen;
+  const prodSetores=mergeProdSetores(current.prodSetores,next.prodSetores);
+  return {...chosen,...(rotas.length?{rotas}:{}),...(prodSetores?{prodSetores}:{})};
 }
 
 function mergeDays(remoteDays,localDays){
@@ -2599,7 +2655,7 @@ function ensureProdSetores(day){
     if(!Array.isArray(data.bySection[sec]))data.bySection[sec]=[];
     for(let i=0;i<PROD_SETORES_HOURS.length;i++){
       const row=data.bySection[sec][i]||{};
-      data.bySection[sec][i]={caixa:row.caixa??'',acesso:row.acesso??'',tempo:row.tempo??''};
+      data.bySection[sec][i]={caixa:row.caixa??'',acesso:row.acesso??'',tempo:row.tempo??'',...(row._fieldUpdatedAt?{_fieldUpdatedAt:row._fieldUpdatedAt}:{})};
     }
   });
   return data;
@@ -2626,6 +2682,12 @@ function prodMetaColor(v){
   return +v<=PROD_SETORES_META_SEG?'#1e88e5':'#e94560';
 }
 
+function prodChartMax(values){
+  const nums=values.filter(v=>v!==null&&v!==undefined&&Number.isFinite(+v)).map(Number);
+  const max=nums.length?Math.max(PROD_SETORES_META_SEG,...nums):PROD_SETORES_META_SEG;
+  return Math.ceil(max*1.18+2);
+}
+
 function prodSetoresValue(sec,hour,field){
   const day=getDay(curDate)||emptyDay(curDate||today());
   const data=ensureProdSetores(day);
@@ -2640,8 +2702,10 @@ function saveProdSetoresField(sec,hour,field,value){
   }
   const data=ensureProdSetores(day);
   const row=data.bySection[sec][hour];
+  const ts=Date.now();
   row[field]=value===''?'':+value||0;
-  day._updatedAt=Date.now();
+  row._fieldUpdatedAt={...(row._fieldUpdatedAt||{}),[field]:ts};
+  day._updatedAt=ts;
   curDate=day.date;
   save();
   renderProdSetoresRowCalcs(sec,hour);
@@ -2773,8 +2837,8 @@ function renderProdSetoresChart(){
   });
   if(CH.prodSetores){CH.prodSetores.destroy();delete CH.prodSetores;}
   CH.prodSetores=new Chart(canvas,{type:'bar',
-    data:{labels:PROD_SETORES_SECTIONS.map(s=>'Sec. '+s),datasets:[{label:`${PROD_SETORES_HOURS[hourIndex]} - Tempo/Acesso por seção`,data,backgroundColor:data.map(prodMetaColor),borderRadius:4,valueLabels:data.map(v=>prodFmt(v,1))}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#00385f',font:{size:10,weight:'bold'}}}},scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45},grid:{color:'rgba(6,35,61,0.08)'}},y:{beginAtZero:true,ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'},title:{display:true,text:'Tempo/Acesso (s)',color:'#00385f',font:{size:9,weight:'bold'}}}}}
+    data:{labels:PROD_SETORES_SECTIONS.map(s=>'Sec. '+s),datasets:[{label:`${PROD_SETORES_HOURS[hourIndex]} - Tempo/Acesso por seção`,data,backgroundColor:data.map(prodMetaColor),borderRadius:4,valueLabels:data.map(v=>v===null?'':prodFmt(v,1)+'s')}]},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24,right:8,left:4}},plugins:{legend:{labels:{color:'#00385f',font:{size:10,weight:'bold'}}}},scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45},grid:{color:'rgba(6,35,61,0.08)'}},y:{beginAtZero:true,suggestedMax:prodChartMax(data),ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'},title:{display:true,text:'Tempo/Acesso (s)',color:'#00385f',font:{size:9,weight:'bold'}}}}}
   });
 }
 
@@ -2788,8 +2852,8 @@ function renderProdSetoresDash(day){
   });
   if(CH.prodSetoresDash){CH.prodSetoresDash.destroy();delete CH.prodSetoresDash;}
   CH.prodSetoresDash=new Chart(canvas,{type:'bar',
-    data:{labels:PROD_SETORES_SECTIONS.map(s=>'Sec. '+s),datasets:[{label:'Tempo/Acesso médio por seção',data:sectionAvg,backgroundColor:sectionAvg.map(prodMetaColor),borderRadius:4,valueLabels:sectionAvg.map(v=>prodFmt(v,1))}]},
-    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#00385f',font:{size:10,weight:'bold'}}}},scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45},grid:{color:'rgba(6,35,61,0.08)'}},y:{beginAtZero:true,ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'},title:{display:true,text:'Tempo/Acesso médio (s)',color:'#00385f',font:{size:9,weight:'bold'}}}}}
+    data:{labels:PROD_SETORES_SECTIONS.map(s=>'Sec. '+s),datasets:[{label:'Tempo/Acesso médio por seção',data:sectionAvg,backgroundColor:sectionAvg.map(prodMetaColor),borderRadius:4,valueLabels:sectionAvg.map(v=>v===null?'':prodFmt(v,1)+'s')}]},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24,right:8,left:4}},plugins:{legend:{labels:{color:'#00385f',font:{size:10,weight:'bold'}}}},scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45},grid:{color:'rgba(6,35,61,0.08)'}},y:{beginAtZero:true,suggestedMax:prodChartMax(sectionAvg),ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'},title:{display:true,text:'Tempo/Acesso médio (s)',color:'#00385f',font:{size:9,weight:'bold'}}}}}
   });
 }
 
