@@ -1112,7 +1112,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 const HOURS=['17:30→18h','18→19h','19→20h','20→21h','21→22h','22→23h','23→00h','00→01h','01→02h','02→03h','03→04h','04→05h','05→06h','06→07h'];
 const HOURS_LABEL=['17:30','18:00','19:00','20:00','21:00','22:00','23:00','00:00','01:00','02:00','03:00','04:00','05:00','06:00','07:00']; // início e fim dos slots
 const PROD_SETORES_SECTIONS=Array.from({length:20},(_,i)=>String(i+11));
-const PROD_SETORES_HOURS=['17:30→18:30','18:30→19:30','19:30→20:30','20:30→21:30','21:30→22:30','22:30→23:30','23:30→00:30','00:30→01:30','01:30→02:30','02:30→03:30','03:30→04:30','04:30→05:30','05:30→06:30','06:30→07:30'];
+const PROD_SETORES_HOURS=[...HOURS];
 const PROD_SETORES_DEFAULT='correiaPerf';
 const PROD_SETORES_META_SEG=30;
 const SHIFT_START_DEC=17.5;
