@@ -852,7 +852,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
   <div style="padding:8px">
     <div style="background:#0a2340;border-radius:6px;padding:8px 14px;margin-bottom:8px;border:1px solid rgba(0,230,118,.3);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span style="font-size:11px;font-weight:bold;color:#00e676">Dashboard Produtividade Individual — Correia Perfumaria</span>
-      <span style="font-size:10px;color:#6a9fc0">Tempo/Acesso em segundos | Acesso/Caixa calculado automaticamente</span>
+      <span style="font-size:10px;color:#6a9fc0">Meta 30s por acesso | azul dentro da meta, vermelho acima da meta</span>
       <label style="margin-left:auto;font-size:10px;color:#89b4d4;font-weight:bold">Seção do gráfico</label>
       <select id="prodSecSelect" onchange="renderProdSetoresChart()" style="background:#eef6ff;border:1px solid #9cc3df;color:#00385f;font-weight:bold;border-radius:4px;padding:4px 8px;font-size:11px"></select>
     </div>
@@ -866,7 +866,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
       <div class="chart-box" id="prodSetoresDashBox">
         <div class="chart-ttl">
           <span>Média do dia por seção — Correia Perfumaria</span>
-          <span style="font-size:9px;font-weight:normal;color:#6a9fc0">Tempo/Acesso médio</span>
+          <span style="font-size:9px;font-weight:normal;color:#6a9fc0">Meta 30s por acesso</span>
         </div>
         <div style="position:relative;height:260px"><canvas id="cProdSetoresDash" role="img" aria-label="Produtividade por colaborador"></canvas></div>
       </div>
@@ -1114,6 +1114,7 @@ const HOURS_LABEL=['17:30','18:00','19:00','20:00','21:00','22:00','23:00','00:0
 const PROD_SETORES_SECTIONS=Array.from({length:20},(_,i)=>String(i+11));
 const PROD_SETORES_HOURS=['17:30→18:30','18:30→19:30','19:30→20:30','20:30→21:30','21:30→22:30','22:30→23:30','23:30→00:30','00:30→01:30','01:30→02:30','02:30→03:30','03:30→04:30','04:30→05:30','05:30→06:30','06:30→07:30'];
 const PROD_SETORES_DEFAULT='correiaPerf';
+const PROD_SETORES_META_SEG=30;
 const SHIFT_START_DEC=17.5;
 const SHIFT_END_DEC=28;
 const FORECAST_CUTOFF_DEC=21.5;
@@ -2620,6 +2621,11 @@ function prodSecFmt(v){
   return prodFmt(v,0)+'s';
 }
 
+function prodMetaColor(v){
+  if(v===null||v===undefined||!Number.isFinite(+v))return'rgba(0,0,0,.08)';
+  return +v<=PROD_SETORES_META_SEG?'#1e88e5':'#e94560';
+}
+
 function prodSetoresValue(sec,hour,field){
   const day=getDay(curDate)||emptyDay(curDate||today());
   const data=ensureProdSetores(day);
@@ -2762,7 +2768,7 @@ function renderProdSetoresChart(){
   const data=prodSetoresSeries(day,sec);
   if(CH.prodSetores){CH.prodSetores.destroy();delete CH.prodSetores;}
   CH.prodSetores=new Chart(canvas,{type:'bar',
-    data:{labels:PROD_SETORES_HOURS,datasets:[{label:`Seção ${sec} - Tempo/Acesso`,data,backgroundColor:data.map(v=>v===null?'rgba(0,0,0,.08)':'#1e88e5'),borderRadius:4,valueLabels:data.map(v=>prodFmt(v,1))}]},
+    data:{labels:PROD_SETORES_HOURS,datasets:[{label:`Seção ${sec} - Tempo/Acesso`,data,backgroundColor:data.map(prodMetaColor),borderRadius:4,valueLabels:data.map(v=>prodFmt(v,1))}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#00385f',font:{size:10,weight:'bold'}}}},scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45},grid:{color:'rgba(6,35,61,0.08)'}},y:{beginAtZero:true,ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'},title:{display:true,text:'Tempo/Acesso (s)',color:'#00385f',font:{size:9,weight:'bold'}}}}}
   });
 }
@@ -2777,7 +2783,7 @@ function renderProdSetoresDash(day){
   });
   if(CH.prodSetoresDash){CH.prodSetoresDash.destroy();delete CH.prodSetoresDash;}
   CH.prodSetoresDash=new Chart(canvas,{type:'bar',
-    data:{labels:PROD_SETORES_SECTIONS.map(s=>'Sec. '+s),datasets:[{label:'Tempo/Acesso médio por seção',data:sectionAvg,backgroundColor:sectionAvg.map(v=>v===null?'rgba(0,0,0,.08)':'#1e88e5'),borderRadius:4,valueLabels:sectionAvg.map(v=>prodFmt(v,1))}]},
+    data:{labels:PROD_SETORES_SECTIONS.map(s=>'Sec. '+s),datasets:[{label:'Tempo/Acesso médio por seção',data:sectionAvg,backgroundColor:sectionAvg.map(prodMetaColor),borderRadius:4,valueLabels:sectionAvg.map(v=>prodFmt(v,1))}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#00385f',font:{size:10,weight:'bold'}}}},scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45},grid:{color:'rgba(6,35,61,0.08)'}},y:{beginAtZero:true,ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'},title:{display:true,text:'Tempo/Acesso médio (s)',color:'#00385f',font:{size:9,weight:'bold'}}}}}
   });
 }
