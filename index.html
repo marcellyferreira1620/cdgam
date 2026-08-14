@@ -853,13 +853,13 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
     <div style="background:#0a2340;border-radius:6px;padding:8px 14px;margin-bottom:8px;border:1px solid rgba(0,230,118,.3);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span style="font-size:11px;font-weight:bold;color:#00e676">Dashboard Produtividade Individual — Correia Perfumaria</span>
       <span style="font-size:10px;color:#6a9fc0">Meta 30s por acesso | azul dentro da meta, vermelho acima da meta</span>
-      <label style="margin-left:auto;font-size:10px;color:#89b4d4;font-weight:bold">Seção do gráfico</label>
-      <select id="prodSecSelect" onchange="renderProdSetoresChart()" style="background:#eef6ff;border:1px solid #9cc3df;color:#00385f;font-weight:bold;border-radius:4px;padding:4px 8px;font-size:11px"></select>
+      <label style="margin-left:auto;font-size:10px;color:#89b4d4;font-weight:bold">Hora do gráfico</label>
+      <select id="prodHourSelect" onchange="renderProdSetoresChart()" style="background:#eef6ff;border:1px solid #9cc3df;color:#00385f;font-weight:bold;border-radius:4px;padding:4px 8px;font-size:11px"></select>
     </div>
     <div class="chart-grid" style="grid-template-columns:1fr">
       <div class="chart-box">
-        <div class="chart-ttl">Tempo/Acesso hora a hora — Correia Perfumaria</div>
-        <div style="position:relative;height:260px"><canvas id="cProdSetores" role="img" aria-label="Tempo por acesso hora a hora"></canvas></div>
+        <div class="chart-ttl">Tempo/Acesso por seção — hora selecionada</div>
+        <div style="position:relative;height:260px"><canvas id="cProdSetores" role="img" aria-label="Tempo por acesso por seção na hora selecionada"></canvas></div>
       </div>
     </div>
     <div class="chart-grid" style="grid-template-columns:1fr">
@@ -2673,10 +2673,10 @@ function renderProdSetoresInput(sec,hour,field,value){
   return `<input type="number" min="0" value="${value}" oninput="saveProdSetoresField('${sec}',${hour},'${field}',this.value)"/>`;
 }
 
-function populateProdSecSelect(){
-  const select=document.getElementById('prodSecSelect');
+function populateProdHourSelect(){
+  const select=document.getElementById('prodHourSelect');
   if(select&&!select.options.length){
-    select.innerHTML=PROD_SETORES_SECTIONS.map(sec=>`<option value="${sec}">Seção ${sec}</option>`).join('');
+    select.innerHTML=PROD_SETORES_HOURS.map((hour,i)=>`<option value="${i}">${hour}</option>`).join('');
   }
   return select;
 }
@@ -2685,7 +2685,7 @@ function renderProdSetores(){
   const grid=document.getElementById('prodSetoresTbl');
   const day=getDay(curDate)||emptyDay(curDate||today());
   ensureProdSetores(day);
-  populateProdSecSelect();
+  populateProdHourSelect();
   if(!grid)return;
   let html='';
   PROD_SETORES_SECTIONS.forEach(sec=>{
@@ -2763,12 +2763,17 @@ function renderProdSetoresChart(){
   const canvas=document.getElementById('cProdSetores');
   if(!canvas)return;
   const day=getDay(curDate)||emptyDay(curDate||today());
-  const select=populateProdSecSelect();
-  const sec=select&&select.value?select.value:'11';
-  const data=prodSetoresSeries(day,sec);
+  const select=populateProdHourSelect();
+  const hourIndex=select&&select.value!==''?+select.value:0;
+  const prodData=ensureProdSetores(day);
+  const data=PROD_SETORES_SECTIONS.map(sec=>{
+    const row=prodData.bySection[sec][hourIndex];
+    const acessoCaixa=prodRatio(row.acesso,row.caixa);
+    return prodRatio(row.tempo,acessoCaixa);
+  });
   if(CH.prodSetores){CH.prodSetores.destroy();delete CH.prodSetores;}
   CH.prodSetores=new Chart(canvas,{type:'bar',
-    data:{labels:PROD_SETORES_HOURS,datasets:[{label:`Seção ${sec} - Tempo/Acesso`,data,backgroundColor:data.map(prodMetaColor),borderRadius:4,valueLabels:data.map(v=>prodFmt(v,1))}]},
+    data:{labels:PROD_SETORES_SECTIONS.map(s=>'Sec. '+s),datasets:[{label:`${PROD_SETORES_HOURS[hourIndex]} - Tempo/Acesso por seção`,data,backgroundColor:data.map(prodMetaColor),borderRadius:4,valueLabels:data.map(v=>prodFmt(v,1))}]},
     options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#00385f',font:{size:10,weight:'bold'}}}},scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45},grid:{color:'rgba(6,35,61,0.08)'}},y:{beginAtZero:true,ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'},title:{display:true,text:'Tempo/Acesso (s)',color:'#00385f',font:{size:9,weight:'bold'}}}}}
   });
 }
