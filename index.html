@@ -907,25 +907,14 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
     <div style="background:#0a2340;border-radius:6px;padding:8px 14px;margin-bottom:8px;border:1px solid rgba(0,230,118,.3);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span style="font-size:11px;font-weight:bold;color:#00e676">Dashboard Produtividade Individual (Diurno) — Recebimento e Armazenagem</span>
       <span style="font-size:10px;color:#6a9fc0">Resultado por hora = acumulado informado menos acumulado anterior</span>
-      <label style="margin-left:auto;font-size:10px;color:#89b4d4;font-weight:bold">Indicador</label>
-      <select id="prodDiaMetricSelect" onchange="renderProdDiurnoDash()" style="background:#eef6ff;border:1px solid #9cc3df;color:#00385f;font-weight:bold;border-radius:4px;padding:4px 8px;font-size:11px"></select>
-      <label style="font-size:10px;color:#89b4d4;font-weight:bold">Hora do gráfico</label>
+      <label style="margin-left:auto;font-size:10px;color:#89b4d4;font-weight:bold">Hora do gráfico</label>
       <select id="prodDiaHourSelect" onchange="renderProdDiurnoDash()" style="background:#eef6ff;border:1px solid #9cc3df;color:#00385f;font-weight:bold;border-radius:4px;padding:4px 8px;font-size:11px"></select>
     </div>
-    <div class="chart-grid" style="grid-template-columns:1fr">
-      <div class="chart-box">
-        <div class="chart-ttl">Consolidado por matrícula — hora selecionada</div>
-        <div style="position:relative;height:260px"><canvas id="cProdDiaHora" role="img" aria-label="Produtividade diurna por hora"></canvas></div>
-      </div>
-    </div>
-    <div class="chart-grid" style="grid-template-columns:1fr">
-      <div class="chart-box">
-        <div class="chart-ttl">Total do dia por matrícula</div>
-        <div style="position:relative;height:260px"><canvas id="cProdDiaTotal" role="img" aria-label="Produtividade diurna total do dia"></canvas></div>
-      </div>
-    </div>
+    <div id="prodDiaDashCharts"></div>
     <div class="separator">Resultado hora a hora — acumulado menos hora anterior</div>
     <div class="tbl-wrap" id="prodDiaHoraResumo"></div>
+    <div class="separator">Resumo do dia — média por hora</div>
+    <div class="tbl-wrap" id="prodDiaMediaResumo"></div>
   </div>
 </div>
 
@@ -3121,6 +3110,18 @@ function prodDiaTotal(person){
   },0);
 }
 
+function prodDiaFilledHours(person){
+  if(!person||!Array.isArray(person.values))return 0;
+  return person.values.reduce((count,value)=>{
+    return count+(value!==''&&value!==null&&value!==undefined&&Number.isFinite(+value)?1:0);
+  },0);
+}
+
+function prodDiaMediaHora(person){
+  const hours=prodDiaFilledHours(person);
+  return hours?prodDiaTotal(person)/hours:null;
+}
+
 function prodDiaTouch(day,person,field){
   const ts=Date.now();
   person._fieldUpdatedAt={...(person._fieldUpdatedAt||{}),[field]:ts};
@@ -3215,11 +3216,7 @@ function renderProdDiurno(){
 }
 
 function populateProdDiaDashSelects(){
-  const metricSel=document.getElementById('prodDiaMetricSelect');
   const hourSel=document.getElementById('prodDiaHourSelect');
-  if(metricSel&&!metricSel.options.length){
-    metricSel.innerHTML=PROD_DIA_METRICS.map(m=>`<option value="${m.key}">${m.short}</option>`).join('');
-  }
   if(hourSel&&!hourSel.options.length){
     hourSel.innerHTML=PROD_DIA_HOURS.map((h,i)=>`<option value="${i}">${h}</option>`).join('');
   }
@@ -3232,59 +3229,75 @@ function prodDiaChartPeople(day,metricKey){
 function renderProdDiaHoraResumo(day,metricKey){
   const wrap=document.getElementById('prodDiaHoraResumo');
   if(!wrap)return;
-  const metric=prodDiaMetricDef(metricKey);
-  const people=prodDiaChartPeople(day,metricKey);
-  if(!people.length){
-    wrap.innerHTML=`<table><tbody><tr><td style="text-align:center;color:#6a9fc0;font-weight:bold">Sem dados preenchidos para ${excelText(metric.short)}.</td></tr></tbody></table>`;
-    return;
-  }
-  let html=`<table><thead><tr><th>Matrícula</th>`;
+  let html=`<table><thead><tr><th>Indicador</th><th>Matrícula</th>`;
   PROD_DIA_HOURS.forEach(hour=>{html+=`<th>${hour}</th>`;});
   html+='<th>Total dia</th></tr></thead><tbody>';
-  people.forEach(person=>{
-    html+=`<tr><td style="font-weight:bold">${excelText(person.matricula||'Sem matrícula')}</td>`;
-    PROD_DIA_HOURS.forEach((_,i)=>{
-      const result=prodDiaResult(person,i);
-      html+=`<td style="font-weight:bold;color:#1e88e5">${prodFmt(result,0)}</td>`;
+  let hasRows=false;
+  PROD_DIA_METRICS.forEach(metric=>{
+    const people=prodDiaChartPeople(day,metric.key);
+    people.forEach(person=>{
+      hasRows=true;
+      html+=`<tr><td style="font-weight:bold;color:#00385f">${excelText(metric.short)}</td><td style="font-weight:bold">${excelText(person.matricula||'Sem matrícula')}</td>`;
+      PROD_DIA_HOURS.forEach((_,i)=>{
+        const result=prodDiaResult(person,i);
+        html+=`<td style="font-weight:bold;color:#1e88e5">${prodFmt(result,0)}</td>`;
+      });
+      html+=`<td style="font-weight:bold;color:#00a86b">${prodFmt(prodDiaTotal(person),0)}</td></tr>`;
     });
-    html+=`<td style="font-weight:bold;color:#00a86b">${prodFmt(prodDiaTotal(person),0)}</td></tr>`;
   });
+  if(!hasRows)html+='<tr><td colspan="12" style="text-align:center;color:#6a9fc0;font-weight:bold">Sem dados preenchidos para o diurno.</td></tr>';
+  html+='</tbody></table>';
+  wrap.innerHTML=html;
+}
+
+function renderProdDiaDashChart(day,metric,hourIndex){
+  const canvas=document.getElementById(`cProdDiaHora_${metric.key}`);
+  if(!canvas)return;
+  const chartKey=`prodDiaHora_${metric.key}`;
+  const people=prodDiaChartPeople(day,metric.key);
+  const labels=people.map(p=>String(p.matricula||'Sem matrícula'));
+  const hourData=people.map(p=>prodDiaResult(p,hourIndex));
+  if(CH[chartKey]){CH[chartKey].destroy();delete CH[chartKey];}
+  CH[chartKey]=new Chart(canvas,{type:'bar',
+    data:{labels,datasets:[{label:`${metric.short} - ${PROD_DIA_HOURS[hourIndex]}`,data:hourData,backgroundColor:'#1e88e5',borderRadius:4,valueLabels:hourData.map(v=>v===null?'':prodFmt(v,0))}]},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24,right:8,left:4}},plugins:{legend:{labels:{color:'#00385f',font:{size:10,weight:'bold'}}}},scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45},grid:{color:'rgba(6,35,61,0.08)'}},y:{beginAtZero:true,suggestedMax:prodChartMax(hourData),ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'},title:{display:true,text:'Resultado da hora',color:'#00385f',font:{size:9,weight:'bold'}}}}}
+  });
+}
+
+function renderProdDiaMediaResumo(day){
+  const wrap=document.getElementById('prodDiaMediaResumo');
+  if(!wrap)return;
+  let html='<table><thead><tr><th>Indicador</th><th>Matrícula</th><th>Total dia</th><th>Horas preenchidas</th><th>Média/h</th></tr></thead><tbody>';
+  let hasRows=false;
+  PROD_DIA_METRICS.forEach(metric=>{
+    prodDiaChartPeople(day,metric.key).forEach(person=>{
+      hasRows=true;
+      const filled=prodDiaFilledHours(person);
+      const media=prodDiaMediaHora(person);
+      html+=`<tr><td style="font-weight:bold;color:#00385f">${excelText(metric.short)}</td><td style="font-weight:bold">${excelText(person.matricula||'Sem matrícula')}</td><td style="font-weight:bold;color:#00a86b">${prodFmt(prodDiaTotal(person),0)}</td><td>${filled}</td><td style="font-weight:bold;color:#1e88e5">${prodFmt(media,1)}</td></tr>`;
+    });
+  });
+  if(!hasRows)html+='<tr><td colspan="5" style="text-align:center;color:#6a9fc0;font-weight:bold">Sem dados preenchidos para calcular média/h.</td></tr>';
   html+='</tbody></table>';
   wrap.innerHTML=html;
 }
 
 function renderProdDiurnoDash(dayArg){
   const day=dayArg||getDay(curDate)||emptyDay(curDate||today());
-  const canvasHour=document.getElementById('cProdDiaHora');
-  const canvasTotal=document.getElementById('cProdDiaTotal');
+  const chartsWrap=document.getElementById('prodDiaDashCharts');
   const resumo=document.getElementById('prodDiaHoraResumo');
-  if(!canvasHour&&!canvasTotal&&!resumo)return;
+  const mediaResumo=document.getElementById('prodDiaMediaResumo');
+  if(!chartsWrap&&!resumo&&!mediaResumo)return;
   populateProdDiaDashSelects();
   ensureProdDiurno(day);
-  const metricSel=document.getElementById('prodDiaMetricSelect');
   const hourSel=document.getElementById('prodDiaHourSelect');
-  const metricKey=metricSel&&metricSel.value?metricSel.value:PROD_DIA_METRICS[0].key;
   const hourIndex=hourSel&&hourSel.value!==''?+hourSel.value:0;
-  const metric=prodDiaMetricDef(metricKey);
-  const people=prodDiaChartPeople(day,metricKey);
-  const labels=people.map(p=>String(p.matricula||'Sem matrícula'));
-  const hourData=people.map(p=>prodDiaResult(p,hourIndex));
-  const totalData=people.map(prodDiaTotal);
-  if(canvasHour){
-    if(CH.prodDiaHora){CH.prodDiaHora.destroy();delete CH.prodDiaHora;}
-    CH.prodDiaHora=new Chart(canvasHour,{type:'bar',
-      data:{labels,datasets:[{label:`${metric.short} - ${PROD_DIA_HOURS[hourIndex]}`,data:hourData,backgroundColor:'#1e88e5',borderRadius:4,valueLabels:hourData.map(v=>v===null?'':prodFmt(v,0))}]},
-      options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24,right:8,left:4}},plugins:{legend:{labels:{color:'#00385f',font:{size:10,weight:'bold'}}}},scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45},grid:{color:'rgba(6,35,61,0.08)'}},y:{beginAtZero:true,suggestedMax:prodChartMax(hourData),ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'},title:{display:true,text:'Resultado da hora',color:'#00385f',font:{size:9,weight:'bold'}}}}}
-    });
+  if(chartsWrap){
+    chartsWrap.innerHTML=PROD_DIA_METRICS.map(metric=>`<div class="chart-grid" style="grid-template-columns:1fr"><div class="chart-box"><div class="chart-ttl">${metric.setor} — ${metric.short} por matrícula</div><div style="position:relative;height:260px"><canvas id="cProdDiaHora_${metric.key}" role="img" aria-label="${metric.short} por matricula"></canvas></div></div></div>`).join('');
+    PROD_DIA_METRICS.forEach(metric=>renderProdDiaDashChart(day,metric,hourIndex));
   }
-  if(canvasTotal){
-    if(CH.prodDiaTotal){CH.prodDiaTotal.destroy();delete CH.prodDiaTotal;}
-    CH.prodDiaTotal=new Chart(canvasTotal,{type:'bar',
-      data:{labels,datasets:[{label:`${metric.short} - Total do dia`,data:totalData,backgroundColor:'#1e88e5',borderRadius:4,valueLabels:totalData.map(v=>v?prodFmt(v,0):'')}]},
-      options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24,right:8,left:4}},plugins:{legend:{labels:{color:'#00385f',font:{size:10,weight:'bold'}}}},scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45},grid:{color:'rgba(6,35,61,0.08)'}},y:{beginAtZero:true,suggestedMax:prodChartMax(totalData),ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'},title:{display:true,text:'Total do dia',color:'#00385f',font:{size:9,weight:'bold'}}}}}
-    });
-  }
-  renderProdDiaHoraResumo(day,metricKey);
+  renderProdDiaHoraResumo(day);
+  renderProdDiaMediaResumo(day);
 }
 
 function exportProdDiurnoExcel(){
