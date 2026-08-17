@@ -506,6 +506,19 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 .prod-section-card input{width:62px;background:#071525;border:1px solid #1e4a72;color:#fff;padding:2px 4px;border-radius:3px;font-size:10px;text-align:center}
 .prod-section-card input:focus{outline:none;border-color:#ffd700;background:#162a3d}
 .prod-calc-cell{background:rgba(255,255,255,.06)!important;font-weight:bold}
+.prod-dia-block{background:#122033;border:1px solid #1a3550;border-radius:6px;margin-bottom:10px;overflow:hidden}
+.prod-dia-head{display:flex;align-items:center;gap:10px;justify-content:space-between;background:#0a2340;color:#ffd700;font-weight:bold;font-size:11px;padding:7px 9px;border-bottom:1px solid #1a3550}
+.prod-dia-head span:last-child{font-size:9px;color:#6a9fc0;font-weight:normal}
+.prod-dia-table-wrap{overflow:auto}
+.prod-dia-table{width:100%;min-width:1180px;border-collapse:collapse;font-size:10px}
+.prod-dia-table th{background:#071525;color:#6a9fc0;border:1px solid #1a3550;padding:4px 5px;white-space:nowrap}
+.prod-dia-table td{border:1px solid #162a3d;padding:3px 4px;text-align:center;background:#0d1c2e;vertical-align:middle}
+.prod-dia-table tr:nth-child(even) td{background:#122033}
+.prod-dia-table input{width:72px;background:#eef6ff;border:1px solid #9cc3df;color:#00385f;padding:3px 5px;border-radius:3px;font-size:10px;text-align:center;font-weight:bold}
+.prod-dia-table .matricula-input{width:90px}
+.prod-dia-result{display:block;margin-top:2px;color:#ffd700;font-weight:bold;font-size:10px}
+.prod-dia-del{background:#e94560;color:#fff;border:none;border-radius:3px;padding:3px 7px;font-weight:bold;cursor:pointer;font-size:10px}
+.prod-dia-add{background:#00a86b;color:#fff;border:none;border-radius:4px;padding:5px 10px;font-weight:bold;cursor:pointer;font-size:11px}
 </style>
 </head>
 <body>
@@ -664,8 +677,10 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
   <div class="tab"     id="tabRotas"   onclick="switchTab('rotas')">🚛 Rotas</div>
   <div class="tab"     id="tabPreench" onclick="switchTab('preench')" style="display:none">⏱️ Preencher</div>
   <div class="tab"     id="tabAdm"     onclick="switchTab('adm')" style="display:none">⚙️ Editar Dados</div>
-  <div class="tab"     id="tabProdDash" onclick="switchTab('proddash')" style="display:none">Dashboard Prod. Individual</div>
-  <div class="tab"     id="tabProdSetores" onclick="switchTab('prodsetores')" style="display:none">Produtividade Individual</div>
+  <div class="tab"     id="tabProdDash" onclick="switchTab('proddash')" style="display:none">Dashboard Prod. Individual (Noturno)</div>
+  <div class="tab"     id="tabProdSetores" onclick="switchTab('prodsetores')" style="display:none">Produtividade Individual (Noturno)</div>
+  <div class="tab"     id="tabProdDashDia" onclick="switchTab('proddashdia')" style="display:none">Dashboard Prod. Individual (Diurno)</div>
+  <div class="tab"     id="tabProdDia" onclick="switchTab('proddia')" style="display:none">Produtividade Individual (Diurno)</div>
 </div>
 
 <!-- TAB DASHBOARD -->
@@ -851,7 +866,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 <div class="tab-body" id="tb-proddash">
   <div style="padding:8px">
     <div style="background:#0a2340;border-radius:6px;padding:8px 14px;margin-bottom:8px;border:1px solid rgba(0,230,118,.3);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <span style="font-size:11px;font-weight:bold;color:#00e676">Dashboard Produtividade Individual — Correia Perfumaria</span>
+      <span style="font-size:11px;font-weight:bold;color:#00e676">Dashboard Produtividade Individual (Noturno) — Correia Perfumaria</span>
       <span style="font-size:10px;color:#6a9fc0">Meta 30s por acesso | azul dentro da meta, vermelho acima da meta</span>
       <label style="margin-left:auto;font-size:10px;color:#89b4d4;font-weight:bold">Hora do gráfico</label>
       <select id="prodHourSelect" onchange="renderProdSetoresChart()" style="background:#eef6ff;border:1px solid #9cc3df;color:#00385f;font-weight:bold;border-radius:4px;padding:4px 8px;font-size:11px"></select>
@@ -878,11 +893,51 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 <div class="tab-body" id="tb-prodsetores">
   <div style="padding:8px">
     <div style="background:#0a2340;border-radius:6px;padding:8px 14px;margin-bottom:8px;border:1px solid rgba(0,230,118,.3);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
-      <span style="font-size:11px;font-weight:bold;color:#00e676">Produtividade Individual — Correia Perfumaria</span>
+      <span style="font-size:11px;font-weight:bold;color:#00e676">Produtividade Individual (Noturno) — Correia Perfumaria</span>
       <span style="font-size:10px;color:#6a9fc0">Um bloco por seção | preencher Caixa, Acesso e Tempo em segundos</span>
       <button type="button" onclick="exportProdSetoresExcel()" style="margin-left:auto;background:#00a86b;color:#fff;border:none;border-radius:4px;padding:6px 12px;font-weight:bold;font-size:11px;cursor:pointer">Exportar Excel</button>
     </div>
     <div id="prodSetoresTbl" class="prod-ind-grid"></div>
+  </div>
+</div>
+
+<!-- TAB DASHBOARD PRODUTIVIDADE INDIVIDUAL DIURNO -->
+<div class="tab-body" id="tb-proddashdia">
+  <div style="padding:8px">
+    <div style="background:#0a2340;border-radius:6px;padding:8px 14px;margin-bottom:8px;border:1px solid rgba(0,230,118,.3);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:11px;font-weight:bold;color:#00e676">Dashboard Produtividade Individual (Diurno) — Recebimento e Armazenagem</span>
+      <span style="font-size:10px;color:#6a9fc0">Resultado por hora = acumulado informado menos acumulado anterior</span>
+      <label style="margin-left:auto;font-size:10px;color:#89b4d4;font-weight:bold">Indicador</label>
+      <select id="prodDiaMetricSelect" onchange="renderProdDiurnoDash()" style="background:#eef6ff;border:1px solid #9cc3df;color:#00385f;font-weight:bold;border-radius:4px;padding:4px 8px;font-size:11px"></select>
+      <label style="font-size:10px;color:#89b4d4;font-weight:bold">Hora do gráfico</label>
+      <select id="prodDiaHourSelect" onchange="renderProdDiurnoDash()" style="background:#eef6ff;border:1px solid #9cc3df;color:#00385f;font-weight:bold;border-radius:4px;padding:4px 8px;font-size:11px"></select>
+    </div>
+    <div class="chart-grid" style="grid-template-columns:1fr">
+      <div class="chart-box">
+        <div class="chart-ttl">Consolidado por matrícula — hora selecionada</div>
+        <div style="position:relative;height:260px"><canvas id="cProdDiaHora" role="img" aria-label="Produtividade diurna por hora"></canvas></div>
+      </div>
+    </div>
+    <div class="chart-grid" style="grid-template-columns:1fr">
+      <div class="chart-box">
+        <div class="chart-ttl">Total do dia por matrícula</div>
+        <div style="position:relative;height:260px"><canvas id="cProdDiaTotal" role="img" aria-label="Produtividade diurna total do dia"></canvas></div>
+      </div>
+    </div>
+    <div class="separator">Resultado hora a hora — acumulado menos hora anterior</div>
+    <div class="tbl-wrap" id="prodDiaHoraResumo"></div>
+  </div>
+</div>
+
+<!-- TAB PRODUTIVIDADE INDIVIDUAL DIURNO -->
+<div class="tab-body" id="tb-proddia">
+  <div style="padding:8px">
+    <div style="background:#0a2340;border-radius:6px;padding:8px 14px;margin-bottom:8px;border:1px solid rgba(0,230,118,.3);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <span style="font-size:11px;font-weight:bold;color:#00e676">Produtividade Individual (Diurno) — Recebimento e Armazenagem</span>
+      <span style="font-size:10px;color:#6a9fc0">Preencha o acumulado cheio por hora; o resultado/h é calculado automaticamente</span>
+      <button type="button" onclick="exportProdDiurnoExcel()" style="margin-left:auto;background:#00a86b;color:#fff;border:none;border-radius:4px;padding:6px 12px;font-weight:bold;font-size:11px;cursor:pointer">Exportar Excel</button>
+    </div>
+    <div id="prodDiaTables"></div>
   </div>
 </div>
 
@@ -1115,6 +1170,41 @@ const PROD_SETORES_SECTIONS=Array.from({length:20},(_,i)=>String(i+11));
 const PROD_SETORES_HOURS=[...HOURS];
 const PROD_SETORES_DEFAULT='correiaPerf';
 const PROD_SETORES_META_SEG=30;
+const PROD_DIA_HOURS=['07→08h','08→09h','09→10h','10→11h','11→12h','13→14h','14→15h','15→16h','16→17h'];
+const PROD_DIA_METRICS=[
+  {key:'recebItens',setor:'Recebimento',label:'Quantidade de itens conferidos por conferente',short:'Itens conferidos'},
+  {key:'armBipes',setor:'Armazenagem',label:'Quantidade de bipes de armazenagem por armazenador',short:'Bipes armazenagem'},
+  {key:'armItens',setor:'Armazenagem',label:'Quantidade de itens armazenados por armazenador',short:'Itens armazenados'}
+];
+const PROD_DIA_PEOPLE={
+  recebItens:[
+    {matricula:'15706',nome:'ELIZABETH APARECIDA MALKOSKI'},
+    {matricula:'15783',nome:'JHONATAN DOS SANTOS'},
+    {matricula:'10369',nome:'LUCIANE APARECIDA ALVES DA SILVA'},
+    {matricula:'15619',nome:'RHAYSSA CAROLINE SANTOS'},
+    {matricula:'15562',nome:'SALATIEL FERREIRA DE MELO'}
+  ],
+  armBipes:[
+    {matricula:'15880',nome:'ALESSANDRO VEZINE WESTPHAL'},
+    {matricula:'10189',nome:'EDUARDO ALMEIDA COSTA'},
+    {matricula:'15704',nome:'EDUARDO TISSOT SOARES DA SILVA'},
+    {matricula:'10233',nome:'GUSTAVO FERREIRA DOS SANTOS'},
+    {matricula:'10049',nome:'LUIZ ANTONIO BATISTA FERNANDES'},
+    {matricula:'15413',nome:'NATHAN TONELLI CORCETTI'},
+    {matricula:'15866',nome:'RAYNE RIBEIRO BERNADINO'},
+    {matricula:'15815',nome:'RODOLFO LOPES DA SILVA'}
+  ],
+  armItens:[
+    {matricula:'15880',nome:'ALESSANDRO VEZINE WESTPHAL'},
+    {matricula:'10189',nome:'EDUARDO ALMEIDA COSTA'},
+    {matricula:'15704',nome:'EDUARDO TISSOT SOARES DA SILVA'},
+    {matricula:'10233',nome:'GUSTAVO FERREIRA DOS SANTOS'},
+    {matricula:'10049',nome:'LUIZ ANTONIO BATISTA FERNANDES'},
+    {matricula:'15413',nome:'NATHAN TONELLI CORCETTI'},
+    {matricula:'15866',nome:'RAYNE RIBEIRO BERNADINO'},
+    {matricula:'15815',nome:'RODOLFO LOPES DA SILVA'}
+  ]
+};
 const SHIFT_START_DEC=17.5;
 const SHIFT_END_DEC=28;
 const FORECAST_CUTOFF_DEC=21.5;
@@ -1746,6 +1836,55 @@ function mergeProdSetores(current,next){
   return out;
 }
 
+function mergeProdDiaPerson(current,next){
+  const a=current||{};
+  const b=next||{};
+  const out={...a,...b};
+  const aTs=a._fieldUpdatedAt||{};
+  const bTs=b._fieldUpdatedAt||{};
+  out.matricula=(+bTs.matricula||0)>=(+aTs.matricula||0)?(b.matricula??a.matricula??''):(a.matricula??b.matricula??'');
+  out.nome=b.nome??a.nome??'';
+  const values=[];
+  for(let i=0;i<PROD_DIA_HOURS.length;i++){
+    const key='v'+i;
+    const av=Array.isArray(a.values)?a.values[i]:'';
+    const bv=Array.isArray(b.values)?b.values[i]:'';
+    const ats=+aTs[key]||0;
+    const bts=+bTs[key]||0;
+    if(ats||bts)values[i]=bts>=ats?bv:av;
+    else values[i]=prodFieldHasValue(bv)?bv:(prodFieldHasValue(av)?av:(bv!==undefined?bv:av));
+  }
+  out.values=values;
+  const fieldUpdatedAt={...aTs};
+  Object.entries(bTs).forEach(([field,ts])=>{
+    fieldUpdatedAt[field]=Math.max(+fieldUpdatedAt[field]||0,+ts||0);
+  });
+  if(Object.keys(fieldUpdatedAt).length)out._fieldUpdatedAt=fieldUpdatedAt;
+  else delete out._fieldUpdatedAt;
+  return out;
+}
+
+function mergeProdDiurno(current,next){
+  if(!current&&!next)return null;
+  const out=JSON.parse(JSON.stringify(current||next||{}));
+  const metrics=new Set([...PROD_DIA_METRICS.map(m=>m.key),...Object.keys(current||{}),...Object.keys(next||{})]);
+  metrics.forEach(key=>{
+    const a=(current&&current[key])||{};
+    const b=(next&&next[key])||{};
+    const peopleByKey={};
+    const addPeople=(people,source)=>{
+      (Array.isArray(people)?people:[]).forEach((p,i)=>{
+        const personKey=p.id||p.matricula||`${source}-${i}`;
+        peopleByKey[personKey]=peopleByKey[personKey]?mergeProdDiaPerson(peopleByKey[personKey],p):mergeProdDiaPerson(null,p);
+      });
+    };
+    addPeople(a.people,'a');
+    addPeople(b.people,'b');
+    out[key]={...a,...b,people:Object.values(peopleByKey)};
+  });
+  return out;
+}
+
 function mergeDayRecords(current,next){
   if(!current)return next;
   if(!next)return current;
@@ -1761,7 +1900,8 @@ function mergeDayRecords(current,next){
   }
   const rotas=mergeRotas(current.rotas,next.rotas);
   const prodSetores=mergeProdSetores(current.prodSetores,next.prodSetores);
-  return {...chosen,...(rotas.length?{rotas}:{}),...(prodSetores?{prodSetores}:{})};
+  const prodDiurno=mergeProdDiurno(current.prodDiurno,next.prodDiurno);
+  return {...chosen,...(rotas.length?{rotas}:{}),...(prodSetores?{prodSetores}:{}),...(prodDiurno?{prodDiurno}:{})};
 }
 
 function mergeDays(remoteDays,localDays){
@@ -2001,6 +2141,9 @@ function applyRemoteData(remote){
     if(!(tab==='rotas'&&editing))renderRotasTbl(day,'rotasTblFull');
     updateRotasKPIs(day);
     refreshOpenPrevisaoEncerramento(day);
+    if(tab==='proddash')renderProdSetoresDash(day);
+    if(tab==='proddashdia')renderProdDiurnoDash(day);
+    if(tab==='proddia'&&!editing)renderProdDiurno();
   }
 }
 
@@ -2552,7 +2695,7 @@ function updateMediaHoraAuto(){
 // ── TABS ──────────────────────────────────────────────────
 function switchTab(id){
   document.querySelectorAll('.tab').forEach((t,i)=>{
-    const ids=['dash','hist','comp','rotas','preench','adm','proddash','prodsetores'];
+    const ids=['dash','hist','comp','rotas','preench','adm','proddash','prodsetores','proddashdia','proddia'];
     t.classList.toggle('act',ids[i]===id);
   });
   document.querySelectorAll('.tab-body').forEach(t=>t.classList.remove('act'));
@@ -2563,6 +2706,8 @@ function switchTab(id){
   if(id==='preench')renderPreench();
   if(id==='proddash'){renderProdSetoresChart();renderProdSetoresDash(getDay(curDate)||emptyDay(curDate||today()));}
   if(id==='prodsetores')renderProdSetores();
+  if(id==='proddashdia')renderProdDiurnoDash(getDay(curDate)||emptyDay(curDate||today()));
+  if(id==='proddia')renderProdDiurno();
 }
 
 // ── DAY NAV ───────────────────────────────────────────────
@@ -2598,7 +2743,12 @@ function selectDay(dt){
   if(!dt)return;
   curDate=dt;buildDayNav();
   const day=getDay(dt);
-  if(day){renderKPIs(day);renderFlowBar(day);renderDashCharts(day);renderDashTables(day);renderRotasTbl(day,'rotasTblFull');updateRotasKPIs(day);refreshOpenPrevisaoEncerramento(day);renderProdSetoresDash(day);}
+  if(day){renderKPIs(day);renderFlowBar(day);renderDashCharts(day);renderDashTables(day);renderRotasTbl(day,'rotasTblFull');updateRotasKPIs(day);refreshOpenPrevisaoEncerramento(day);renderProdSetoresDash(day);renderProdDiurnoDash(day);}
+  const tab=activeTab();
+  if(tab==='prodsetores')renderProdSetores();
+  if(tab==='proddash'){renderProdSetoresChart();renderProdSetoresDash(day||emptyDay(dt));}
+  if(tab==='proddia')renderProdDiurno();
+  if(tab==='proddashdia')renderProdDiurnoDash(day||emptyDay(dt));
   if(adminOk)loadFormFrom(day||emptyDay(dt));
 }
 
@@ -2609,7 +2759,7 @@ function activeTab(){
 
 function isEditingDataField(){
   const el=document.activeElement;
-  return !!(el&&['INPUT','TEXTAREA','SELECT'].includes(el.tagName)&&el.closest('#tb-adm,#tb-preench,#tb-rotas,#tb-proddash,#tb-prodsetores'));
+  return !!(el&&['INPUT','TEXTAREA','SELECT'].includes(el.tagName)&&el.closest('#tb-adm,#tb-preench,#tb-rotas,#tb-proddash,#tb-prodsetores,#tb-proddashdia,#tb-proddia'));
 }
 
 function refreshFromDb(){
@@ -2632,6 +2782,8 @@ function refreshFromDb(){
   if(tab==='preench'&&!editing)renderPreench();
   if(tab==='proddash'&&!editing){renderProdSetoresChart();renderProdSetoresDash(day);}
   if(tab==='prodsetores'&&!editing)renderProdSetores();
+  if(tab==='proddashdia'&&!editing)renderProdDiurnoDash(day);
+  if(tab==='proddia'&&!editing)renderProdDiurno();
   if(adminOk&&tab==='adm'&&!editing)loadFormFrom(day||emptyDay(curDate||today()));
   if(currentUser&&currentUser.role==='admin')renderUsersList();
 }
@@ -2778,6 +2930,10 @@ function excelText(v){
   return String(v??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
 }
 
+function attrText(v){
+  return excelText(v).replace(/"/g,'&quot;');
+}
+
 function exportProdSetoresExcel(){
   const day=getDay(curDate)||emptyDay(curDate||today());
   ensureProdSetores(day);
@@ -2855,6 +3011,314 @@ function renderProdSetoresDash(day){
     data:{labels:PROD_SETORES_SECTIONS.map(s=>'Sec. '+s),datasets:[{label:'Tempo/Acesso médio por seção',data:sectionAvg,backgroundColor:sectionAvg.map(prodMetaColor),borderRadius:4,valueLabels:sectionAvg.map(v=>v===null?'':prodFmt(v,1)+'s')}]},
     options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24,right:8,left:4}},plugins:{legend:{labels:{color:'#00385f',font:{size:10,weight:'bold'}}}},scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45},grid:{color:'rgba(6,35,61,0.08)'}},y:{beginAtZero:true,suggestedMax:prodChartMax(sectionAvg),ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'},title:{display:true,text:'Tempo/Acesso médio (s)',color:'#00385f',font:{size:9,weight:'bold'}}}}}
   });
+}
+
+// Produtividade individual diurna - Recebimento e Armazenagem
+function emptyProdDiurno(){
+  const out={};
+  PROD_DIA_METRICS.forEach(metric=>{
+    out[metric.key]={people:prodDiaDefaultPeople(metric.key)};
+  });
+  return out;
+}
+
+function prodDiaEmptyPerson(seed){
+  const person=seed||{};
+  const matricula=String(person.matricula||'');
+  return{id:person.id||prodDiaPersonId('',matricula),matricula,nome:person.nome||'',values:PROD_DIA_HOURS.map(()=>''),_fieldUpdatedAt:{}};
+}
+
+function prodDiaPersonId(metricKey,matricula){
+  const clean=String(matricula||'').replace(/\D/g,'');
+  return clean?`${metricKey||'prodDia'}-${clean}`:'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+}
+
+function prodDiaDefaultPeople(metricKey){
+  const list=PROD_DIA_PEOPLE[metricKey]||[];
+  return list.length?list.map(person=>prodDiaEmptyPerson({...person,id:prodDiaPersonId(metricKey,person.matricula)})):[prodDiaEmptyPerson()];
+}
+
+function prodDiaHasInput(person){
+  return !!(person&&(String(person.matricula||'').trim()||String(person.nome||'').trim()||(Array.isArray(person.values)&&person.values.some(prodFieldHasValue))));
+}
+
+function prodDiaDefaultName(metricKey,matricula){
+  const found=(PROD_DIA_PEOPLE[metricKey]||[]).find(p=>String(p.matricula)===String(matricula));
+  return found?found.nome:'';
+}
+
+function ensureProdDiurno(day){
+  if(!day.prodDiurno||typeof day.prodDiurno!=='object')day.prodDiurno=emptyProdDiurno();
+  PROD_DIA_METRICS.forEach(metric=>{
+    if(!day.prodDiurno[metric.key]||typeof day.prodDiurno[metric.key]!=='object')day.prodDiurno[metric.key]={people:[]};
+    const block=day.prodDiurno[metric.key];
+    if(!Array.isArray(block.people))block.people=[];
+    const defaults=prodDiaDefaultPeople(metric.key);
+    if(!block.people.length)block.people=defaults;
+    block.people=block.people.map(person=>{
+      const values=Array.isArray(person.values)?person.values:[];
+      const matricula=String(person.matricula||'');
+      return{
+        id:person.id||prodDiaPersonId(metric.key,matricula),
+        matricula,
+        nome:person.nome||prodDiaDefaultName(metric.key,matricula),
+        values:PROD_DIA_HOURS.map((_,i)=>values[i]??''),
+        ...(person._fieldUpdatedAt?{_fieldUpdatedAt:person._fieldUpdatedAt}:{_fieldUpdatedAt:{}})
+      };
+    });
+    if(defaults.length&&block.people.length===1&&!prodDiaHasInput(block.people[0]))block.people=[];
+    const byMatricula=new Map(block.people.filter(p=>String(p.matricula||'').trim()).map(p=>[String(p.matricula),p]));
+    defaults.forEach(defaultPerson=>{
+      const current=byMatricula.get(String(defaultPerson.matricula));
+      if(current){
+        current.nome=current.nome||defaultPerson.nome;
+        current.id=current.id||defaultPerson.id;
+      }else{
+        block.people.push(defaultPerson);
+      }
+    });
+    if(!block.people.length)block.people.push(prodDiaEmptyPerson());
+  });
+  return day.prodDiurno;
+}
+
+function prodDiaMetricDef(metricKey){
+  return PROD_DIA_METRICS.find(m=>m.key===metricKey)||PROD_DIA_METRICS[0];
+}
+
+function prodDiaPeople(day,metricKey){
+  const data=ensureProdDiurno(day);
+  return data[metricKey].people;
+}
+
+function prodDiaWorkingDay(){
+  let day=getDay(curDate);
+  if(!day){
+    day=emptyDay(curDate||today());
+    db.days.push(day);
+    curDate=day.date;
+  }
+  ensureProdDiurno(day);
+  return day;
+}
+
+function prodDiaPerson(day,metricKey,personId){
+  return prodDiaPeople(day,metricKey).find(p=>p.id===personId);
+}
+
+function prodDiaResult(person,hourIndex){
+  if(!person||!Array.isArray(person.values))return null;
+  const current=person.values[hourIndex];
+  if(current===''||current===null||current===undefined||!Number.isFinite(+current))return null;
+  const prev=hourIndex>0&&Number.isFinite(+person.values[hourIndex-1])?+person.values[hourIndex-1]:0;
+  return Math.max(+current-prev,0);
+}
+
+function prodDiaTotal(person){
+  return PROD_DIA_HOURS.reduce((sum,_,i)=>{
+    const v=prodDiaResult(person,i);
+    return sum+(v===null?0:v);
+  },0);
+}
+
+function prodDiaTouch(day,person,field){
+  const ts=Date.now();
+  person._fieldUpdatedAt={...(person._fieldUpdatedAt||{}),[field]:ts};
+  day._updatedAt=ts;
+  curDate=day.date;
+}
+
+function saveProdDiaMatricula(metricKey,personId,value){
+  let day=prodDiaWorkingDay();
+  const person=prodDiaPerson(day,metricKey,personId);
+  if(!person)return;
+  person.matricula=value;
+  person.nome=prodDiaDefaultName(metricKey,value)||person.nome||'';
+  prodDiaTouch(day,person,'matricula');
+  save();
+  renderProdDiurnoDash(day);
+  buildDayNav();
+}
+
+function saveProdDiaValue(metricKey,personId,hourIndex,value){
+  let day=prodDiaWorkingDay();
+  const person=prodDiaPerson(day,metricKey,personId);
+  if(!person)return;
+  person.values[hourIndex]=value===''?'':+value||0;
+  prodDiaTouch(day,person,'v'+hourIndex);
+  save();
+  renderProdDiaPersonResults(metricKey,personId);
+  renderProdDiurnoDash(day);
+  buildDayNav();
+}
+
+function addProdDiaPerson(metricKey){
+  let day=prodDiaWorkingDay();
+  const data=day.prodDiurno;
+  data[metricKey].people.push(prodDiaEmptyPerson());
+  day._updatedAt=Date.now();
+  save();
+  renderProdDiurno();
+  renderProdDiurnoDash(day);
+  buildDayNav();
+}
+
+function removeProdDiaPerson(metricKey,personId){
+  let day=getDay(curDate);
+  if(!day)return;
+  const data=ensureProdDiurno(day);
+  data[metricKey].people=data[metricKey].people.filter(p=>p.id!==personId);
+  if(!data[metricKey].people.length)data[metricKey].people.push(prodDiaEmptyPerson());
+  day._updatedAt=Date.now();
+  save();
+  renderProdDiurno();
+  renderProdDiurnoDash(day);
+  buildDayNav();
+}
+
+function renderProdDiaPersonResults(metricKey,personId){
+  const day=getDay(curDate)||emptyDay(curDate||today());
+  const person=prodDiaPerson(day,metricKey,personId);
+  PROD_DIA_HOURS.forEach((_,i)=>{
+    const el=document.querySelector(`[data-prod-dia-result="${metricKey}"][data-person="${personId}"][data-hour="${i}"]`);
+    if(el)el.textContent=prodFmt(prodDiaResult(person,i),0);
+  });
+  const total=document.querySelector(`[data-prod-dia-total="${metricKey}"][data-person="${personId}"]`);
+  if(total)total.textContent=prodFmt(prodDiaTotal(person),0);
+}
+
+function renderProdDiurno(){
+  const wrap=document.getElementById('prodDiaTables');
+  if(!wrap)return;
+  const day=prodDiaWorkingDay();
+  let html='';
+  PROD_DIA_METRICS.forEach(metric=>{
+    const people=prodDiaPeople(day,metric.key);
+    html+=`<div class="prod-dia-block">
+      <div class="prod-dia-head"><div>${metric.setor} — ${metric.label}</div><span>Acumulado cheio informado | resultado/h calculado</span></div>
+      <div style="padding:7px 8px"><button type="button" class="prod-dia-add" onclick="addProdDiaPerson('${metric.key}')">Adicionar matrícula</button></div>
+      <div class="prod-dia-table-wrap"><table class="prod-dia-table"><thead><tr><th>Matrícula</th><th>Nome</th>`;
+    PROD_DIA_HOURS.forEach(h=>{html+=`<th>${h}</th>`;});
+    html+='<th>Total dia</th><th></th></tr></thead><tbody>';
+    people.forEach(person=>{
+      html+=`<tr><td><input class="matricula-input" value="${attrText(person.matricula||'')}" oninput="saveProdDiaMatricula('${metric.key}','${person.id}',this.value)" placeholder="matrícula"/></td><td style="min-width:210px;font-weight:bold;color:#89b4d4;text-align:left">${excelText(person.nome||'')}</td>`;
+      PROD_DIA_HOURS.forEach((_,i)=>{
+        const v=person.values&&person.values[i]!==undefined?person.values[i]:'';
+        html+=`<td><input type="number" min="0" value="${v}" oninput="saveProdDiaValue('${metric.key}','${person.id}',${i},this.value)" placeholder="0"/><span class="prod-dia-result" data-prod-dia-result="${metric.key}" data-person="${person.id}" data-hour="${i}">${prodFmt(prodDiaResult(person,i),0)}</span></td>`;
+      });
+      html+=`<td style="font-weight:bold;color:#00e5ff" data-prod-dia-total="${metric.key}" data-person="${person.id}">${prodFmt(prodDiaTotal(person),0)}</td><td><button type="button" class="prod-dia-del" onclick="removeProdDiaPerson('${metric.key}','${person.id}')">Excluir</button></td></tr>`;
+    });
+    html+='</tbody></table></div></div>';
+  });
+  wrap.innerHTML=html;
+  populateProdDiaDashSelects();
+}
+
+function populateProdDiaDashSelects(){
+  const metricSel=document.getElementById('prodDiaMetricSelect');
+  const hourSel=document.getElementById('prodDiaHourSelect');
+  if(metricSel&&!metricSel.options.length){
+    metricSel.innerHTML=PROD_DIA_METRICS.map(m=>`<option value="${m.key}">${m.short}</option>`).join('');
+  }
+  if(hourSel&&!hourSel.options.length){
+    hourSel.innerHTML=PROD_DIA_HOURS.map((h,i)=>`<option value="${i}">${h}</option>`).join('');
+  }
+}
+
+function prodDiaChartPeople(day,metricKey){
+  return prodDiaPeople(day,metricKey).filter(p=>String(p.matricula||'').trim()||prodDiaTotal(p)>0);
+}
+
+function renderProdDiaHoraResumo(day,metricKey){
+  const wrap=document.getElementById('prodDiaHoraResumo');
+  if(!wrap)return;
+  const metric=prodDiaMetricDef(metricKey);
+  const people=prodDiaChartPeople(day,metricKey);
+  if(!people.length){
+    wrap.innerHTML=`<table><tbody><tr><td style="text-align:center;color:#6a9fc0;font-weight:bold">Sem dados preenchidos para ${excelText(metric.short)}.</td></tr></tbody></table>`;
+    return;
+  }
+  let html=`<table><thead><tr><th>Matrícula</th>`;
+  PROD_DIA_HOURS.forEach(hour=>{html+=`<th>${hour}</th>`;});
+  html+='<th>Total dia</th></tr></thead><tbody>';
+  people.forEach(person=>{
+    html+=`<tr><td style="font-weight:bold">${excelText(person.matricula||'Sem matrícula')}</td>`;
+    PROD_DIA_HOURS.forEach((_,i)=>{
+      const result=prodDiaResult(person,i);
+      html+=`<td style="font-weight:bold;color:#1e88e5">${prodFmt(result,0)}</td>`;
+    });
+    html+=`<td style="font-weight:bold;color:#00a86b">${prodFmt(prodDiaTotal(person),0)}</td></tr>`;
+  });
+  html+='</tbody></table>';
+  wrap.innerHTML=html;
+}
+
+function renderProdDiurnoDash(dayArg){
+  const day=dayArg||getDay(curDate)||emptyDay(curDate||today());
+  const canvasHour=document.getElementById('cProdDiaHora');
+  const canvasTotal=document.getElementById('cProdDiaTotal');
+  const resumo=document.getElementById('prodDiaHoraResumo');
+  if(!canvasHour&&!canvasTotal&&!resumo)return;
+  populateProdDiaDashSelects();
+  ensureProdDiurno(day);
+  const metricSel=document.getElementById('prodDiaMetricSelect');
+  const hourSel=document.getElementById('prodDiaHourSelect');
+  const metricKey=metricSel&&metricSel.value?metricSel.value:PROD_DIA_METRICS[0].key;
+  const hourIndex=hourSel&&hourSel.value!==''?+hourSel.value:0;
+  const metric=prodDiaMetricDef(metricKey);
+  const people=prodDiaChartPeople(day,metricKey);
+  const labels=people.map(p=>String(p.matricula||'Sem matrícula'));
+  const hourData=people.map(p=>prodDiaResult(p,hourIndex));
+  const totalData=people.map(prodDiaTotal);
+  if(canvasHour){
+    if(CH.prodDiaHora){CH.prodDiaHora.destroy();delete CH.prodDiaHora;}
+    CH.prodDiaHora=new Chart(canvasHour,{type:'bar',
+      data:{labels,datasets:[{label:`${metric.short} - ${PROD_DIA_HOURS[hourIndex]}`,data:hourData,backgroundColor:'#1e88e5',borderRadius:4,valueLabels:hourData.map(v=>v===null?'':prodFmt(v,0))}]},
+      options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24,right:8,left:4}},plugins:{legend:{labels:{color:'#00385f',font:{size:10,weight:'bold'}}}},scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45},grid:{color:'rgba(6,35,61,0.08)'}},y:{beginAtZero:true,suggestedMax:prodChartMax(hourData),ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'},title:{display:true,text:'Resultado da hora',color:'#00385f',font:{size:9,weight:'bold'}}}}}
+    });
+  }
+  if(canvasTotal){
+    if(CH.prodDiaTotal){CH.prodDiaTotal.destroy();delete CH.prodDiaTotal;}
+    CH.prodDiaTotal=new Chart(canvasTotal,{type:'bar',
+      data:{labels,datasets:[{label:`${metric.short} - Total do dia`,data:totalData,backgroundColor:'#1e88e5',borderRadius:4,valueLabels:totalData.map(v=>v?prodFmt(v,0):'')}]},
+      options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24,right:8,left:4}},plugins:{legend:{labels:{color:'#00385f',font:{size:10,weight:'bold'}}}},scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45},grid:{color:'rgba(6,35,61,0.08)'}},y:{beginAtZero:true,suggestedMax:prodChartMax(totalData),ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'},title:{display:true,text:'Total do dia',color:'#00385f',font:{size:9,weight:'bold'}}}}}
+    });
+  }
+  renderProdDiaHoraResumo(day,metricKey);
+}
+
+function exportProdDiurnoExcel(){
+  const day=getDay(curDate)||emptyDay(curDate||today());
+  ensureProdDiurno(day);
+  let rows='<tr><th>Data</th><th>Setor</th><th>Indicador</th><th>Matrícula</th><th>Nome</th><th>Horário</th><th>Acumulado informado</th><th>Resultado da hora</th><th>Total do dia da matrícula</th></tr>';
+  PROD_DIA_METRICS.forEach(metric=>{
+    prodDiaPeople(day,metric.key).forEach(person=>{
+      PROD_DIA_HOURS.forEach((hour,i)=>{
+        rows+=`<tr>
+          <td>${excelText(fmtDateShort(day.date||curDate||today()))}</td>
+          <td>${excelText(metric.setor)}</td>
+          <td>${excelText(metric.label)}</td>
+          <td>${excelText(person.matricula||'')}</td>
+          <td>${excelText(person.nome||'')}</td>
+          <td>${excelText(hour)}</td>
+          <td>${excelText(person.values&&person.values[i]!==undefined?person.values[i]:0)}</td>
+          <td>${excelText(prodFmt(prodDiaResult(person,i),0))}</td>
+          <td>${excelText(prodFmt(prodDiaTotal(person),0))}</td>
+        </tr>`;
+      });
+    });
+  });
+  const html=`<!doctype html><html><head><meta charset="utf-8"></head><body><table border="1">${rows}</table></body></html>`;
+  const blob=new Blob([html],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  const date=(day.date||curDate||today()).replaceAll('-','');
+  a.href=url;
+  a.download=`produtividade-individual-diurno-${date}.xls`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
 // ── KPIs ──────────────────────────────────────────────────
@@ -4724,6 +5188,7 @@ function readFormAsDay(){
   const existing=getDay(dt);
   const savedRotas=existing&&Array.isArray(existing.rotas)?JSON.parse(JSON.stringify(existing.rotas)):null;
   const savedProdSetores=existing&&existing.prodSetores?JSON.parse(JSON.stringify(existing.prodSetores)):null;
+  const savedProdDiurno=existing&&existing.prodDiurno?JSON.parse(JSON.stringify(existing.prodDiurno)):null;
   const newRules=useNewRules(dt);
   const simpleOp=useSimpleOperational(dt);
   const totalLinesOp=useTotalLinesOperational(dt);
@@ -4830,7 +5295,8 @@ function readFormAsDay(){
     rJuncao:+document.getElementById('iRJuncao').value||0,rDoc:+document.getElementById('iRDoc').value||0,
     hd:hdData,
     ...(savedRotas?{rotas:savedRotas}:{}),
-    ...(savedProdSetores?{prodSetores:savedProdSetores}:{})
+    ...(savedProdSetores?{prodSetores:savedProdSetores}:{}),
+    ...(savedProdDiurno?{prodDiurno:savedProdDiurno}:{})
   };
 }
 function loadFormFrom(day){
@@ -4892,6 +5358,7 @@ function renderCurrentDay(day){
   renderRotasTbl(day,'rotasTbl');renderRotasTbl(day,'rotasTblFull');updateRotasKPIs(day);
   refreshOpenPrevisaoEncerramento(day);
   renderProdSetoresDash(day);
+  renderProdDiurnoDash(day);
 }
 function prepNewDay(){
   clearTimeout(autoSaveTimer);
@@ -6018,13 +6485,13 @@ function applyRoleUI(){
   const hide=id=>{const e=document.getElementById(id);if(e)e.style.display='none';};
   if(r==='admin'){
     adminOk=true;
-    show('tabAdm');show('tabProdDash');show('tabProdSetores');show('floatBtn');hide('tabPreench');
+    show('tabAdm');show('tabProdDash');show('tabProdSetores');show('tabProdDashDia');show('tabProdDia');show('floatBtn');hide('tabPreench');
     document.querySelectorAll('.adm-restricted').forEach(e=>e.style.display='');
   }else if(r==='supervisor'){
-    show('tabProdDash');show('tabProdSetores');hide('floatBtn');hide('tabAdm');hide('tabPreench');
+    show('tabProdDash');show('tabProdSetores');show('tabProdDashDia');show('tabProdDia');hide('floatBtn');hide('tabAdm');hide('tabPreench');
   }else if(r==='operador'){
     adminOk=true;
-    show('tabPreench');show('tabAdm');show('tabProdDash');show('tabProdSetores');
+    show('tabPreench');show('tabAdm');show('tabProdDash');show('tabProdSetores');show('tabProdDashDia');show('tabProdDia');
     hide('floatBtn');hide('tabHist');hide('tabComp');hide('tabRotas');
     document.querySelectorAll('.adm-restricted').forEach(e=>e.style.display='none');
     setTimeout(()=>switchTab('preench'),80);
