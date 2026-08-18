@@ -75,6 +75,21 @@ body.privacy-lock::after{content:attr(data-watermark);position:fixed;right:16px;
 .tab:hover{color:#aad4f0}
 .tab.act{background:#0e1621;color:#ffd700;font-weight:bold;border-color:#ffd700;border-bottom:2px solid #0e1621}
 .tab-body{display:none}.tab-body.act{display:block}
+body.recebarm-view #kpiBar1,
+body.recebarm-view #flowBar,
+body.recebarm-view #prevEncPanel{display:none!important}
+body.recebarm-view .day-nav button{display:none!important}
+body.recebarm-view .hdr{position:static}
+body.recebarm-view .tabs{padding-top:8px;background:#071525}
+body.recebarm-view .tabs .tab:not(#tabRecebArm){display:none!important}
+body.recebarm-view #tabRecebArm{font-size:13px;padding:10px 18px}
+body.recebarm-view .day-nav{justify-content:flex-start;padding:8px 14px}
+body.recebarm-view .receb-arm-page{padding:12px 14px}
+body.recebarm-view .receb-arm-kpis{grid-template-columns:repeat(7,1fr)}
+body.recebarm-view .receb-arm-panel{margin-bottom:10px}
+body.recebarm-view .receb-arm-body{padding:12px}
+body.recebarm-view .receb-arm-form{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+@media(max-width:1100px){body.recebarm-view .receb-arm-kpis{grid-template-columns:repeat(auto-fit,minmax(145px,1fr))}}
 /* CHARTS */
 .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px}
 .chart-box{background:#122033;border-radius:6px;padding:8px;border:1px solid #1a3550}
@@ -544,6 +559,11 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 .receb-arm-agenda th,.receb-arm-tbl th{background:#071525;color:#6a9fc0;text-transform:uppercase}
 .receb-arm-agenda td,.receb-arm-tbl td{background:#0d1c2e;color:#dcecff}
 .receb-arm-agenda tr:nth-child(even) td,.receb-arm-tbl tr:nth-child(even) td{background:#122033}
+.receb-arm-item-preview{margin-top:8px;overflow-x:auto;border:1px solid #1a3550;border-radius:5px;display:none}
+.receb-arm-item-preview.on{display:block}
+.receb-arm-item-preview .preview-title{background:#071525;color:#ffd700;font-weight:bold;font-size:10px;padding:7px 9px;border-bottom:1px solid #1a3550;text-transform:uppercase}
+.receb-arm-item-mini{margin-top:8px;overflow-x:auto;border-top:1px solid #1a3550;padding-top:7px}
+.receb-arm-item-mini summary{cursor:pointer;color:#ffd700;font-weight:bold;font-size:10px;margin-bottom:6px}
 .receb-arm-groups{display:grid;grid-template-columns:1fr;gap:8px}
 .receb-arm-group{border:1px solid #1a3550;border-radius:6px;overflow:hidden;background:#0d1c2e}
 .receb-arm-group-title{background:#071525;color:#ffd700;padding:7px 9px;font-weight:bold;font-size:11px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
@@ -1021,9 +1041,14 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
           <label>Arquivo XML/PDF
             <input type="file" id="recebArmNotaFile" accept=".xml,.pdf" onchange="readRecebArmNotaFile(event)">
           </label>
+          <label>Base COD GAM / descrição
+            <input type="file" id="recebArmBaseFile" accept=".xls,.xlsx,.csv" onchange="importRecebArmProductBase(event)">
+          </label>
           <button class="receb-arm-btn" type="button" onclick="addRecebArmNota()">Adicionar NF</button>
         </div>
         <div class="receb-arm-msg" id="recebArmNotaMsg"></div>
+        <div class="receb-arm-msg" id="recebArmBaseMsg"></div>
+        <div class="receb-arm-item-preview" id="recebArmItensPreview"></div>
       </div>
     </div>
 
@@ -1057,10 +1082,10 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
         <div class="receb-arm-body">
           <div class="receb-arm-form">
             <label>NF
-              <input id="recebArmPendConfNf" placeholder="NF">
+              <select id="recebArmPendConfNf" onchange="renderRecebArm()"></select>
             </label>
             <label>Item/código
-              <input id="recebArmPendConfItem" placeholder="Código ou item">
+              <select id="recebArmPendConfItem"></select>
             </label>
             <label>Quantidade
               <input type="number" id="recebArmPendConfQtd" min="0" placeholder="0">
@@ -1070,6 +1095,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
             </label>
             <button class="receb-arm-btn red" type="button" onclick="addRecebArmPendencia('conf')">Adicionar pendência</button>
           </div>
+          <div style="overflow-x:auto;margin-top:8px" id="recebArmPendConfItens"></div>
           <div style="overflow-x:auto;margin-top:8px" id="recebArmPendConfTbl"></div>
         </div>
       </div>
@@ -2081,6 +2107,7 @@ function mergeRecebArm(current,next){
     pendConf:mergeByIdOrIndex(a.pendConf,b.pendConf,'id'),
     pendArm:mergeByIdOrIndex(a.pendArm,b.pendArm,'id'),
     qrpRows:mergeByIdOrIndex(a.qrpRows,b.qrpRows,'id'),
+    productBase:mergeByIdOrIndex(a.productBase,b.productBase,'codigo'),
     _updatedAt:Math.max(+a._updatedAt||0,+b._updatedAt||0)
   };
 }
@@ -2894,7 +2921,16 @@ function updateMediaHoraAuto(){
 }
 
 // ── TABS ──────────────────────────────────────────────────
+function updateRecebArmViewMode(id){
+  document.body.classList.toggle('recebarm-view',id==='recebarm');
+  if(id==='recebarm'){
+    const panel=document.getElementById('prevEncPanel');
+    if(panel)panel.style.display='none';
+  }
+}
+
 function switchTab(id){
+  updateRecebArmViewMode(id);
   document.querySelectorAll('.tab').forEach((t,i)=>{
     const ids=['dash','hist','comp','rotas','preench','adm','proddash','prodsetores','proddashdia','proddia','recebarm'];
     t.classList.toggle('act',ids[i]===id);
@@ -3136,6 +3172,10 @@ function excelText(v){
 
 function attrText(v){
   return excelText(v).replace(/"/g,'&quot;');
+}
+
+function jsText(v){
+  return JSON.stringify(String(v??'')).replace(/</g,'\\u003c');
 }
 
 function exportProdSetoresExcel(){
@@ -3551,13 +3591,13 @@ function exportProdDiurnoExcel(){
 
 // Recebimento / Armazenagem
 function emptyRecebArm(){
-  return{agendaRows:[],notas:[],pendConf:[],pendArm:[],qrpRows:[],_updatedAt:0};
+  return{agendaRows:[],notas:[],pendConf:[],pendArm:[],qrpRows:[],productBase:[],_updatedAt:0};
 }
 
 function ensureRecebArm(day){
   if(!day.recebArm||typeof day.recebArm!=='object')day.recebArm=emptyRecebArm();
   const data=day.recebArm;
-  ['agendaRows','notas','pendConf','pendArm','qrpRows'].forEach(k=>{if(!Array.isArray(data[k]))data[k]=[];});
+  ['agendaRows','notas','pendConf','pendArm','qrpRows','productBase'].forEach(k=>{if(!Array.isArray(data[k]))data[k]=[];});
   return data;
 }
 
@@ -3643,6 +3683,79 @@ function recebArmCell(row,headers,names){
   return '';
 }
 
+function recebArmProductMap(data){
+  const map={};
+  (data&&Array.isArray(data.productBase)?data.productBase:[]).forEach(p=>{
+    const code=String(p.codigo||'').trim();
+    if(code)map[code]=p;
+  });
+  return map;
+}
+
+function recebArmEnrichItems(items,data){
+  const map=recebArmProductMap(data);
+  return (Array.isArray(items)?items:[]).map(item=>{
+    const code=String(item.codigo||'').trim();
+    const base=map[code];
+    if(!base)return item;
+    return{
+      ...item,
+      descricao:item.descricao||base.descricao||'',
+      descricaoBase:base.descricao||'',
+      codGam:base.codigo||code
+    };
+  });
+}
+
+function parseRecebArmProductBaseRows(rows){
+  const headerIndex=recebArmFindHeader(rows,['codigo']);
+  let productRows=[];
+  if(headerIndex>=0){
+    const headers=rows[headerIndex];
+    productRows=rows.slice(headerIndex+1).map((row,i)=>{
+      const codigo=String(recebArmCell(row,headers,['cod gam','codigo gam','código gam','codigo','código','cod'])||'').trim();
+      const descricao=String(recebArmCell(row,headers,['descricao','descrição','nome','produto','mercadoria'])||'').trim();
+      if(!codigo||!descricao)return null;
+      return{id:codigo,codigo,descricao,_updatedAt:Date.now()+i};
+    }).filter(Boolean);
+  }
+  if(!productRows.length){
+    rows.forEach((row,i)=>{
+      const cells=(row||[]).map(v=>String(v||'').trim()).filter(Boolean);
+      const codigo=cells.find(v=>/^\d{4,9}$/.test(v));
+      const descricao=cells.filter(v=>/[A-Za-zÀ-ÿ]/.test(v)&&v.length>5).sort((a,b)=>b.length-a.length)[0];
+      if(codigo&&descricao)productRows.push({id:codigo,codigo,descricao,_updatedAt:Date.now()+i});
+    });
+  }
+  const byCode={};
+  productRows.forEach(p=>{byCode[p.codigo]=p;});
+  return Object.values(byCode);
+}
+
+async function importRecebArmProductBase(ev){
+  const file=ev.target.files&&ev.target.files[0];
+  if(!file)return;
+  if(typeof XLSX==='undefined'){recebArmMsg('recebArmBaseMsg','Leitor de Excel não carregou. Reabra a página e tente novamente.',true);return;}
+  try{
+    const wb=XLSX.read(await readFileBuffer(file),{type:'array'});
+    const rows=recebArmSheetRows(wb);
+    const productBase=parseRecebArmProductBaseRows(rows);
+    if(!productBase.length)throw new Error('Base sem código/descrição');
+    const day=recebArmDay();
+    const data=ensureRecebArm(day);
+    data.productBase=productBase;
+    data.notas.forEach(n=>{n.itens=recebArmEnrichItems(n.itens,data);});
+    recebArmTouch(day);
+    recebArmMsg('recebArmBaseMsg',`${productBase.length} produto(s) carregados da base COD GAM.`,false);
+    renderRecebArm();
+  }catch(e){
+    console.error(e);
+    recebArmMsg('recebArmBaseMsg','Não consegui ler a base. Envie uma planilha com Código/COD GAM e Descrição/Nome.',true);
+  }finally{
+    ev.target.value='';
+  }
+}
+
 async function importRecebArmAgenda(ev){
   const file=ev.target.files&&ev.target.files[0];
   if(!file)return;
@@ -3702,22 +3815,35 @@ function recebArmXmlText(el,name){
   return node?node.textContent.trim():'';
 }
 
+function recebArmXmlAll(el,name){
+  return [...el.getElementsByTagName(name)];
+}
+
 function parseRecebArmXml(text){
   const xml=new DOMParser().parseFromString(text,'text/xml');
+  if(xml.getElementsByTagName('parsererror').length)throw new Error('XML inválido');
   const inf=xml.getElementsByTagName('infNFe')[0];
   const emit=xml.getElementsByTagName('emit')[0];
   const ide=xml.getElementsByTagName('ide')[0];
   const chave=inf&&inf.getAttribute('Id')?inf.getAttribute('Id').replace(/^NFe/,''):'';
   const itens=[...xml.getElementsByTagName('det')].map(det=>{
     const prod=det.getElementsByTagName('prod')[0]||det;
+    const rastros=recebArmXmlAll(prod,'rastro');
+    const lotes=rastros.map(r=>recebArmXmlText(r,'nLote')).filter(Boolean).join(' / ');
+    const validade=rastros.map(r=>recebArmXmlText(r,'dVal')).filter(Boolean).join(' / ');
+    const qtdLote=rastros.reduce((sum,r)=>sum+(+recebArmXmlText(r,'qLote')||0),0);
     return{
       id:recebArmId('item'),
+      nItem:det.getAttribute('nItem')||'',
       codigo:recebArmXmlText(prod,'cProd'),
+      ean:recebArmXmlText(prod,'cEAN')||recebArmXmlText(prod,'cEANTrib'),
       descricao:recebArmXmlText(prod,'xProd'),
-      lote:'',
+      unidade:recebArmXmlText(prod,'uCom')||recebArmXmlText(prod,'uTrib'),
+      lote:lotes,
       qtdEntrada:+recebArmXmlText(prod,'qCom')||0,
+      qtdLote:qtdLote||'',
       qtdArmazenada:0,
-      validade:'',
+      validade,
       endereco:''
     };
   });
@@ -3727,6 +3853,32 @@ function parseRecebArmXml(text){
     fornecedor:recebArmXmlText(emit||xml,'xNome'),
     itens
   };
+}
+
+function recebArmRenderItensTable(itens,title,compact=false){
+  const list=Array.isArray(itens)?itens:[];
+  if(!list.length)return '';
+  return `${title?`<div class="preview-title">${excelText(title)}</div>`:''}<table class="receb-arm-tbl"><thead><tr><th>Item</th><th>Código</th><th>EAN</th><th>Descrição</th><th>Unid.</th><th>Qtd NF</th><th>Lote</th><th>Validade</th>${compact?'':'<th>Armazenado</th><th>Pendente</th>'}</tr></thead><tbody>
+    ${list.map((i,idx)=>{
+      const entrou=+i.qtdEntrada||0;
+      const arm=+i.qtdArmazenada||0;
+      const desc=i.descricaoBase||i.descricao||'';
+      const baseHint=i.descricaoBase?'<div style="font-size:9px;color:#00e5ff;font-weight:normal">base COD GAM</div>':'';
+      return `<tr><td>${excelText(i.nItem||idx+1)}</td><td>${excelText(i.codigo||'')}</td><td>${excelText(i.ean||'')}</td><td style="text-align:left;color:#fff;font-weight:bold">${excelText(desc)}${baseHint}</td><td>${excelText(i.unidade||'')}</td><td style="font-weight:bold;color:#ffd700">${prodFmt(entrou,3)}</td><td>${excelText(i.lote||'')}</td><td>${excelText(i.validade||'')}</td>${compact?'':`<td style="color:#00e5ff;font-weight:bold">${prodFmt(arm,3)}</td><td style="color:#ff9500;font-weight:bold">${prodFmt(Math.max(entrou-arm,0),3)}</td>`}</tr>`;
+    }).join('')}
+  </tbody></table>`;
+}
+
+function renderRecebArmNotaPreview(parsed){
+  const el=document.getElementById('recebArmItensPreview');
+  if(!el)return;
+  if(!parsed||!Array.isArray(parsed.itens)||!parsed.itens.length){
+    el.classList.remove('on');
+    el.innerHTML='';
+    return;
+  }
+  el.classList.add('on');
+  el.innerHTML=recebArmRenderItensTable(parsed.itens,`Itens lidos do XML - NF ${parsed.nfNumero||''}`,true);
 }
 
 function parseRecebArmPdfText(text){
@@ -3749,7 +3901,9 @@ async function readRecebArmNotaFile(ev){
     let parsed=null;
     if(/\.xml$/i.test(file.name)){
       parsed=parseRecebArmXml(await readFileText(file,'UTF-8'));
+      parsed.itens=recebArmEnrichItems(parsed.itens,ensureRecebArm(getDay(curDate)||emptyDay(curDate||today())));
     }else if(/\.pdf$/i.test(file.name)){
+      renderRecebArmNotaPreview(null);
       if(typeof pdfjsLib==='undefined')throw new Error('PDF.js indisponível');
       pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
       const pdf=await pdfjsLib.getDocument({data:new Uint8Array(await readFileBuffer(file))}).promise;
@@ -3767,10 +3921,14 @@ async function readRecebArmNotaFile(ev){
       if(parsed.chave)document.getElementById('recebArmChave').value=parsed.chave;
       if(parsed.fornecedor)document.getElementById('recebArmFornecedor').value=parsed.fornecedor;
       document.getElementById('recebArmNotaFile')._parsedNota=parsed;
-      if(/\.xml$/i.test(file.name))recebArmMsg('recebArmNotaMsg',`${parsed.itens.length} item(ns) lidos do XML. Clique em Adicionar NF.`,false);
+      if(/\.xml$/i.test(file.name)){
+        renderRecebArmNotaPreview(parsed);
+        recebArmMsg('recebArmNotaMsg',`${parsed.itens.length} item(ns) lidos do XML. Confira a lista abaixo e clique em Adicionar NF.`,false);
+      }
     }
   }catch(e){
     console.error(e);
+    renderRecebArmNotaPreview(null);
     recebArmMsg('recebArmNotaMsg','Não consegui ler esse arquivo. Pode digitar a NF manualmente para o teste.',true);
   }
 }
@@ -3787,6 +3945,7 @@ function addRecebArmNota(){
   if(!nfNumero&&!chave){recebArmMsg('recebArmNotaMsg','Informe o número da NF ou a chave.',true);return;}
   const existing=data.notas.find(n=>(nfNumero&&String(n.nfNumero)===nfNumero)||(chave&&String(n.chave)===chave));
   const nota=existing||{id:recebArmId('nf'),createdAt:Date.now(),itens:[],pendConf:[],pendArm:[]};
+  const enrichedItems=recebArmEnrichItems(parsed.itens,data);
   Object.assign(nota,{
     nfNumero:nfNumero||nota.nfNumero||'',
     chave:chave||nota.chave||'',
@@ -3794,13 +3953,14 @@ function addRecebArmNota(){
     protocolo:protocolo||nota.protocolo||'',
     confStatus:nota.confStatus||'pendente',
     armStatus:nota.armStatus||'pendente',
-    itens:Array.isArray(parsed.itens)&&parsed.itens.length?parsed.itens:(nota.itens||[]),
+    itens:Array.isArray(enrichedItems)&&enrichedItems.length?enrichedItems:(nota.itens||[]),
     _updatedAt:Date.now()
   });
   if(!existing)data.notas.push(nota);
   recebArmTouch(day);
   ['recebArmNfNumero','recebArmChave','recebArmFornecedor','recebArmProtocolo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   if(fileEl){fileEl.value='';fileEl._parsedNota=null;}
+  renderRecebArmNotaPreview(null);
   recebArmMsg('recebArmNotaMsg',existing?'NF atualizada.':'NF adicionada ao fluxo.',false);
   compareRecebArmStorage(false);
   renderRecebArm();
@@ -3964,12 +4124,14 @@ function addRecebArmPendencia(tipo){
   const qtd=+document.getElementById(isConf?'recebArmPendConfQtd':'recebArmPendArmQtd').value||0;
   const obsEl=document.getElementById(isConf?'recebArmPendConfObs':'recebArmPendArmEnd');
   if(!nf&&!item){alert('Informe a NF ou o item da pendência.');return;}
-  const record={id:recebArmId(isConf?'pc':'pa'),nf,item,qtd,_updatedAt:Date.now()};
+  const nota=data.notas.find(n=>String(n.nfNumero||n.chave||'')===String(nf));
+  const itemData=nota&&(nota.itens||[]).find(i=>String(i.codigo||i.descricao||'')===String(item));
+  const record={id:recebArmId(isConf?'pc':'pa'),nf,item,qtd,descricao:itemData?(itemData.descricaoBase||itemData.descricao||''):'',_updatedAt:Date.now()};
   if(isConf)record.obs=obsEl.value.trim();
   else record.endereco=obsEl.value.trim()||'997';
   data[isConf?'pendConf':'pendArm'].push(record);
   recebArmTouch(day);
-  ['recebArmPendConfNf','recebArmPendConfItem','recebArmPendConfQtd','recebArmPendConfObs','recebArmPendArmNf','recebArmPendArmItem','recebArmPendArmQtd'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['recebArmPendConfQtd','recebArmPendConfObs','recebArmPendArmNf','recebArmPendArmItem','recebArmPendArmQtd'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   renderRecebArm();
 }
 
@@ -4014,6 +4176,48 @@ function renderRecebArmAgenda(data){
   </tbody></table>`;
 }
 
+function renderRecebArmPendSelectors(data){
+  const nfSel=document.getElementById('recebArmPendConfNf');
+  const itemSel=document.getElementById('recebArmPendConfItem');
+  if(!nfSel||!itemSel)return null;
+  const prevNf=nfSel.value;
+  const notas=data.notas||[];
+  nfSel.innerHTML=notas.length
+    ?notas.map(n=>`<option value="${attrText(n.nfNumero||n.chave||'')}">NF ${excelText(n.nfNumero||'sem número')} - ${excelText(n.fornecedor||'')}</option>`).join('')
+    :'<option value="">Sem NF lida</option>';
+  if(prevNf&&[...nfSel.options].some(o=>o.value===prevNf))nfSel.value=prevNf;
+  const selected=notas.find(n=>String(n.nfNumero||n.chave||'')===String(nfSel.value))||notas[0];
+  const prevItem=itemSel.value;
+  const itens=selected&&Array.isArray(selected.itens)?selected.itens:[];
+  itemSel.innerHTML=itens.length
+    ?itens.map(i=>`<option value="${attrText(i.codigo||i.descricao||'')}">${excelText(i.codigo||'sem código')} - ${excelText(i.descricaoBase||i.descricao||'')}</option>`).join('')
+    :'<option value="">Sem itens lidos no XML</option>';
+  if(prevItem&&[...itemSel.options].some(o=>o.value===prevItem))itemSel.value=prevItem;
+  return selected;
+}
+
+function fillRecebArmPendConf(nf,item,qtd){
+  const nfEl=document.getElementById('recebArmPendConfNf');
+  const itemEl=document.getElementById('recebArmPendConfItem');
+  const qtdEl=document.getElementById('recebArmPendConfQtd');
+  if(nfEl)nfEl.value=nf||'';
+  renderRecebArm();
+  const itemEl2=document.getElementById('recebArmPendConfItem');
+  if(itemEl2)itemEl2.value=item||'';
+  if(qtdEl)qtdEl.value=qtd||'';
+}
+
+function renderRecebArmPendConfItens(nota){
+  const el=document.getElementById('recebArmPendConfItens');
+  if(!el)return;
+  const itens=nota&&Array.isArray(nota.itens)?nota.itens:[];
+  if(!nota){el.innerHTML='<table class="receb-arm-tbl"><tbody><tr><td>Adicione ou selecione uma NF para ver os itens.</td></tr></tbody></table>';return;}
+  if(!itens.length){el.innerHTML='<table class="receb-arm-tbl"><tbody><tr><td>Esta NF ainda não tem itens lidos. Anexe o XML para carregar todos os produtos.</td></tr></tbody></table>';return;}
+  el.innerHTML=`<table class="receb-arm-tbl"><thead><tr><th>Item</th><th>Código</th><th>Descrição</th><th>Qtd NF</th><th>Lote</th><th>Validade</th><th>Ação</th></tr></thead><tbody>
+    ${itens.map((i,idx)=>`<tr><td>${excelText(i.nItem||idx+1)}</td><td>${excelText(i.codigo||'')}</td><td style="text-align:left;color:#fff;font-weight:bold">${excelText(i.descricaoBase||i.descricao||'')}</td><td style="color:#ffd700;font-weight:bold">${prodFmt(+i.qtdEntrada||0,3)}</td><td>${excelText(i.lote||'')}</td><td>${excelText(i.validade||'')}</td><td><button class="receb-arm-btn red" type="button" onclick="fillRecebArmPendConf(${jsText(nota.nfNumero||nota.chave||'')},${jsText(i.codigo||i.descricao||'')},${+i.qtdEntrada||0})">Marcar pendência</button></td></tr>`).join('')}
+  </tbody></table>`;
+}
+
 function renderRecebArmFluxo(data){
   const el=document.getElementById('recebArmFluxo');
   if(!el)return;
@@ -4034,6 +4238,7 @@ function renderRecebArmFluxo(data){
           <div>Chave: ${excelText(n.chave||'não informada')}</div>
           <div>Itens lidos: <b style="color:#ffd700">${(n.itens||[]).length}</b></div>
           <div>Armazenado pela 997: <b style="color:#00e5ff">${(n.itens||[]).filter(i=>(+i.qtdArmazenada||0)>0).length}</b> item(ns)</div>
+          ${(n.itens||[]).length?`<details class="receb-arm-item-mini"><summary>Ver todos os itens da NF</summary>${recebArmRenderItensTable(n.itens,'',false)}</details>`:''}
           <div class="receb-arm-status-grid">
             <div class="receb-arm-status"><label>Conferência</label>${recebArmStatusSelect(n.id,'confStatus',n.confStatus)}</div>
             <div class="receb-arm-status"><label>Armazenagem</label>${recebArmStatusSelect(n.id,'armStatus',n.armStatus)}</div>
@@ -4052,11 +4257,13 @@ function renderRecebArmFluxo(data){
 }
 
 function renderRecebArmPendTables(data){
+  const selectedNota=renderRecebArmPendSelectors(data);
+  renderRecebArmPendConfItens(selectedNota);
   const conf=document.getElementById('recebArmPendConfTbl');
   const arm=document.getElementById('recebArmPendArmTbl');
   if(conf){
     const rows=data.pendConf||[];
-    conf.innerHTML=`<table class="receb-arm-tbl"><thead><tr><th>NF</th><th>Item</th><th>Qtd</th><th>Obs.</th><th></th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td>${excelText(r.nf||'')}</td><td>${excelText(r.item||'')}</td><td>${prodFmt(+r.qtd||0,0)}</td><td>${excelText(r.obs||'')}</td><td><button class="receb-arm-btn red" type="button" onclick="removeRecebArmPendencia('conf','${r.id}')">Excluir</button></td></tr>`).join(''):'<tr><td colspan="5">Sem pendência de conferência.</td></tr>'}</tbody></table>`;
+    conf.innerHTML=`<table class="receb-arm-tbl"><thead><tr><th>NF</th><th>Item</th><th>Descrição</th><th>Qtd</th><th>Obs.</th><th></th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td>${excelText(r.nf||'')}</td><td>${excelText(r.item||'')}</td><td style="text-align:left;color:#fff;font-weight:bold">${excelText(r.descricao||'')}</td><td>${prodFmt(+r.qtd||0,0)}</td><td>${excelText(r.obs||'')}</td><td><button class="receb-arm-btn red" type="button" onclick="removeRecebArmPendencia('conf','${r.id}')">Excluir</button></td></tr>`).join(''):'<tr><td colspan="6">Sem pendência de conferência.</td></tr>'}</tbody></table>`;
   }
   if(arm){
     const rows=data.pendArm||[];
@@ -4086,10 +4293,10 @@ function exportRecebArmExcel(){
   (data.agendaRows||[]).forEach(r=>{html+=`<tr><td>${excelText(r.horario||'')}</td><td>${excelText(r.protocolo||'')}</td><td>${excelText(r.fornecedor||'')}</td><td>${excelText(r.transportador||'')}</td><td>${excelText(r.tipo||'')}</td><td>${r.skus||0}</td><td>${r.volumes||0}</td></tr>`;});
   html+='</table><h3>Notas</h3><table border="1"><tr><th>NF</th><th>Chave</th><th>Fornecedor</th><th>Protocolo</th><th>Status conferência</th><th>Status armazenagem</th><th>Itens lidos</th></tr>';
   (data.notas||[]).forEach(n=>{html+=`<tr><td>${excelText(n.nfNumero||'')}</td><td>${excelText(n.chave||'')}</td><td>${excelText(n.fornecedor||'')}</td><td>${excelText(n.protocolo||'')}</td><td>${excelText(RECEB_ARM_STATUS[recebArmNormalizeStatus(n.confStatus)])}</td><td>${excelText(RECEB_ARM_STATUS[recebArmNormalizeStatus(n.armStatus)])}</td><td>${(n.itens||[]).length}</td></tr>`;});
-  html+='</table><h3>Itens da NF x 997</h3><table border="1"><tr><th>NF</th><th>Código</th><th>Descrição</th><th>Lote</th><th>Entrou</th><th>Armazenado</th><th>Pendente</th></tr>';
-  (data.notas||[]).forEach(n=>(n.itens||[]).forEach(i=>{const entrou=+i.qtdEntrada||0,arm=+i.qtdArmazenada||0;html+=`<tr><td>${excelText(n.nfNumero||'')}</td><td>${excelText(i.codigo||'')}</td><td>${excelText(i.descricao||'')}</td><td>${excelText(i.lote||'')}</td><td>${entrou}</td><td>${arm}</td><td>${Math.max(entrou-arm,0)}</td></tr>`;}));
-  html+='</table><h3>Pendências Conferência</h3><table border="1"><tr><th>NF</th><th>Item</th><th>Qtd</th><th>Obs.</th></tr>';
-  (data.pendConf||[]).forEach(r=>{html+=`<tr><td>${excelText(r.nf||'')}</td><td>${excelText(r.item||'')}</td><td>${r.qtd||0}</td><td>${excelText(r.obs||'')}</td></tr>`;});
+  html+='</table><h3>Itens da NF x 997</h3><table border="1"><tr><th>NF</th><th>Item</th><th>Código</th><th>EAN</th><th>Descrição</th><th>Unid.</th><th>Lote</th><th>Validade</th><th>Entrou</th><th>Armazenado</th><th>Pendente</th></tr>';
+  (data.notas||[]).forEach(n=>(n.itens||[]).forEach(i=>{const entrou=+i.qtdEntrada||0,arm=+i.qtdArmazenada||0;html+=`<tr><td>${excelText(n.nfNumero||'')}</td><td>${excelText(i.nItem||'')}</td><td>${excelText(i.codigo||'')}</td><td>${excelText(i.ean||'')}</td><td>${excelText(i.descricao||'')}</td><td>${excelText(i.unidade||'')}</td><td>${excelText(i.lote||'')}</td><td>${excelText(i.validade||'')}</td><td>${entrou}</td><td>${arm}</td><td>${Math.max(entrou-arm,0)}</td></tr>`;}));
+  html+='</table><h3>Pendências Conferência</h3><table border="1"><tr><th>NF</th><th>Item</th><th>Descrição</th><th>Qtd</th><th>Obs.</th></tr>';
+  (data.pendConf||[]).forEach(r=>{html+=`<tr><td>${excelText(r.nf||'')}</td><td>${excelText(r.item||'')}</td><td>${excelText(r.descricao||'')}</td><td>${r.qtd||0}</td><td>${excelText(r.obs||'')}</td></tr>`;});
   html+='</table><h3>Pendências Armazenagem</h3><table border="1"><tr><th>NF</th><th>Item</th><th>Qtd</th><th>Endereço</th><th>Origem</th></tr>';
   (data.pendArm||[]).forEach(r=>{html+=`<tr><td>${excelText(r.nf||'')}</td><td>${excelText(r.item||'')}</td><td>${r.qtd||0}</td><td>${excelText(r.endereco||'')}</td><td>${excelText(r.origem||'manual')}</td></tr>`;});
   html+='</table></body></html>';
