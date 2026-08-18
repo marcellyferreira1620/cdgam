@@ -2205,12 +2205,11 @@ function initFirebase(){
       (err)=>{
         fbConnected=false;
         console.error('Firebase error:',err);
-        const msg=err.code==='PERMISSION_DENIED'?'⚠ Permissão negada — ver instruções':'⚠ Erro Firebase: '+err.code;
+        const msg=err.code==='PERMISSION_DENIED'?'⚠ Permissão negada — contate o administrador':'⚠ Erro Firebase: '+err.code;
         showSyncStatus(msg,true);
-        // Mostrar alerta de configuração se permissão negada
         if(err.code==='PERMISSION_DENIED'){
           const el=document.getElementById('syncStatus');
-          if(el)el.title='Abra o Firebase Console → Realtime Database → Rules e cole: {"rules":{".read":true,".write":true}}';
+          if(el)el.title='A regra do banco bloqueou o acesso. Ajustar somente com administrador/TI.';
         }
         fbRetryTimer=setTimeout(()=>reconnectFirebase(),60000);
       }
@@ -6034,12 +6033,20 @@ async function sbConnect(){
 }
 
 function openSyncConfig(){
+  if(!currentUser||currentUser.role!=='admin'){
+    alert('Configuração da nuvem restrita ao administrador.');
+    return;
+  }
   document.getElementById('sbUrlIn').value=localStorage.getItem('gam_sb_url')||'';
   document.getElementById('sbKeyIn').value=localStorage.getItem('gam_sb_key')||'';
   document.getElementById('syncOv').classList.add('on');
 }
 
 async function saveSyncConfig(){
+  if(!currentUser||currentUser.role!=='admin'){
+    alert('Configuração da nuvem restrita ao administrador.');
+    return;
+  }
   const url=document.getElementById('sbUrlIn').value.trim();
   const key=document.getElementById('sbKeyIn').value.trim();
   if(!url||!key){alert('Preencha URL e chave!');return;}
@@ -6080,6 +6087,10 @@ async function saveSyncConfig(){
 }
 
 function clearSyncConfig(){
+  if(!currentUser||currentUser.role!=='admin'){
+    alert('Configuração da nuvem restrita ao administrador.');
+    return;
+  }
   if(!confirm('Remover configuração de nuvem? Dados locais ficam intactos.'))return;
   localStorage.removeItem('gam_sb_url');localStorage.removeItem('gam_sb_key');
   sbUrl='';sbKey='';sbConnected=false;
@@ -6393,6 +6404,7 @@ const SESS_KEY='cdgam_sess_v2';
 const USERS_FB='cdgam/users';
 const USERS_LS='cdgam_users_v2';
 let currentUser=null;
+let cloudSyncStarted=false;
 
 function isEditableTarget(target){
   return !!(target&&target.closest&&target.closest('input,textarea,select,[contenteditable="true"]'));
@@ -6430,15 +6442,21 @@ function setSession(u){currentUser=u;sessionStorage.setItem(SESS_KEY,JSON.string
 function clearSession(){currentUser=null;sessionStorage.removeItem(SESS_KEY);}
 
 async function getUsers(){
-  // Tenta Supabase, depois Firebase e por fim o cache local.
-  const sbUsers=await sbLoadUsers();
-  if(sbUsers&&Object.keys(sbUsers).length)return sbUsers;
+  // Antes do login, consulta somente o cadastro de usuários, não a base operacional inteira.
   if(ensureFirebase()){
     try{
       const snap=await fbDb.ref(USERS_FB).once('value');
       const d=snap.val();
-      if(d){setLocalUsersCache(d);await sbSaveUsers(d);return d;}
+      if(d){
+        setLocalUsersCache(d);
+        if(currentUser)await sbSaveUsers(d);
+        return d;
+      }
     }catch(e){}
+  }
+  if(currentUser){
+    const sbUsers=await sbLoadUsers();
+    if(sbUsers&&Object.keys(sbUsers).length)return sbUsers;
   }
   return getLocalUsersCache();
 }
@@ -6479,10 +6497,21 @@ function afterLogin(){
   applyRoleUI();
   const day=getDay(curDate)||emptyDay(curDate||today());
   loadFormFrom(day);
+  startCloudSyncAfterLogin();
   if(currentUser.role==='admin'){
     document.getElementById('usersPanelWrap').style.display='';
     setTimeout(renderUsersList,1500);
   }
+}
+
+function startCloudSyncAfterLogin(){
+  if(cloudSyncStarted)return;
+  cloudSyncStarted=true;
+  startFirebaseRestPolling(false);
+  setTimeout(async()=>{
+    await sbConnect();
+    if(!sbConnected)setTimeout(initFirebase,500);
+  },500);
 }
 function updateUserBadge(){
   const el=document.getElementById('userBadge');if(!el)return;
@@ -6691,13 +6720,6 @@ function init(){
   }
   // loginOv já está visível por CSS (display:flex) quando não há sessão
   startRouteLiveDelayClock();
-  startFirebaseRestPolling(false);
-
-  // 6. Iniciar sync completo em background
-  setTimeout(async()=>{
-    await sbConnect();
-    if(!sbConnected)setTimeout(initFirebase,500);
-  },500);
 }
 init();
 </script>
