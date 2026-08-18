@@ -1828,20 +1828,46 @@ function bestBackupSnapshot(){
   }catch(e){return null;}
 }
 
+function backupPayloads(){
+  try{
+    const raw=localStorage.getItem(SK_BACKUPS);
+    const current=raw?JSON.parse(raw):null;
+    return Array.isArray(current?.items)
+      ?current.items.map(item=>item&&item.payload).filter(payload=>payload&&Array.isArray(payload.days)&&payload.days.length)
+      :(current&&current.payload&&Array.isArray(current.payload.days)?[current.payload]:[]);
+  }catch(e){return [];}
+}
+
+function shouldRestoreBackupPayload(payload){
+  if(!payload||!Array.isArray(payload.days)||!payload.days.length)return false;
+  const localDays=Array.isArray(db.days)?db.days:[];
+  if(payload.days.length>localDays.length)return true;
+  if(maxDayDate(payload.days)>maxDayDate(localDays))return true;
+  return payload.days.some(day=>{
+    if(!day||!day.date)return false;
+    const local=localDays.find(d=>d&&d.date===day.date);
+    if(!local)return true;
+    const backupScore=dayDataScore(day);
+    const localScore=dayDataScore(local);
+    if(backupScore>localScore)return true;
+    return (+day._updatedAt||0)>(+local._updatedAt||0)&&backupScore>=localScore;
+  });
+}
+
 function restoreBestLocalBackupIfNeeded(reason){
-  const backup=bestBackupSnapshot();
-  if(!backup||!Array.isArray(backup.days)||!backup.days.length)return false;
-  const localLen=Array.isArray(db.days)?db.days.length:0;
-  const backupLatest=maxDayDate(backup.days);
-  const localLatest=maxDayDate(db.days);
-  if(backup.days.length>localLen||backupLatest>localLatest){
+  const payloads=backupPayloads();
+  let restored=false;
+  payloads.forEach(backup=>{
+    if(!shouldRestoreBackupPayload(backup))return;
     db.days=mergeDays(db.days,backup.days);
+    restored=true;
+  });
+  if(restored){
     db.days.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
     localStorage.setItem(SK,JSON.stringify(db));
-    console.warn('Backup local restaurado:',reason,backup.days.length,backupLatest);
-    return true;
+    console.warn('Backup local restaurado:',reason,db.days.length,maxDayDate(db.days));
   }
-  return false;
+  return restored;
 }
 
 function shouldRejectOlderCloud(remoteDays,source){
@@ -1863,7 +1889,7 @@ function shouldRejectOlderCloud(remoteDays,source){
   return false;
 }
 
-const DATA_SCORE_IGNORED_KEYS=new Set(['date','savedAt','_updatedAt','_fieldUpdatedAt','_correiaDirectHour','cod','cidade','destino','hPrev']);
+const DATA_SCORE_IGNORED_KEYS=new Set(['date','savedAt','_updatedAt','_fieldUpdatedAt','_correiaDirectHour','cod','cidade','destino','hPrev','recebArm','prodSetores','prodDiurno','productBase']);
 
 function dataScoreValue(v,key){
   if(DATA_SCORE_IGNORED_KEYS.has(key))return 0;
@@ -1883,6 +1909,69 @@ function dataScoreValue(v,key){
 function dayDataScore(day){
   if(!day||typeof day!=='object')return 0;
   return Object.keys(day).reduce((s,k)=>s+dataScoreValue(day[k],k),0);
+}
+
+function dayFieldHasValue(value){
+  if(value===null||value===undefined)return false;
+  if(Array.isArray(value))return value.some(dayFieldHasValue);
+  if(typeof value==='object')return Object.keys(value).some(k=>!DATA_SCORE_IGNORED_KEYS.has(k)&&dayFieldHasValue(value[k]));
+  if(typeof value==='number')return Number.isFinite(value)&&value!==0;
+  if(typeof value==='string'){
+    const t=value.trim();
+    return t!==''&&t!=='0';
+  }
+  if(typeof value==='boolean')return value;
+  return false;
+}
+
+function mergeHourData(current,next,chosen){
+  const out=JSON.parse(JSON.stringify((chosen&&chosen.hd)||{}));
+  const keys=new Set([
+    ...Object.keys((current&&current.hd)||{}),
+    ...Object.keys((next&&next.hd)||{}),
+    ...Object.keys(out||{})
+  ]);
+  keys.forEach(metric=>{
+    const a=Array.isArray(current&&current.hd&&current.hd[metric])?current.hd[metric]:[];
+    const b=Array.isArray(next&&next.hd&&next.hd[metric])?next.hd[metric]:[];
+    const c=Array.isArray(chosen&&chosen.hd&&chosen.hd[metric])?chosen.hd[metric]:[];
+    const len=Math.max(HOURS.length,a.length,b.length,c.length);
+    out[metric]=new Array(len).fill('').map((_,i)=>{
+      const av=a[i],bv=b[i],cv=c[i];
+      const hasA=dayFieldHasValue(av);
+      const hasB=dayFieldHasValue(bv);
+      if(hasA&&hasB)return cv!==undefined?cv:bv;
+      if(hasB)return bv;
+      if(hasA)return av;
+      return cv!==undefined?cv:(bv!==undefined?bv:av);
+    });
+  });
+  return out;
+}
+
+function mergeDayRootFields(current,next,chosen){
+  const out={...chosen};
+  const skip=new Set(['date','_updatedAt','_fieldUpdatedAt','rotas','prodSetores','prodDiurno','recebArm','hd']);
+  const keys=new Set([...Object.keys(current||{}),...Object.keys(next||{}),...Object.keys(chosen||{})]);
+  keys.forEach(key=>{
+    if(skip.has(key))return;
+    const av=current&&current[key];
+    const bv=next&&next[key];
+    const cv=chosen&&chosen[key];
+    const hasA=dayFieldHasValue(av);
+    const hasB=dayFieldHasValue(bv);
+    if(hasA&&hasB)out[key]=cv!==undefined?cv:bv;
+    else if(hasB)out[key]=bv;
+    else if(hasA)out[key]=av;
+    else if(cv!==undefined)out[key]=cv;
+    else if(bv!==undefined)out[key]=bv;
+    else if(av!==undefined)out[key]=av;
+  });
+  out.hd=mergeHourData(current,next,chosen);
+  out.date=(chosen&&chosen.date)||(next&&next.date)||(current&&current.date);
+  const ts=Math.max(+(current&&current._updatedAt)||0,+(next&&next._updatedAt)||0,+(chosen&&chosen._updatedAt)||0);
+  if(ts)out._updatedAt=ts;
+  return out;
 }
 
 function maxDayUpdatedAt(days){
@@ -2129,7 +2218,8 @@ function mergeDayRecords(current,next){
   const prodSetores=mergeProdSetores(current.prodSetores,next.prodSetores);
   const prodDiurno=mergeProdDiurno(current.prodDiurno,next.prodDiurno);
   const recebArm=mergeRecebArm(current.recebArm,next.recebArm);
-  return {...chosen,...(rotas.length?{rotas}:{}),...(prodSetores?{prodSetores}:{}),...(prodDiurno?{prodDiurno}:{}),...(recebArm?{recebArm}:{})};
+  const root=mergeDayRootFields(current,next,chosen);
+  return {...root,...(rotas.length?{rotas}:{}),...(prodSetores?{prodSetores}:{}),...(prodDiurno?{prodDiurno}:{}),...(recebArm?{recebArm}:{})};
 }
 
 function mergeDays(remoteDays,localDays){
@@ -2193,6 +2283,24 @@ async function fbRestWritePayload(payload){
   return await r.json().catch(()=>null);
 }
 
+function payloadDaysHash(days){
+  return simpleHash(JSON.stringify(Array.isArray(days)?days:[]));
+}
+
+async function confirmFirebaseRestSave(payload){
+  await new Promise(r=>setTimeout(r,250));
+  const remote=await fbRestReadPayload().catch(()=>null);
+  if(!remote||!Array.isArray(remote.days))return payload;
+  const mergedDays=mergeDays(remote.days,payload.days);
+  if(payloadDaysHash(mergedDays)!==payloadDaysHash(remote.days)){
+    const ts=Date.now();
+    const mergedPayload={...remote,days:mergedDays,users:remote.users||payload.users||getLocalUsersCache(),savedAt:ts};
+    await fbRestWritePayload(mergedPayload);
+    return mergedPayload;
+  }
+  return remote;
+}
+
 async function saveToFirebaseRest(replaceDays=false){
   if(replaceDays)fbRestReplaceQueued=true;
   if(fbRestSaveRunning){fbRestSaveQueued=true;return;}
@@ -2217,10 +2325,11 @@ async function saveToFirebaseRest(replaceDays=false){
         savedAt:ts
       };
       await fbRestWritePayload(payload);
-      db.days=daysToSave;
+      const confirmed=replaceDaysNow?payload:await confirmFirebaseRestSave(payload);
+      db.days=Array.isArray(confirmed.days)?confirmed.days:daysToSave;
       localStorage.setItem(SK,JSON.stringify(db));
       fbConnected=true;
-      fbRestLastHash=cloudPayloadHash(payload);
+      fbRestLastHash=cloudPayloadHash(confirmed);
       showSyncStatus('Nuvem ativa',false);
       const lb=document.getElementById('liveBadge');if(lb)lb.style.display='inline';
     }while(fbRestSaveQueued||fbRestReplaceQueued);
@@ -2307,9 +2416,12 @@ async function saveToFirebase(replaceDays=false){
   }
   const payload={days:daysToSave,users:getLocalUsersCache(),savedAt:ts};
   return fbDb.ref(FB_PATH).set(encodeFirebasePayload(payload))
-    .then(()=>{
+    .then(async()=>{
+      const confirmed=replaceDays?payload:await confirmFirebaseRestSave(payload).catch(()=>payload);
+      db.days=Array.isArray(confirmed.days)?confirmed.days:daysToSave;
+      localStorage.setItem(SK,JSON.stringify(db));
       fbConnected=true;
-      fbRestLastHash=cloudPayloadHash(payload);
+      fbRestLastHash=cloudPayloadHash(confirmed);
       showSyncStatus('☁ Nuvem ativa',false);
       setTimeout(()=>{isSaving=false;},1000);
     })
@@ -3602,9 +3714,12 @@ function ensureRecebArm(day){
 }
 
 function recebArmDay(){
-  let day=getDay(curDate);
+  const dt=curDate||today();
+  let day=getDay(dt);
   if(!day){
-    day=emptyDay(curDate||today());
+    const stored=storedDbSnapshot();
+    const storedDay=stored&&Array.isArray(stored.days)?stored.days.find(d=>d&&d.date===dt):null;
+    day=storedDay?normalizeDay(JSON.parse(JSON.stringify(storedDay))):emptyDay(dt);
     db.days.push(day);
     curDate=day.date;
   }
@@ -3612,12 +3727,30 @@ function recebArmDay(){
   return day;
 }
 
+function persistRecebArmOnly(day){
+  if(!day)return;
+  const dt=day.date||curDate||today();
+  const recebArmCopy=JSON.parse(JSON.stringify(ensureRecebArm(day)));
+  const stored=storedDbSnapshot();
+  if(stored&&Array.isArray(stored.days)){
+    db.days=mergeDays(stored.days,db.days);
+  }
+  let idx=db.days.findIndex(d=>d.date===dt);
+  let base=idx>=0?db.days[idx]:emptyDay(dt);
+  base=mergeDayRecords(base,{date:dt,recebArm:recebArmCopy,_updatedAt:+day._updatedAt||Date.now()});
+  idx=db.days.findIndex(d=>d.date===dt);
+  if(idx>=0)db.days[idx]=base;else db.days.push(base);
+  db.days.sort((a,b)=>a.date.localeCompare(b.date));
+  curDate=dt;
+  save();
+}
+
 function recebArmTouch(day){
   const ts=Date.now();
   ensureRecebArm(day)._updatedAt=ts;
   day._updatedAt=ts;
   curDate=day.date;
-  save();
+  persistRecebArmOnly(day);
   buildDayNav();
 }
 
@@ -6391,13 +6524,14 @@ function persistDayNow(){
   if(!day)return null;
   const idx=db.days.findIndex(d=>d.date===day.date);
   const wasNew=idx<0;
-  if(idx>=0)db.days[idx]=day;else db.days.push(day);
+  const merged=idx>=0?mergeDayRecords(db.days[idx],day):day;
+  if(idx>=0)db.days[idx]=merged;else db.days.push(merged);
   db.days.sort((a,b)=>a.date.localeCompare(b.date));
-  curDate=day.date;
+  curDate=merged.date;
   save();
   if(wasNew)buildDayNav();
-  refreshOpenPrevisaoEncerramento(day);
-  return day;
+  refreshOpenPrevisaoEncerramento(merged);
+  return merged;
 }
 function autoSave(){
   clearTimeout(autoSaveTimer);
@@ -6408,15 +6542,16 @@ function autoSave(){
 function saveDay(){
   const day=readFormAsDay();if(!day){alert('⚠️ Informe a data!');return;}
   const idx=db.days.findIndex(d=>d.date===day.date);
-  if(idx>=0)db.days[idx]=day;else db.days.push(day);
+  const merged=idx>=0?mergeDayRecords(db.days[idx],day):day;
+  if(idx>=0)db.days[idx]=merged;else db.days.push(merged);
   db.days.sort((a,b)=>a.date.localeCompare(b.date));
-  save();curDate=day.date;buildDayNav();
-  renderKPIs(day);renderFlowBar(day);renderDashCharts(day);renderDashTables(day);renderRotasTbl(day,'rotasTblFull');updateRotasKPIs(day);
+  save();curDate=merged.date;buildDayNav();
+  renderKPIs(merged);renderFlowBar(merged);renderDashCharts(merged);renderDashTables(merged);renderRotasTbl(merged,'rotasTblFull');updateRotasKPIs(merged);
   renderRecebArm();
-  refreshOpenPrevisaoEncerramento(day);
+  refreshOpenPrevisaoEncerramento(merged);
   document.getElementById('liveBadge').style.display='none';
   document.getElementById('btnDel').style.display='';
-  document.getElementById('admDayLbl').textContent=`(editando: ${fmtDate(day.date)})`;
+  document.getElementById('admDayLbl').textContent=`(editando: ${fmtDate(merged.date)})`;
   showSyncStatus('☁ Salvo!',false);
 }
 function delCurrentDay(){
@@ -6813,6 +6948,20 @@ async function sbWritePayload(payload,ts){
   return r;
 }
 
+async function confirmSupabaseSave(payload){
+  await new Promise(r=>setTimeout(r,250));
+  const remote=await sbReadPayload().catch(()=>null);
+  if(!remote||!Array.isArray(remote.days))return payload;
+  const mergedDays=mergeDays(remote.days,payload.days);
+  if(payloadDaysHash(mergedDays)!==payloadDaysHash(remote.days)){
+    const ts=Date.now();
+    const mergedPayload={...remote,days:mergedDays,users:remote.users||payload.users||getLocalUsersCache(),savedAt:ts};
+    const r=await sbWritePayload(mergedPayload,ts);
+    if(r.ok)return mergedPayload;
+  }
+  return remote;
+}
+
 async function sbSave(replaceDays=false){
   if(!sbUrl||!sbKey)return;
   if(replaceDays)sbReplaceDaysQueued=true;
@@ -6836,9 +6985,10 @@ async function sbSave(replaceDays=false){
         };
         const r=await sbWritePayload(payload,ts);
         if(r.ok){
-          db.days=payload.days;
+          const confirmed=replaceDaysNow?payload:await confirmSupabaseSave(payload);
+          db.days=Array.isArray(confirmed.days)?confirmed.days:payload.days;
           localStorage.setItem(SK,JSON.stringify(db));
-          lastSyncHash=simpleHash(JSON.stringify({days:db.days,users:payload.users||{}}));
+          lastSyncHash=simpleHash(JSON.stringify({days:db.days,users:(confirmed.users||payload.users||{})}));
           sbConnected=true;
           showSyncStatus('☁ Salvo na nuvem ✓',false);
           setTimeout(()=>{if(sbConnected)showSyncStatus('☁ Nuvem ativa ✓',false);},2000);
