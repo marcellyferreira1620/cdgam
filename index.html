@@ -1784,10 +1784,58 @@ function simpleHash(str){
   return String(h);
 }
 
+function compactRecebArmForLocal(data){
+  if(!data||typeof data!=='object')return data;
+  return{
+    ...data,
+    // Bases importadas podem passar do limite do navegador; a nuvem continua sendo a fonte principal.
+    productBase:[],
+    qrpRows:[]
+  };
+}
+
+function compactDayForLocal(day){
+  if(!day||typeof day!=='object')return day;
+  const copy=JSON.parse(JSON.stringify(day));
+  if(copy.recebArm)copy.recebArm=compactRecebArmForLocal(copy.recebArm);
+  return copy;
+}
+
+function compactDbForLocalStorage(snapshot,limitDays){
+  const src=snapshot&&Array.isArray(snapshot.days)?snapshot:{days:[]};
+  let days=src.days.map(compactDayForLocal);
+  if(limitDays&&days.length>limitDays)days=days.sort((a,b)=>(a.date||'').localeCompare(b.date||'')).slice(-limitDays);
+  return{...src,days};
+}
+
+function saveLocalDb(snapshot=db){
+  try{
+    localStorage.setItem(SK,JSON.stringify(compactDbForLocalStorage(snapshot)));
+    return true;
+  }catch(e){
+    try{
+      localStorage.removeItem(SK_BACKUPS);
+      localStorage.setItem(SK,JSON.stringify(compactDbForLocalStorage(snapshot)));
+      console.warn('Backups locais limpos para liberar espaco:',e.message);
+      return true;
+    }catch(e2){
+      try{
+        localStorage.setItem(SK,JSON.stringify(compactDbForLocalStorage(snapshot,45)));
+        console.warn('Cache local reduzido para os ultimos dias:',e2.message);
+        return true;
+      }catch(e3){
+        console.error('Falha ao salvar cache local:',e3);
+        showSyncStatus('Nuvem ativa - cache local cheio',false);
+        return false;
+      }
+    }
+  }
+}
+
 function saveLocalBackup(snapshot,label){
   try{
     if(!snapshot||!Array.isArray(snapshot.days)||!snapshot.days.length)return;
-    const payload={days:snapshot.days,savedAt:snapshot.savedAt||0,label:label||'auto'};
+    const payload={...compactDbForLocalStorage(snapshot,45),savedAt:snapshot.savedAt||0,label:label||'auto'};
     const encoded=JSON.stringify(payload);
     const raw=localStorage.getItem(SK_BACKUPS);
     const current=raw?JSON.parse(raw):null;
@@ -1797,7 +1845,7 @@ function saveLocalBackup(snapshot,label){
       ?current.items
       :(current&&current.payload?[current]:[]);
     if(list.some(item=>item&&item.hash===hash))return;
-    const items=[entry,...list].slice(0,5);
+    const items=[entry,...list].slice(0,2);
     localStorage.setItem(SK_BACKUPS,JSON.stringify({...entry,items}));
   }catch(e){}
 }
@@ -1864,7 +1912,7 @@ function restoreBestLocalBackupIfNeeded(reason){
   });
   if(restored){
     db.days.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
-    localStorage.setItem(SK,JSON.stringify(db));
+    saveLocalDb(db);
     console.warn('Backup local restaurado:',reason,db.days.length,maxDayDate(db.days));
   }
   return restored;
@@ -1873,19 +1921,8 @@ function restoreBestLocalBackupIfNeeded(reason){
 function shouldRejectOlderCloud(remoteDays,source){
   if(!Array.isArray(remoteDays)||!remoteDays.length)return false;
   restoreBestLocalBackupIfNeeded(source+'-check');
-  const localDays=Array.isArray(db.days)?db.days:[];
-  const localLatest=maxDayDate(localDays);
-  const remoteLatest=maxDayDate(remoteDays);
-  if(localDays.length>=2&&remoteLatest&&localLatest&&remoteLatest<localLatest){
-    console.warn('Nuvem ignorada por estar atrasada:',source,remoteLatest,localLatest);
-    setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),250);
-    return true;
-  }
-  if(localDays.length>=5&&remoteDays.length+3<localDays.length&&remoteLatest<=localLatest){
-    console.warn('Nuvem ignorada por ter menos datas:',source,remoteDays.length,localDays.length);
-    setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),250);
-    return true;
-  }
+  // Nunca bloqueia a nuvem só por comparação de data/quantidade.
+  // A função mergeDays preserva campos preenchidos localmente e incorpora o que outro computador salvou.
   return false;
 }
 
@@ -2327,7 +2364,7 @@ async function saveToFirebaseRest(replaceDays=false){
       await fbRestWritePayload(payload);
       const confirmed=replaceDaysNow?payload:await confirmFirebaseRestSave(payload);
       db.days=Array.isArray(confirmed.days)?confirmed.days:daysToSave;
-      localStorage.setItem(SK,JSON.stringify(db));
+      saveLocalDb(db);
       fbConnected=true;
       fbRestLastHash=cloudPayloadHash(confirmed);
       showSyncStatus('Nuvem ativa',false);
@@ -2371,9 +2408,6 @@ async function syncFromFirebaseRest(showOk){
       fbRestLastHash=remoteHash;
       if(updated)refreshFromDb();
     }
-    if(localNewest>remoteNewest+1500){
-      setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),50);
-    }
     if(showOk)showSyncStatus(updated?'Sincronizado':'Nuvem ativa',false);
     return updated;
   }catch(e){
@@ -2412,14 +2446,14 @@ async function saveToFirebase(replaceDays=false){
     const remote=decodeFirebasePayload(snap?snap.val():null);
     daysToSave=mergeDays(remote&&remote.days,db.days);
     db.days=daysToSave;
-    localStorage.setItem(SK,JSON.stringify(db));
+    saveLocalDb(db);
   }
   const payload={days:daysToSave,users:getLocalUsersCache(),savedAt:ts};
   return fbDb.ref(FB_PATH).set(encodeFirebasePayload(payload))
     .then(async()=>{
       const confirmed=replaceDays?payload:await confirmFirebaseRestSave(payload).catch(()=>payload);
       db.days=Array.isArray(confirmed.days)?confirmed.days:daysToSave;
-      localStorage.setItem(SK,JSON.stringify(db));
+      saveLocalDb(db);
       fbConnected=true;
       fbRestLastHash=cloudPayloadHash(confirmed);
       showSyncStatus('☁ Nuvem ativa',false);
@@ -2469,7 +2503,7 @@ function applyRemoteData(remote){
   if(shouldRejectOlderCloud(remote.days,'remote-apply'))return;
   db.days=mergeDays(db.days,JSON.parse(JSON.stringify(remote.days)));
   db.days.sort((a,b)=>a.date.localeCompare(b.date));
-  localStorage.setItem(SK,JSON.stringify(db));
+  saveLocalDb(db);
   buildDayNav();
   const day=getDay(curDate)||latestDay();
   if(day){
@@ -2494,7 +2528,7 @@ function save(replaceDays=false){
   if(!replaceDays&&stored&&Array.isArray(stored.days)){
     db.days=mergeDays(stored.days,db.days);
   }
-  localStorage.setItem(SK,JSON.stringify(db));
+  saveLocalDb(db);
   // Supabase tem prioridade
   if(typeof sbUrl!=='undefined'&&sbUrl&&sbKey&&sbConnected){
     sbSave(replaceDays);
@@ -6987,7 +7021,7 @@ async function sbSave(replaceDays=false){
         if(r.ok){
           const confirmed=replaceDaysNow?payload:await confirmSupabaseSave(payload);
           db.days=Array.isArray(confirmed.days)?confirmed.days:payload.days;
-          localStorage.setItem(SK,JSON.stringify(db));
+          saveLocalDb(db);
           lastSyncHash=simpleHash(JSON.stringify({days:db.days,users:(confirmed.users||payload.users||{})}));
           sbConnected=true;
           showSyncStatus('☁ Salvo na nuvem ✓',false);
@@ -7032,12 +7066,8 @@ async function sbLoad(){
     }
     if(remoteDays.length&&!shouldRejectOlderCloud(remoteDays,'supabase')&&(remoteTs>localTs||remoteDays.length>db.days.length||remoteNewest>localNewest||remoteHash!==lastSyncHash)){
       db.days=mergeDays(db.days,remoteDays);
-      localStorage.setItem(SK,JSON.stringify(db));
+      saveLocalDb(db);
       changed=true;
-    }
-    if(localNewest>remoteNewest+1500){
-      showSyncStatus('☁ Dados locais mais novos — reenviando',false);
-      setTimeout(()=>{if(!sbSaveRunning)sbSave();},50);
     }
     if(remoteTs>sbLastTs)sbLastTs=remoteTs;
     if(changed||remoteHash!==lastSyncHash)lastSyncHash=remoteHash;
@@ -7857,3 +7887,4 @@ init();
 </script>
 </body>
 </html>
+
