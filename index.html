@@ -592,6 +592,23 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 .receb-arm-dot{width:10px;height:10px;border-radius:50%;display:inline-block}.receb-arm-dot.pendente{background:#e94560}.receb-arm-dot.andamento{background:#ffd700}.receb-arm-dot.finalizado{background:#00e676}
 .receb-arm-actions{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}
 .receb-arm-actions button{font-size:10px;padding:5px 8px}
+.receb-arm-flow-list{display:grid;grid-template-columns:1fr;gap:7px;overflow-x:auto}
+.receb-arm-flow-row{display:grid;grid-template-columns:minmax(220px,1.3fr) minmax(120px,1fr) 22px minmax(135px,1fr) 22px minmax(135px,1fr) 22px minmax(135px,1fr) 22px minmax(135px,1fr);gap:6px;align-items:stretch;background:#0d1c2e;border:1px solid #1a3550;border-radius:6px;padding:7px;min-width:1180px}
+.receb-arm-flow-main{background:#071525;border:1px solid #1a3550;border-radius:5px;padding:7px 9px}
+.receb-arm-flow-forn{color:#ffd700;font-size:11px;font-weight:bold;text-transform:uppercase;margin-bottom:4px}
+.receb-arm-flow-meta{color:#89b4d4;font-size:10px;line-height:1.45}
+.receb-arm-flow-arrow{display:flex;align-items:center;justify-content:center;color:#6a9fc0;font-size:18px;font-weight:bold}
+.receb-arm-flow-step{border:1px solid #1a3550;border-radius:5px;background:#122033;padding:7px 8px;min-height:64px}
+.receb-arm-flow-step .step-lbl{font-size:9px;color:#6a9fc0;text-transform:uppercase;font-weight:bold;margin-bottom:5px}
+.receb-arm-flow-step .step-val{font-size:12px;color:#89b4d4;font-weight:bold}
+.receb-arm-flow-step.ok{border-color:rgba(0,230,118,.55);background:rgba(0,230,118,.12)}
+.receb-arm-flow-step.ok .step-val{color:#00e676}
+.receb-arm-flow-step.run{border-color:rgba(30,136,229,.65);background:rgba(30,136,229,.16)}
+.receb-arm-flow-step.run .step-val{color:#1e88e5}
+.receb-arm-flow-step.wait{border-color:rgba(255,215,0,.4);background:rgba(255,215,0,.08)}
+.receb-arm-flow-step.wait .step-val{color:#ffd700}
+.receb-arm-flow-step.off{opacity:.55}
+@media(max-width:1100px){.receb-arm-flow-list{overflow-x:auto}}
 .receb-arm-pend-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
 .receb-arm-pend-grid .receb-arm-panel{margin-bottom:0}
 @media(max-width:760px){.receb-arm-pend-grid{grid-template-columns:1fr}.receb-arm-status-grid{grid-template-columns:1fr}}
@@ -1036,7 +1053,14 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
     </div>
 
     <div class="receb-arm-panel">
-      <div class="receb-arm-head"><strong>Entrada da nota fiscal</strong><span>Use XML quando tiver; PDF/manual ficam como apoio para o teste.</span></div>
+      <div class="receb-arm-head"><strong>Fluxo por fornecedor</strong><span>Fornecedores da agenda entram como agendados; ao bipar a NF, muda para em conferência.</span></div>
+      <div class="receb-arm-body">
+        <div class="receb-arm-groups" id="recebArmFluxo"></div>
+      </div>
+    </div>
+
+    <div class="receb-arm-panel">
+      <div class="receb-arm-head"><strong>Entrada da nota fiscal</strong><span>XML obrigatório para ler itens, caixas/volumes e unidades; manual/PDF fica só como apoio.</span></div>
       <div class="receb-arm-body">
         <div class="receb-arm-form">
           <label>Número da NF
@@ -1079,13 +1103,6 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
           <button class="receb-arm-btn gray" type="button" onclick="clearRecebArm997()">Limpar 997</button>
         </div>
         <div class="receb-arm-msg" id="recebArm997Msg"></div>
-      </div>
-    </div>
-
-    <div class="receb-arm-panel">
-      <div class="receb-arm-head"><strong>Fluxo por fornecedor</strong><span>Notas agrupadas por fornecedor; cada card tem status separado de conferência e armazenagem.</span></div>
-      <div class="receb-arm-body">
-        <div class="receb-arm-groups" id="recebArmFluxo"></div>
       </div>
     </div>
 
@@ -3872,17 +3889,63 @@ function recebArmProductMap(data){
   return map;
 }
 
+function recebArmProductBaseRows(data){
+  const rows=[];
+  if(data&&Array.isArray(data.productBase))rows.push(...data.productBase);
+  (Array.isArray(db.days)?db.days:[]).forEach(day=>{
+    const base=day&&day.recebArm&&Array.isArray(day.recebArm.productBase)?day.recebArm.productBase:[];
+    base.forEach(p=>rows.push(p));
+  });
+  const byCode={};
+  rows.forEach(p=>{
+    const code=String(p&&p.codigo||'').trim();
+    if(code&&!byCode[code])byCode[code]=p;
+  });
+  return Object.values(byCode);
+}
+
+function recebArmCleanDescription(text){
+  return recebArmKey(String(text||'')
+    .replace(/FCI:\s*[A-Z0-9-]+/gi,' ')
+    .replace(/\b\d{8,}\b/g,' ')
+    .replace(/[^\wÀ-ÿ]+/g,' ')
+  ).replace(/\b(cx|cxa|un|unid|und|ml|mg|g|kg|lt|ref|po|s)\b/g,' ').replace(/\s+/g,' ').trim();
+}
+
+function recebArmDescriptionScore(a,b){
+  const ta=recebArmCleanDescription(a).split(' ').filter(t=>t.length>1);
+  const tb=recebArmCleanDescription(b).split(' ').filter(t=>t.length>1);
+  if(!ta.length||!tb.length)return 0;
+  const setB=new Set(tb);
+  const hits=ta.filter(t=>setB.has(t)).length;
+  return hits/Math.max(ta.length,tb.length);
+}
+
+function recebArmFindProductBase(item,data){
+  const bases=recebArmProductBaseRows(data);
+  const code=String(item&&item.codigo||'').replace(/^0+/,'');
+  const ean=String(item&&item.ean||'').replace(/\D/g,'');
+  let found=bases.find(p=>String(p.codigo||'').replace(/^0+/,'')===code);
+  if(found)return found;
+  found=bases.find(p=>String(p.ean||p.codigoBarras||p.barras||'').replace(/\D/g,'')===ean&&ean);
+  if(found)return found;
+  let best=null,bestScore=0;
+  bases.forEach(p=>{
+    const score=recebArmDescriptionScore(item.descricao,p.descricao||p.nome||'');
+    if(score>bestScore){bestScore=score;best=p;}
+  });
+  return bestScore>=0.48?best:null;
+}
+
 function recebArmEnrichItems(items,data){
-  const map=recebArmProductMap(data);
   return (Array.isArray(items)?items:[]).map(item=>{
-    const code=String(item.codigo||'').trim();
-    const base=map[code];
+    const base=recebArmFindProductBase(item,data);
     if(!base)return item;
     return{
       ...item,
       descricao:item.descricao||base.descricao||'',
       descricaoBase:base.descricao||'',
-      codGam:base.codigo||code
+      codGam:base.codigo||item.codigo||''
     };
   });
 }
@@ -3895,8 +3958,9 @@ function parseRecebArmProductBaseRows(rows){
     productRows=rows.slice(headerIndex+1).map((row,i)=>{
       const codigo=String(recebArmCell(row,headers,['cod gam','codigo gam','código gam','codigo','código','cod'])||'').trim();
       const descricao=String(recebArmCell(row,headers,['descricao','descrição','nome','produto','mercadoria'])||'').trim();
+      const ean=String(recebArmCell(row,headers,['ean','codigo de barras','código de barras','barra','barras'])||'').replace(/\D/g,'');
       if(!codigo||!descricao)return null;
-      return{id:codigo,codigo,descricao,_updatedAt:Date.now()+i};
+      return{id:codigo,codigo,descricao,ean,_updatedAt:Date.now()+i};
     }).filter(Boolean);
   }
   if(!productRows.length){
@@ -4005,6 +4069,8 @@ function parseRecebArmXml(text){
   const inf=xml.getElementsByTagName('infNFe')[0];
   const emit=xml.getElementsByTagName('emit')[0];
   const ide=xml.getElementsByTagName('ide')[0];
+  const transp=xml.getElementsByTagName('transp')[0];
+  const vol=transp&&transp.getElementsByTagName('vol')[0];
   const chave=inf&&inf.getAttribute('Id')?inf.getAttribute('Id').replace(/^NFe/,''):'';
   const itens=[...xml.getElementsByTagName('det')].map(det=>{
     const prod=det.getElementsByTagName('prod')[0]||det;
@@ -4021,16 +4087,22 @@ function parseRecebArmXml(text){
       unidade:recebArmXmlText(prod,'uCom')||recebArmXmlText(prod,'uTrib'),
       lote:lotes,
       qtdEntrada:+recebArmXmlText(prod,'qCom')||0,
+      caixas:+recebArmXmlText(prod,'qCom')||0,
+      unidades:+recebArmXmlText(prod,'qTrib')||0,
       qtdLote:qtdLote||'',
       qtdArmazenada:0,
       validade,
       endereco:''
     };
   });
+  const totalCaixas=+recebArmXmlText(vol||xml,'qVol')||itens.reduce((sum,i)=>sum+(+i.caixas||0),0);
+  const totalUnidades=itens.reduce((sum,i)=>sum+(+i.unidades||0),0);
   return{
     nfNumero:recebArmXmlText(ide||xml,'nNF'),
     chave,
-    fornecedor:recebArmXmlText(emit||xml,'xNome'),
+    fornecedor:recebArmXmlText(emit||xml,'xFant')||recebArmXmlText(emit||xml,'xNome'),
+    volumes:totalCaixas,
+    unidades:totalUnidades,
     itens
   };
 }
@@ -4038,13 +4110,13 @@ function parseRecebArmXml(text){
 function recebArmRenderItensTable(itens,title,compact=false){
   const list=Array.isArray(itens)?itens:[];
   if(!list.length)return '';
-  return `${title?`<div class="preview-title">${excelText(title)}</div>`:''}<table class="receb-arm-tbl"><thead><tr><th>Item</th><th>Código</th><th>EAN</th><th>Descrição</th><th>Unid.</th><th>Qtd NF</th><th>Lote</th><th>Validade</th>${compact?'':'<th>Armazenado</th><th>Pendente</th>'}</tr></thead><tbody>
+  return `${title?`<div class="preview-title">${excelText(title)}</div>`:''}<table class="receb-arm-tbl"><thead><tr><th>Item</th><th>COD GAM</th><th>Código NF</th><th>EAN</th><th>Descrição</th><th>Caixas</th><th>Unidades</th><th>Lote</th><th>Validade</th>${compact?'':'<th>Armazenado</th><th>Pendente</th>'}</tr></thead><tbody>
     ${list.map((i,idx)=>{
       const entrou=+i.qtdEntrada||0;
       const arm=+i.qtdArmazenada||0;
       const desc=i.descricaoBase||i.descricao||'';
       const baseHint=i.descricaoBase?'<div style="font-size:9px;color:#00e5ff;font-weight:normal">base COD GAM</div>':'';
-      return `<tr><td>${excelText(i.nItem||idx+1)}</td><td>${excelText(i.codigo||'')}</td><td>${excelText(i.ean||'')}</td><td style="text-align:left;color:#fff;font-weight:bold">${excelText(desc)}${baseHint}</td><td>${excelText(i.unidade||'')}</td><td style="font-weight:bold;color:#ffd700">${prodFmt(entrou,3)}</td><td>${excelText(i.lote||'')}</td><td>${excelText(i.validade||'')}</td>${compact?'':`<td style="color:#00e5ff;font-weight:bold">${prodFmt(arm,3)}</td><td style="color:#ff9500;font-weight:bold">${prodFmt(Math.max(entrou-arm,0),3)}</td>`}</tr>`;
+      return `<tr><td>${excelText(i.nItem||idx+1)}</td><td style="color:#00e5ff;font-weight:bold">${excelText(i.codGam||'')}</td><td>${excelText(i.codigo||'')}</td><td>${excelText(i.ean||'')}</td><td style="text-align:left;color:#fff;font-weight:bold">${excelText(desc)}${baseHint}</td><td style="font-weight:bold;color:#ffd700">${prodFmt(i.caixas!==undefined?+i.caixas:entrou,3)}</td><td style="font-weight:bold;color:#ffd700">${prodFmt(+i.unidades||0,0)}</td><td>${excelText(i.lote||'')}</td><td>${excelText(i.validade||'')}</td>${compact?'':`<td style="color:#00e5ff;font-weight:bold">${prodFmt(arm,3)}</td><td style="color:#ff9500;font-weight:bold">${prodFmt(Math.max(entrou-arm,0),3)}</td>`}</tr>`;
     }).join('')}
   </tbody></table>`;
 }
@@ -4103,7 +4175,7 @@ async function readRecebArmNotaFile(ev){
       document.getElementById('recebArmNotaFile')._parsedNota=parsed;
       if(/\.xml$/i.test(file.name)){
         renderRecebArmNotaPreview(parsed);
-        recebArmMsg('recebArmNotaMsg',`${parsed.itens.length} item(ns) lidos do XML. Confira a lista abaixo e clique em Adicionar NF.`,false);
+        recebArmMsg('recebArmNotaMsg',`${parsed.itens.length} item(ns) lidos do XML | ${prodFmt(+parsed.volumes||0,0)} caixa(s) | ${prodFmt(+parsed.unidades||0,0)} unidade(s). Clique em Adicionar NF.`,false);
       }
     }
   }catch(e){
@@ -4123,6 +4195,10 @@ function addRecebArmNota(){
   const fornecedor=(document.getElementById('recebArmFornecedor').value||parsed.fornecedor||'Sem fornecedor').trim();
   const protocolo=(document.getElementById('recebArmProtocolo').value||'').trim();
   if(!nfNumero&&!chave){recebArmMsg('recebArmNotaMsg','Informe o número da NF ou a chave.',true);return;}
+  if(!Array.isArray(parsed.itens)||!parsed.itens.length){
+    recebArmMsg('recebArmNotaMsg','Anexe o XML da NF para carregar itens, caixas/volumes e unidades antes de adicionar.',true);
+    return;
+  }
   const existing=data.notas.find(n=>(nfNumero&&String(n.nfNumero)===nfNumero)||(chave&&String(n.chave)===chave));
   const nota=existing||{id:recebArmId('nf'),createdAt:Date.now(),itens:[],pendConf:[],pendArm:[]};
   const enrichedItems=recebArmEnrichItems(parsed.itens,data);
@@ -4131,8 +4207,10 @@ function addRecebArmNota(){
     chave:chave||nota.chave||'',
     fornecedor,
     protocolo:protocolo||nota.protocolo||'',
-    confStatus:nota.confStatus||'pendente',
+    confStatus:existing?(nota.confStatus||'andamento'):'andamento',
     armStatus:nota.armStatus||'pendente',
+    volumes:parsed.volumes!==undefined?+parsed.volumes||0:(nota.volumes||0),
+    unidades:parsed.unidades!==undefined?+parsed.unidades||0:(nota.unidades||0),
     itens:Array.isArray(enrichedItems)&&enrichedItems.length?enrichedItems:(nota.itens||[]),
     _updatedAt:Date.now()
   });
@@ -4269,8 +4347,8 @@ function compareRecebArmStorage(showMsg=true){
   const autoPend=[];
   data.notas.forEach(nota=>{
     (nota.itens||[]).forEach(item=>{
-      const codigo=String(item.codigo||'').trim();
-      const entrou=+item.qtdEntrada||0;
+      const codigo=String(item.codGam||item.codigo||'').trim();
+      const entrou=item.caixas!==undefined?+item.caixas:+item.qtdEntrada||0;
       if(!codigo||!entrou)return;
       const armazenado=byCode[codigo]||0;
       const pend=Math.max(entrou-armazenado,0);
@@ -4280,7 +4358,7 @@ function compareRecebArmStorage(showMsg=true){
           id:`auto-${nota.id}-${codigo}`,
           nf:nota.nfNumero||nota.chave||'',
           item:codigo,
-          descricao:item.descricao||'',
+          descricao:item.descricaoBase||item.descricao||'',
           qtd:pend,
           endereco:'997',
           origem:'automático 997',
@@ -4472,47 +4550,115 @@ function renderRecebArmPendConfItens(nota){
   const itens=nota&&Array.isArray(nota.itens)?nota.itens:[];
   if(!nota){el.innerHTML='<table class="receb-arm-tbl"><tbody><tr><td>Adicione ou selecione uma NF para ver os itens.</td></tr></tbody></table>';return;}
   if(!itens.length){el.innerHTML='<table class="receb-arm-tbl"><tbody><tr><td>Esta NF ainda não tem itens lidos. Anexe o XML para carregar todos os produtos.</td></tr></tbody></table>';return;}
-  el.innerHTML=`<table class="receb-arm-tbl"><thead><tr><th>Item</th><th>Código</th><th>Descrição</th><th>Qtd NF</th><th>Lote</th><th>Validade</th><th>Ação</th></tr></thead><tbody>
-    ${itens.map((i,idx)=>`<tr><td>${excelText(i.nItem||idx+1)}</td><td>${excelText(i.codigo||'')}</td><td style="text-align:left;color:#fff;font-weight:bold">${excelText(i.descricaoBase||i.descricao||'')}</td><td style="color:#ffd700;font-weight:bold">${prodFmt(+i.qtdEntrada||0,3)}</td><td>${excelText(i.lote||'')}</td><td>${excelText(i.validade||'')}</td><td><button class="receb-arm-btn red" type="button" onclick="fillRecebArmPendConf(${jsText(nota.nfNumero||nota.chave||'')},${jsText(i.codigo||i.descricao||'')},${+i.qtdEntrada||0})">Marcar pendência</button></td></tr>`).join('')}
+  el.innerHTML=`<table class="receb-arm-tbl"><thead><tr><th>Item</th><th>COD GAM</th><th>Código NF</th><th>Descrição</th><th>Caixas</th><th>Unidades</th><th>Lote</th><th>Validade</th><th>Ação</th></tr></thead><tbody>
+    ${itens.map((i,idx)=>`<tr><td>${excelText(i.nItem||idx+1)}</td><td style="color:#00e5ff;font-weight:bold">${excelText(i.codGam||'')}</td><td>${excelText(i.codigo||'')}</td><td style="text-align:left;color:#fff;font-weight:bold">${excelText(i.descricaoBase||i.descricao||'')}</td><td style="color:#ffd700;font-weight:bold">${prodFmt(i.caixas!==undefined?+i.caixas:+i.qtdEntrada||0,3)}</td><td style="color:#ffd700;font-weight:bold">${prodFmt(+i.unidades||0,0)}</td><td>${excelText(i.lote||'')}</td><td>${excelText(i.validade||'')}</td><td><button class="receb-arm-btn red" type="button" onclick="fillRecebArmPendConf(${jsText(nota.nfNumero||nota.chave||'')},${jsText(i.codGam||i.codigo||i.descricao||'')},${i.caixas!==undefined?+i.caixas:+i.qtdEntrada||0})">Marcar pendência</button></td></tr>`).join('')}
   </tbody></table>`;
+}
+
+function recebArmFornecedorTokens(text){
+  return recebArmCleanDescription(text)
+    .replace(/\b(ltda|eireli|sa|s a|br|do|da|de|dos|das|ind|com|prod|dist|distrib|distribuidora|comercial)\b/g,' ')
+    .replace(/\s+/g,' ')
+    .trim()
+    .split(' ')
+    .filter(t=>t.length>1);
+}
+
+function recebArmFornecedorScore(a,b){
+  const ta=recebArmFornecedorTokens(a);
+  const tb=recebArmFornecedorTokens(b);
+  if(!ta.length||!tb.length)return 0;
+  const setB=new Set(tb);
+  const hits=ta.filter(t=>setB.has(t)).length;
+  return hits/Math.max(Math.min(ta.length,tb.length),1);
+}
+
+function recebArmAgendaRowsForFlow(data){
+  return (data.agendaRows||[]).filter(r=>r&&r.fornecedor&&!recebArmAgendaIsTotalRow(r)&&!recebArmKey(r.fornecedor).includes('total de volumes'));
+}
+
+function recebArmFlowGroups(data){
+  const groups=[];
+  const ensureGroup=(fornecedor,agendaRow)=>{
+    let g=null;
+    if(agendaRow&&agendaRow.id)g=groups.find(x=>x.agendaIds.includes(agendaRow.id));
+    if(!g){
+      g=groups.find(x=>recebArmFornecedorScore(x.fornecedor,fornecedor)>=0.55);
+    }
+    if(!g){
+      g={id:'flow-'+groups.length,fornecedor:fornecedor||'Sem fornecedor',agendaIds:[],agendaRows:[],notas:[]};
+      groups.push(g);
+    }
+    if(agendaRow&&!g.agendaIds.includes(agendaRow.id)){
+      g.agendaIds.push(agendaRow.id);
+      g.agendaRows.push(agendaRow);
+    }
+    return g;
+  };
+  recebArmAgendaRowsForFlow(data).forEach(row=>ensureGroup(row.fornecedor,row));
+  (data.notas||[]).forEach(nota=>{
+    let g=groups
+      .map(group=>({group,score:recebArmFornecedorScore(group.fornecedor,nota.fornecedor)}))
+      .sort((a,b)=>b.score-a.score)[0];
+    if(!g||g.score<0.45)g={group:ensureGroup(nota.fornecedor,null),score:1};
+    g.group.notas.push(nota);
+  });
+  return groups.sort((a,b)=>a.fornecedor.localeCompare(b.fornecedor,'pt-BR'));
+}
+
+function recebArmFlowStep(label,value,cls,sub){
+  return `<div class="receb-arm-flow-step ${cls||'off'}"><div class="step-lbl">${excelText(label)}</div><div class="step-val">${value}</div>${sub?`<div class="receb-arm-flow-meta">${sub}</div>`:''}</div>`;
 }
 
 function renderRecebArmFluxo(data){
   const el=document.getElementById('recebArmFluxo');
   if(!el)return;
-  const notas=recebArmFilteredRows(data.notas||[]);
-  if(!notas.length){el.innerHTML='<div class="no-data" style="padding:18px">Sem notas no fluxo. Importe ou adicione uma NF para começar o teste.</div>';return;}
-  const groups={};
-  notas.forEach(n=>{
-    const key=n.fornecedor||'Sem fornecedor';
-    if(!groups[key])groups[key]=[];
-    groups[key].push(n);
-  });
-  el.innerHTML=Object.entries(groups).map(([fornecedor,items])=>`<div class="receb-arm-group">
-    <div class="receb-arm-group-title"><span>${excelText(fornecedor)}</span><span>${items.length} nota(s)</span></div>
-    <div class="receb-arm-cards">
-      ${items.map(n=>`<div class="receb-arm-card">
-        <div class="receb-arm-card-top"><div><b>NF ${excelText(n.nfNumero||'sem número')}</b><br><small>${excelText(n.protocolo?'Protocolo '+n.protocolo:'Sem protocolo')}</small></div><div>${recebArmStatusDot(n.confStatus)} ${recebArmStatusDot(n.armStatus)}</div></div>
-        <div class="receb-arm-card-body">
-          <div>Chave: ${excelText(n.chave||'não informada')}</div>
-          <div>Itens lidos: <b style="color:#ffd700">${(n.itens||[]).length}</b></div>
-          <div>Armazenado pela 997: <b style="color:#00e5ff">${(n.itens||[]).filter(i=>(+i.qtdArmazenada||0)>0).length}</b> item(ns)</div>
-          ${(n.itens||[]).length?`<details class="receb-arm-item-mini"><summary>Ver todos os itens da NF</summary>${recebArmRenderItensTable(n.itens,'',false)}</details>`:''}
-          <div class="receb-arm-status-grid">
-            <div class="receb-arm-status"><label>Conferência</label>${recebArmStatusSelect(n.id,'confStatus',n.confStatus)}</div>
-            <div class="receb-arm-status"><label>Armazenagem</label>${recebArmStatusSelect(n.id,'armStatus',n.armStatus)}</div>
-          </div>
-          <div class="receb-arm-actions">
-            <button class="receb-arm-btn" type="button" onclick="markRecebArmNota('${n.id}','confStatus','andamento')">Iniciar conferência</button>
-            <button class="receb-arm-btn green" type="button" onclick="markRecebArmNota('${n.id}','confStatus','finalizado')">Conferência 100%</button>
-            <button class="receb-arm-btn" type="button" onclick="markRecebArmNota('${n.id}','armStatus','andamento')">Iniciar armazenagem</button>
-            <button class="receb-arm-btn green" type="button" onclick="markRecebArmNota('${n.id}','armStatus','finalizado')">Armazenagem 100%</button>
-            <button class="receb-arm-btn red" type="button" onclick="removeRecebArmNota('${n.id}')">Remover</button>
-          </div>
-        </div>
-      </div>`).join('')}
-    </div>
-  </div>`).join('');
+  const filter=recebArmKey(document.getElementById('recebArmFilter')?.value||'');
+  const groups=recebArmFlowGroups(data).filter(g=>!filter||recebArmKey([g.fornecedor,...g.agendaRows.map(r=>r.protocolo),...g.notas.map(n=>n.nfNumero)].join(' ')).includes(filter));
+  if(!groups.length){el.innerHTML='<div class="no-data" style="padding:18px">Importe a agenda para montar o fluxo por fornecedor.</div>';return;}
+  el.classList.add('receb-arm-flow-list');
+  el.innerHTML=groups.map(g=>{
+    const agendaVol=g.agendaRows.reduce((s,r)=>s+(+r.volumes||0),0);
+    const agendaSkus=g.agendaRows.reduce((s,r)=>s+(+r.skus||0),0);
+    const protocolos=[...new Set(g.agendaRows.map(r=>r.protocolo).filter(Boolean))];
+    const notas=g.notas;
+    const nfList=notas.map(n=>n.nfNumero||'sem NF').join(', ');
+    const volNf=notas.reduce((s,n)=>s+(+n.volumes||0),0);
+    const unNf=notas.reduce((s,n)=>s+(+n.unidades||0),0);
+    const confRun=notas.filter(n=>recebArmNormalizeStatus(n.confStatus)==='andamento');
+    const confOk=notas.filter(n=>recebArmNormalizeStatus(n.confStatus)==='finalizado');
+    const armRun=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)==='andamento');
+    const armOk=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)==='finalizado');
+    const notaCards=notas.map(n=>`<details class="receb-arm-item-mini"><summary>NF ${excelText(n.nfNumero||'sem número')} - ${prodFmt(+n.volumes||0,0)} cx / ${prodFmt(+n.unidades||0,0)} un</summary>
+      <div class="receb-arm-status-grid">
+        <div class="receb-arm-status"><label>Conferência</label>${recebArmStatusSelect(n.id,'confStatus',n.confStatus)}</div>
+        <div class="receb-arm-status"><label>Armazenagem</label>${recebArmStatusSelect(n.id,'armStatus',n.armStatus)}</div>
+      </div>
+      <div class="receb-arm-actions">
+        <button class="receb-arm-btn green" type="button" onclick="markRecebArmNota('${n.id}','confStatus','finalizado')">Conferência 100%</button>
+        <button class="receb-arm-btn" type="button" onclick="markRecebArmNota('${n.id}','armStatus','andamento')">Iniciar armazenagem</button>
+        <button class="receb-arm-btn green" type="button" onclick="markRecebArmNota('${n.id}','armStatus','finalizado')">Armazenagem 100%</button>
+        <button class="receb-arm-btn red" type="button" onclick="removeRecebArmNota('${n.id}')">Remover</button>
+      </div>
+      ${(n.itens||[]).length?recebArmRenderItensTable(n.itens,'',false):''}
+    </details>`).join('');
+    return `<div class="receb-arm-flow-row">
+      <div class="receb-arm-flow-main">
+        <div class="receb-arm-flow-forn">${excelText(g.fornecedor)}</div>
+        <div class="receb-arm-flow-meta">${protocolos.length?`Protocolo: ${excelText(protocolos.join(', '))}<br>`:''}Agenda: <b style="color:#ffd700">${prodFmt(agendaVol,0)} vol.</b> / ${prodFmt(agendaSkus,0)} SKUs<br>${notas.length?`NF: <b style="color:#00e5ff">${excelText(nfList)}</b><br>XML: ${prodFmt(volNf,0)} cx / ${prodFmt(unNf,0)} un`:''}</div>
+        ${notaCards}
+      </div>
+      ${recebArmFlowStep('Agendado',agendaVol?prodFmt(agendaVol,0)+' vol.':'Sem volume',notas.length?'ok':'wait',notas.length?'NF bipada':'Aguardando NF')}
+      <div class="receb-arm-flow-arrow">→</div>
+      ${recebArmFlowStep('Em conferência',confRun.length?confRun.map(n=>'NF '+excelText(n.nfNumero||'')).join('<br>'):'-',confRun.length?'run':'off')}
+      <div class="receb-arm-flow-arrow">→</div>
+      ${recebArmFlowStep('Conferência finalizada',confOk.length?confOk.map(n=>'NF '+excelText(n.nfNumero||'')).join('<br>'):'-',confOk.length?'ok':'off')}
+      <div class="receb-arm-flow-arrow">→</div>
+      ${recebArmFlowStep('Em armazenagem',armRun.length?armRun.map(n=>'NF '+excelText(n.nfNumero||'')).join('<br>'):'-',armRun.length?'run':'off')}
+      <div class="receb-arm-flow-arrow">→</div>
+      ${recebArmFlowStep('Armazenagem finalizada',armOk.length?armOk.map(n=>'NF '+excelText(n.nfNumero||'')).join('<br>'):'-',armOk.length?'ok':'off')}
+    </div>`;
+  }).join('');
 }
 
 function renderRecebArmPendTables(data){
@@ -4556,8 +4702,8 @@ function exportRecebArmExcel(){
   (data.agendaRows||[]).filter(r=>!recebArmAgendaIsTotalRow(r)).forEach(r=>{html+=`<tr><td>${excelText(r.protocolo||'')}</td><td>${excelText(r.fornecedor||'')}</td><td>${excelText(r.transportador||'')}</td><td>${excelText(r.tipo||'')}</td><td>${r.skus||0}</td><td>${r.volumes||0}</td></tr>`;});
   html+='</table><h3>Notas</h3><table border="1"><tr><th>NF</th><th>Chave</th><th>Fornecedor</th><th>Protocolo</th><th>Status conferência</th><th>Status armazenagem</th><th>Itens lidos</th></tr>';
   (data.notas||[]).forEach(n=>{html+=`<tr><td>${excelText(n.nfNumero||'')}</td><td>${excelText(n.chave||'')}</td><td>${excelText(n.fornecedor||'')}</td><td>${excelText(n.protocolo||'')}</td><td>${excelText(RECEB_ARM_STATUS[recebArmNormalizeStatus(n.confStatus)])}</td><td>${excelText(RECEB_ARM_STATUS[recebArmNormalizeStatus(n.armStatus)])}</td><td>${(n.itens||[]).length}</td></tr>`;});
-  html+='</table><h3>Itens da NF x 997</h3><table border="1"><tr><th>NF</th><th>Item</th><th>Código</th><th>EAN</th><th>Descrição</th><th>Unid.</th><th>Lote</th><th>Validade</th><th>Entrou</th><th>Armazenado</th><th>Pendente</th></tr>';
-  (data.notas||[]).forEach(n=>(n.itens||[]).forEach(i=>{const entrou=+i.qtdEntrada||0,arm=+i.qtdArmazenada||0;html+=`<tr><td>${excelText(n.nfNumero||'')}</td><td>${excelText(i.nItem||'')}</td><td>${excelText(i.codigo||'')}</td><td>${excelText(i.ean||'')}</td><td>${excelText(i.descricao||'')}</td><td>${excelText(i.unidade||'')}</td><td>${excelText(i.lote||'')}</td><td>${excelText(i.validade||'')}</td><td>${entrou}</td><td>${arm}</td><td>${Math.max(entrou-arm,0)}</td></tr>`;}));
+  html+='</table><h3>Itens da NF x 997</h3><table border="1"><tr><th>NF</th><th>Item</th><th>COD GAM</th><th>Código NF</th><th>EAN</th><th>Descrição</th><th>Caixas</th><th>Unidades</th><th>Lote</th><th>Validade</th><th>Armazenado</th><th>Pendente</th></tr>';
+  (data.notas||[]).forEach(n=>(n.itens||[]).forEach(i=>{const entrou=i.caixas!==undefined?+i.caixas:+i.qtdEntrada||0,arm=+i.qtdArmazenada||0;html+=`<tr><td>${excelText(n.nfNumero||'')}</td><td>${excelText(i.nItem||'')}</td><td>${excelText(i.codGam||'')}</td><td>${excelText(i.codigo||'')}</td><td>${excelText(i.ean||'')}</td><td>${excelText(i.descricaoBase||i.descricao||'')}</td><td>${entrou}</td><td>${+i.unidades||0}</td><td>${excelText(i.lote||'')}</td><td>${excelText(i.validade||'')}</td><td>${arm}</td><td>${Math.max(entrou-arm,0)}</td></tr>`;}));
   html+='</table><h3>Pendências Conferência</h3><table border="1"><tr><th>NF</th><th>Item</th><th>Descrição</th><th>Qtd</th><th>Obs.</th></tr>';
   (data.pendConf||[]).forEach(r=>{html+=`<tr><td>${excelText(r.nf||'')}</td><td>${excelText(r.item||'')}</td><td>${excelText(r.descricao||'')}</td><td>${r.qtd||0}</td><td>${excelText(r.obs||'')}</td></tr>`;});
   html+='</table><h3>Pendências Armazenagem</h3><table border="1"><tr><th>NF</th><th>Item</th><th>Qtd</th><th>Endereço</th><th>Origem</th></tr>';
