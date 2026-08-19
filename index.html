@@ -4268,24 +4268,25 @@ function parseRecebArmQrpText(text,endereco){
     if(/^\d{1,3}(\.\d{3})+$/.test(v))return +v.replace(/\./g,'')||0;
     return +v.replace(',','.')||0;
   };
-  const isLocal=t=>/^\d{2}\s+\d{2}\s+\d{3}\s+\d{2}$/.test(t);
-  const isCode=t=>/^\d{4,8}$/.test(t);
+  const isLocal=t=>/^\d{2}\s+\d{2}\s+\d{3}\s+\d{2}/.test(t);
+  const isCode=t=>/^\d{3,8}[A-ZÇÃÕÉÊÁÍÓÚÂÔÀÜ]?$/i.test(t);
   const isDate=t=>/^\d{2}\/\d{2}\/\d{4}$/.test(t);
+  const hasLetter=t=>/[A-ZÇÃÕÉÊÁÍÓÚÂÔÀÜ]/i.test(t);
   const rows=[];
   for(let i=0;i<tokens.length;i++){
     if(!isLocal(tokens[i]))continue;
     const nextLocal=tokens.findIndex((t,idx)=>idx>i&&isLocal(t));
     const end=nextLocal>i?nextLocal:Math.min(tokens.length,i+40);
     const chunk=tokens.slice(i,end);
-    const codeRel=chunk.findIndex((t,idx)=>idx>0&&isCode(t));
+    const codeRel=chunk.findIndex((t,idx)=>idx>0&&isCode(t)&&hasLetter(chunk[idx+1]||''));
     if(codeRel<0)continue;
     const dateRel=chunk.findIndex((t,idx)=>idx>codeRel+2&&isDate(t));
     if(dateRel<0)continue;
-    const code=chunk[codeRel]||'';
+    const code=(chunk[codeRel]||'').replace(/\D+$/,'');
     const middle=chunk.slice(codeRel+3,dateRel);
     const qtyCandidates=middle
       .map((t,idx)=>({t,idx,q:parseQty(t)}))
-      .filter(x=>/^\d+(?:[.,]\d+)?$/.test(x.t));
+      .filter(x=>/^\d+(?:[.,]\d+)?$/.test(x.t)&&!(/^\d{8}$/.test(x.t)&&isDate(chunk[dateRel]||'')));
     const qtdArmazenada=qtyCandidates.length>=2?qtyCandidates[qtyCandidates.length-2].q:(qtyCandidates[0]?.q||0);
     const loteText=middle.find(t=>/[A-Z]/i.test(t)&&/\d/.test(t))||(qtyCandidates.length>2?qtyCandidates[0].t:'');
     rows.push({
