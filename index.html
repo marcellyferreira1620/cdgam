@@ -559,6 +559,19 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 .receb-arm-agenda th,.receb-arm-tbl th{background:#071525;color:#6a9fc0;text-transform:uppercase}
 .receb-arm-agenda td,.receb-arm-tbl td{background:#0d1c2e;color:#dcecff}
 .receb-arm-agenda tr:nth-child(even) td,.receb-arm-tbl tr:nth-child(even) td{background:#122033}
+.receb-arm-resumo{min-width:720px}
+.receb-arm-resumo table{width:100%;border-collapse:collapse;font-size:12px;margin-bottom:8px}
+.receb-arm-resumo th,.receb-arm-resumo td{border:1px solid #1a3550;padding:7px 8px;text-align:center;font-weight:bold}
+.receb-arm-resumo th:first-child,.receb-arm-resumo td:first-child{background:#071525;color:#dcecff;text-align:left;width:230px}
+.receb-arm-resumo .tipo-cell{color:#001426;cursor:pointer}
+.receb-arm-resumo .tipo-vol{font-size:14px;color:#001426}
+.receb-arm-detail-block{display:none;background:#0d1c2e;border:1px solid #1a3550;border-radius:5px;margin-bottom:6px;overflow:hidden}
+.receb-arm-detail-block.on{display:block}
+.receb-arm-detail-title{padding:8px 10px;font-size:11px;font-weight:bold;color:#ffd700;background:#071525}
+.receb-arm-resumo .detail-wrap{overflow-x:auto;padding:7px}
+.receb-arm-resumo .detail-wrap table{font-size:10px;margin-bottom:0;min-width:780px}
+.receb-arm-resumo .detail-wrap th{background:#071525;color:#6a9fc0;text-transform:uppercase}
+.receb-arm-resumo .detail-wrap td{background:#122033;color:#dcecff}
 .receb-arm-item-preview{margin-top:8px;overflow-x:auto;border:1px solid #1a3550;border-radius:5px;display:none}
 .receb-arm-item-preview.on{display:block}
 .receb-arm-item-preview .preview-title{background:#071525;color:#ffd700;font-weight:bold;font-size:10px;padding:7px 9px;border-bottom:1px solid #1a3550;text-transform:uppercase}
@@ -4317,6 +4330,68 @@ function recebArmFilteredRows(rows){
   return rows.filter(r=>recebArmKey(Object.values(r).join(' ')).includes(f));
 }
 
+const RECEB_ARM_AGENDA_TIPOS=[
+  {key:'medicamento',label:'Medicamento',color:'#ff5b45'},
+  {key:'perfumaria',label:'Perfumaria',color:'#00e676'},
+  {key:'fralda',label:'Fralda',color:'#ffab00'},
+  {key:'termolabil',label:'Termolábil',color:'#ffff33'},
+  {key:'misto',label:'Misto',color:'#b8b8b8'}
+];
+
+function recebArmAgendaTipoKey(value){
+  const text=recebArmKey(value);
+  if(text.includes('medic'))return'medicamento';
+  if(text.includes('perf'))return'perfumaria';
+  if(text.includes('fralda'))return'fralda';
+  if(text.includes('termol'))return'termolabil';
+  if(text.includes('misto'))return'misto';
+  return'';
+}
+
+function recebArmAgendaIsTotalRow(row){
+  const fornecedor=recebArmKey(row&&row.fornecedor);
+  const transportador=recebArmKey(row&&row.transportador);
+  return fornecedor.includes('total de ')||fornecedor.includes('total do ')||transportador.includes('total de ')||transportador.includes('total do ');
+}
+
+function recebArmAgendaSummary(rows){
+  const summary={};
+  RECEB_ARM_AGENDA_TIPOS.forEach(t=>{summary[t.key]={...t,skus:0,volumes:0,rows:[],explicit:false};});
+  let totalExplicit=null;
+  (Array.isArray(rows)?rows:[]).forEach(row=>{
+    const tipoKey=recebArmAgendaTipoKey(row.tipo);
+    const fornecedorKey=recebArmKey(row.fornecedor);
+    if(fornecedorKey.includes('total de volumes')){
+      totalExplicit=+row.volumes||0;
+      return;
+    }
+    if(!tipoKey||!summary[tipoKey])return;
+    const isTotal=recebArmAgendaIsTotalRow(row);
+    if(isTotal&&fornecedorKey.includes('total de '+tipoKey)){
+      summary[tipoKey].skus=+row.skus||summary[tipoKey].skus||0;
+      summary[tipoKey].volumes=+row.volumes||summary[tipoKey].volumes||0;
+      summary[tipoKey].explicit=true;
+      return;
+    }
+    if(!isTotal)summary[tipoKey].rows.push(row);
+  });
+  Object.values(summary).forEach(item=>{
+    if(item.explicit)return;
+    item.skus=item.rows.reduce((sum,row)=>sum+(+row.skus||0),0);
+    item.volumes=item.rows.reduce((sum,row)=>sum+(+row.volumes||0),0);
+  });
+  const total=totalExplicit!==null?totalExplicit:Object.values(summary).reduce((sum,item)=>sum+(+item.volumes||0),0);
+  return{summary,total};
+}
+
+function recebArmToggleAgendaTipo(key){
+  const el=document.getElementById('recebArmAgendaDetalhe-'+key);
+  if(!el)return;
+  const willOpen=!el.classList.contains('on');
+  document.querySelectorAll('.receb-arm-detail-block').forEach(block=>block.classList.remove('on'));
+  if(willOpen)el.classList.add('on');
+}
+
 function renderRecebArmKpis(data){
   const el=document.getElementById('recebArmKpis');
   if(!el)return;
@@ -4338,9 +4413,26 @@ function renderRecebArmAgenda(data){
   if(!el)return;
   const rows=recebArmFilteredRows(data.agendaRows||[]);
   if(!rows.length){el.innerHTML='<div class="no-data" style="padding:18px">Sem agenda importada para este dia.</div>';return;}
-  el.innerHTML=`<table><thead><tr><th>Horário</th><th>Protocolo</th><th>Fornecedor</th><th>Transportador</th><th>Tipo</th><th>SKUs</th><th>Volumes</th></tr></thead><tbody>
-    ${rows.map(r=>`<tr><td>${excelText(r.horario||'')}</td><td>${excelText(r.protocolo||'')}</td><td style="text-align:left;color:#fff;font-weight:bold">${excelText(r.fornecedor||'')}</td><td style="text-align:left">${excelText(r.transportador||'')}</td><td>${excelText(r.tipo||'')}</td><td>${prodFmt(+r.skus||0,0)}</td><td style="font-weight:bold;color:#ffd700">${prodFmt(+r.volumes||0,0)}</td></tr>`).join('')}
-  </tbody></table>`;
+  const {summary,total}=recebArmAgendaSummary(rows);
+  const headers=RECEB_ARM_AGENDA_TIPOS.map(t=>summary[t.key]);
+  const detailBlocks=headers.map(item=>`<div class="receb-arm-detail-block" id="recebArmAgendaDetalhe-${item.key}">
+    <div class="receb-arm-detail-title">${excelText(item.label)} - ${prodFmt(+item.volumes||0,0)} volumes (${prodFmt(+item.skus||0,0)} SKUs)</div>
+    <div class="detail-wrap">
+      <table><thead><tr><th>Protocolo</th><th>Fornecedor</th><th>Transportador</th><th>SKUs</th><th>Volumes</th></tr></thead><tbody>
+        ${item.rows.length?item.rows.map(r=>`<tr><td>${excelText(r.protocolo||'')}</td><td style="text-align:left;color:#fff;font-weight:bold">${excelText(r.fornecedor||'')}</td><td style="text-align:left">${excelText(r.transportador||'')}</td><td>${prodFmt(+r.skus||0,0)}</td><td style="font-weight:bold;color:#ffd700">${prodFmt(+r.volumes||0,0)}</td></tr>`).join(''):'<tr><td colspan="5">Sem detalhe importado para este tipo.</td></tr>'}
+      </tbody></table>
+    </div>
+  </div>`).join('');
+  el.innerHTML=`<div class="receb-arm-resumo">
+    <table>
+      <tbody>
+        <tr><th>Centro de Distribuição</th><td colspan="6" style="background:#0d1c2e;color:#ff4c4c;text-align:left">GAM SAO JOSE DOS PINHAIS</td></tr>
+        <tr><th>Tipo de Mercadoria</th>${headers.map(item=>`<th class="tipo-cell" onclick="recebArmToggleAgendaTipo('${item.key}')" style="background:${item.color}">${excelText(item.label)}</th>`).join('')}<th style="background:#16c5ef;color:#001426">Total</th></tr>
+        <tr><td>Quant. de Volumes</td>${headers.map(item=>`<td class="tipo-vol" onclick="recebArmToggleAgendaTipo('${item.key}')" style="background:${item.color}">${prodFmt(+item.volumes||0,0)}</td>`).join('')}<td class="tipo-vol" style="background:#16c5ef">${prodFmt(total,0)}</td></tr>
+      </tbody>
+    </table>
+    ${detailBlocks}
+  </div>`;
 }
 
 function renderRecebArmPendSelectors(data){
@@ -4456,8 +4548,12 @@ function exportRecebArmExcel(){
   let html='<!doctype html><html><head><meta charset="utf-8"></head><body>';
   html+='<h3>Resumo</h3><table border="1"><tr><th>Data</th><th>Notas</th><th>Conferência 100%</th><th>Armazenagem 100%</th><th>Pend. conferência</th><th>Pend. armazenagem</th></tr>';
   html+=`<tr><td>${excelText(fmtDateShort(date))}</td><td>${(data.notas||[]).length}</td><td>${(data.notas||[]).filter(n=>n.confStatus==='finalizado').length}</td><td>${(data.notas||[]).filter(n=>n.armStatus==='finalizado').length}</td><td>${(data.pendConf||[]).length}</td><td>${(data.pendArm||[]).length}</td></tr></table>`;
-  html+='<h3>Agenda</h3><table border="1"><tr><th>Horário</th><th>Protocolo</th><th>Fornecedor</th><th>Transportador</th><th>Tipo</th><th>SKUs</th><th>Volumes</th></tr>';
-  (data.agendaRows||[]).forEach(r=>{html+=`<tr><td>${excelText(r.horario||'')}</td><td>${excelText(r.protocolo||'')}</td><td>${excelText(r.fornecedor||'')}</td><td>${excelText(r.transportador||'')}</td><td>${excelText(r.tipo||'')}</td><td>${r.skus||0}</td><td>${r.volumes||0}</td></tr>`;});
+  const agendaSummary=recebArmAgendaSummary(data.agendaRows||[]);
+  html+='<h3>Agenda - Volumetria por Tipo</h3><table border="1"><tr><th>Tipo</th><th>Volumes</th></tr>';
+  RECEB_ARM_AGENDA_TIPOS.forEach(t=>{const item=agendaSummary.summary[t.key];html+=`<tr><td>${excelText(t.label)}</td><td>${item?item.volumes||0:0}</td></tr>`;});
+  html+=`<tr><th>Total</th><th>${agendaSummary.total||0}</th></tr></table>`;
+  html+='<h3>Agenda - Detalhes</h3><table border="1"><tr><th>Protocolo</th><th>Fornecedor</th><th>Transportador</th><th>Tipo</th><th>SKUs</th><th>Volumes</th></tr>';
+  (data.agendaRows||[]).filter(r=>!recebArmAgendaIsTotalRow(r)).forEach(r=>{html+=`<tr><td>${excelText(r.protocolo||'')}</td><td>${excelText(r.fornecedor||'')}</td><td>${excelText(r.transportador||'')}</td><td>${excelText(r.tipo||'')}</td><td>${r.skus||0}</td><td>${r.volumes||0}</td></tr>`;});
   html+='</table><h3>Notas</h3><table border="1"><tr><th>NF</th><th>Chave</th><th>Fornecedor</th><th>Protocolo</th><th>Status conferência</th><th>Status armazenagem</th><th>Itens lidos</th></tr>';
   (data.notas||[]).forEach(n=>{html+=`<tr><td>${excelText(n.nfNumero||'')}</td><td>${excelText(n.chave||'')}</td><td>${excelText(n.fornecedor||'')}</td><td>${excelText(n.protocolo||'')}</td><td>${excelText(RECEB_ARM_STATUS[recebArmNormalizeStatus(n.confStatus)])}</td><td>${excelText(RECEB_ARM_STATUS[recebArmNormalizeStatus(n.armStatus)])}</td><td>${(n.itens||[]).length}</td></tr>`;});
   html+='</table><h3>Itens da NF x 997</h3><table border="1"><tr><th>NF</th><th>Item</th><th>Código</th><th>EAN</th><th>Descrição</th><th>Unid.</th><th>Lote</th><th>Validade</th><th>Entrou</th><th>Armazenado</th><th>Pendente</th></tr>';
