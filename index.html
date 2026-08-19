@@ -550,6 +550,8 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 .receb-arm-form label{display:flex;flex-direction:column;gap:3px;font-size:10px;color:#89b4d4;font-weight:bold}
 .receb-arm-form input,.receb-arm-form select,.receb-arm-form textarea{background:#eef6ff;border:1px solid #9cc3df;color:#00385f;border-radius:4px;padding:6px 8px;font-size:11px;font-weight:bold;width:100%;min-height:31px}
 .receb-arm-form textarea{min-height:62px;resize:vertical;font-weight:normal}
+.receb-arm-check{flex-direction:row!important;align-items:center;gap:7px;background:#071525;border:1px solid #1a3550;border-radius:4px;padding:7px 8px;min-height:31px;color:#ffd700!important}
+.receb-arm-check input{width:auto!important;min-height:auto!important;padding:0!important}
 .receb-arm-btn{background:#1e88e5;color:#fff;border:none;border-radius:4px;padding:7px 11px;font-weight:bold;font-size:11px;cursor:pointer;min-height:31px}
 .receb-arm-btn.green{background:#00a86b}.receb-arm-btn.red{background:#e94560}.receb-arm-btn.purple{background:#9b59b6}.receb-arm-btn.gray{background:#4a5a6a}
 .receb-arm-msg{font-size:10px;color:#ffd700;margin-top:7px;min-height:13px}
@@ -1117,11 +1119,18 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
             <label>Item/código
               <select id="recebArmPendConfItem"></select>
             </label>
-            <label>Quantidade
-              <input type="number" id="recebArmPendConfQtd" min="0" placeholder="0">
+            <label>Qtd. volumes/caixas
+              <input type="number" id="recebArmPendConfQtdVol" min="0" step="0.001" placeholder="0">
+            </label>
+            <label>Qtd. unidades
+              <input type="number" id="recebArmPendConfQtdUn" min="0" placeholder="0">
             </label>
             <label>Observação
               <input id="recebArmPendConfObs" placeholder="Observação">
+            </label>
+            <label class="receb-arm-check">
+              <input type="checkbox" id="recebArmPendConfNfd">
+              <span>Emitir NFD para fornecedor</span>
             </label>
             <button class="receb-arm-btn red" type="button" onclick="addRecebArmPendencia('conf')">Adicionar pendência</button>
           </div>
@@ -4379,17 +4388,33 @@ function addRecebArmPendencia(tipo){
   const isConf=tipo==='conf';
   const nf=document.getElementById(isConf?'recebArmPendConfNf':'recebArmPendArmNf').value.trim();
   const item=document.getElementById(isConf?'recebArmPendConfItem':'recebArmPendArmItem').value.trim();
-  const qtd=+document.getElementById(isConf?'recebArmPendConfQtd':'recebArmPendArmQtd').value||0;
   const obsEl=document.getElementById(isConf?'recebArmPendConfObs':'recebArmPendArmEnd');
   if(!nf&&!item){alert('Informe a NF ou o item da pendência.');return;}
   const nota=data.notas.find(n=>String(n.nfNumero||n.chave||'')===String(nf));
-  const itemData=nota&&(nota.itens||[]).find(i=>String(i.codigo||i.descricao||'')===String(item));
-  const record={id:recebArmId(isConf?'pc':'pa'),nf,item,qtd,descricao:itemData?(itemData.descricaoBase||itemData.descricao||''):'',_updatedAt:Date.now()};
-  if(isConf)record.obs=obsEl.value.trim();
-  else record.endereco=obsEl.value.trim()||'997';
+  const itemData=nota&&(nota.itens||[]).find(i=>[i.codGam,i.codigo,i.ean,i.descricao].some(v=>String(v||'')===String(item)));
+  const record={id:recebArmId(isConf?'pc':'pa'),nf,item,descricao:itemData?(itemData.descricaoBase||itemData.descricao||''):'',_updatedAt:Date.now()};
+  if(isConf){
+    const qtdVol=+document.getElementById('recebArmPendConfQtdVol')?.value||0;
+    const qtdUn=+document.getElementById('recebArmPendConfQtdUn')?.value||0;
+    const nfd=!!document.getElementById('recebArmPendConfNfd')?.checked;
+    record.qtdVolumes=qtdVol;
+    record.qtdUnidades=qtdUn;
+    record.qtd=qtdVol||qtdUn||0;
+    record.nfdFornecedor=nfd;
+    record.obs=obsEl.value.trim();
+    if(nfd&&nota){
+      nota.confStatus='finalizado';
+      nota._updatedAt=Date.now();
+    }
+  }else{
+    const qtd=+document.getElementById('recebArmPendArmQtd').value||0;
+    record.qtd=qtd;
+    record.endereco=obsEl.value.trim()||'997';
+  }
   data[isConf?'pendConf':'pendArm'].push(record);
   recebArmTouch(day);
-  ['recebArmPendConfQtd','recebArmPendConfObs','recebArmPendArmNf','recebArmPendArmItem','recebArmPendArmQtd'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  ['recebArmPendConfQtdVol','recebArmPendConfQtdUn','recebArmPendConfObs','recebArmPendArmNf','recebArmPendArmItem','recebArmPendArmQtd'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
+  const nfdEl=document.getElementById('recebArmPendConfNfd');if(nfdEl)nfdEl.checked=false;
   renderRecebArm();
 }
 
@@ -4527,21 +4552,23 @@ function renderRecebArmPendSelectors(data){
   const prevItem=itemSel.value;
   const itens=selected&&Array.isArray(selected.itens)?selected.itens:[];
   itemSel.innerHTML=itens.length
-    ?itens.map(i=>`<option value="${attrText(i.codigo||i.descricao||'')}">${excelText(i.codigo||'sem código')} - ${excelText(i.descricaoBase||i.descricao||'')}</option>`).join('')
+    ?itens.map(i=>`<option value="${attrText(i.codGam||i.codigo||i.descricao||'')}">${excelText(i.codGam||i.codigo||'sem código')} - ${excelText(i.descricaoBase||i.descricao||'')}</option>`).join('')
     :'<option value="">Sem itens lidos no XML</option>';
   if(prevItem&&[...itemSel.options].some(o=>o.value===prevItem))itemSel.value=prevItem;
   return selected;
 }
 
-function fillRecebArmPendConf(nf,item,qtd){
+function fillRecebArmPendConf(nf,item,qtdVol,qtdUn){
   const nfEl=document.getElementById('recebArmPendConfNf');
   const itemEl=document.getElementById('recebArmPendConfItem');
-  const qtdEl=document.getElementById('recebArmPendConfQtd');
+  const qtdVolEl=document.getElementById('recebArmPendConfQtdVol');
+  const qtdUnEl=document.getElementById('recebArmPendConfQtdUn');
   if(nfEl)nfEl.value=nf||'';
   renderRecebArm();
   const itemEl2=document.getElementById('recebArmPendConfItem');
   if(itemEl2)itemEl2.value=item||'';
-  if(qtdEl)qtdEl.value=qtd||'';
+  if(qtdVolEl)qtdVolEl.value=qtdVol||'';
+  if(qtdUnEl)qtdUnEl.value=qtdUn||'';
 }
 
 function renderRecebArmPendConfItens(nota){
@@ -4551,7 +4578,7 @@ function renderRecebArmPendConfItens(nota){
   if(!nota){el.innerHTML='<table class="receb-arm-tbl"><tbody><tr><td>Adicione ou selecione uma NF para ver os itens.</td></tr></tbody></table>';return;}
   if(!itens.length){el.innerHTML='<table class="receb-arm-tbl"><tbody><tr><td>Esta NF ainda não tem itens lidos. Anexe o XML para carregar todos os produtos.</td></tr></tbody></table>';return;}
   el.innerHTML=`<table class="receb-arm-tbl"><thead><tr><th>Item</th><th>COD GAM</th><th>Código NF</th><th>Descrição</th><th>Caixas</th><th>Unidades</th><th>Lote</th><th>Validade</th><th>Ação</th></tr></thead><tbody>
-    ${itens.map((i,idx)=>`<tr><td>${excelText(i.nItem||idx+1)}</td><td style="color:#00e5ff;font-weight:bold">${excelText(i.codGam||'')}</td><td>${excelText(i.codigo||'')}</td><td style="text-align:left;color:#fff;font-weight:bold">${excelText(i.descricaoBase||i.descricao||'')}</td><td style="color:#ffd700;font-weight:bold">${prodFmt(i.caixas!==undefined?+i.caixas:+i.qtdEntrada||0,3)}</td><td style="color:#ffd700;font-weight:bold">${prodFmt(+i.unidades||0,0)}</td><td>${excelText(i.lote||'')}</td><td>${excelText(i.validade||'')}</td><td><button class="receb-arm-btn red" type="button" onclick="fillRecebArmPendConf(${jsText(nota.nfNumero||nota.chave||'')},${jsText(i.codGam||i.codigo||i.descricao||'')},${i.caixas!==undefined?+i.caixas:+i.qtdEntrada||0})">Marcar pendência</button></td></tr>`).join('')}
+    ${itens.map((i,idx)=>`<tr><td>${excelText(i.nItem||idx+1)}</td><td style="color:#00e5ff;font-weight:bold">${excelText(i.codGam||'')}</td><td>${excelText(i.codigo||'')}</td><td style="text-align:left;color:#fff;font-weight:bold">${excelText(i.descricaoBase||i.descricao||'')}</td><td style="color:#ffd700;font-weight:bold">${prodFmt(i.caixas!==undefined?+i.caixas:+i.qtdEntrada||0,3)}</td><td style="color:#ffd700;font-weight:bold">${prodFmt(+i.unidades||0,0)}</td><td>${excelText(i.lote||'')}</td><td>${excelText(i.validade||'')}</td><td><button class="receb-arm-btn red" type="button" onclick="fillRecebArmPendConf(${jsText(nota.nfNumero||nota.chave||'')},${jsText(i.codGam||i.codigo||i.descricao||'')},${i.caixas!==undefined?+i.caixas:+i.qtdEntrada||0},${+i.unidades||0})">Marcar pendência</button></td></tr>`).join('')}
   </tbody></table>`;
 }
 
@@ -4668,7 +4695,7 @@ function renderRecebArmPendTables(data){
   const arm=document.getElementById('recebArmPendArmTbl');
   if(conf){
     const rows=data.pendConf||[];
-    conf.innerHTML=`<table class="receb-arm-tbl"><thead><tr><th>NF</th><th>Item</th><th>Descrição</th><th>Qtd</th><th>Obs.</th><th></th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td>${excelText(r.nf||'')}</td><td>${excelText(r.item||'')}</td><td style="text-align:left;color:#fff;font-weight:bold">${excelText(r.descricao||'')}</td><td>${prodFmt(+r.qtd||0,0)}</td><td>${excelText(r.obs||'')}</td><td><button class="receb-arm-btn red" type="button" onclick="removeRecebArmPendencia('conf','${r.id}')">Excluir</button></td></tr>`).join(''):'<tr><td colspan="6">Sem pendência de conferência.</td></tr>'}</tbody></table>`;
+    conf.innerHTML=`<table class="receb-arm-tbl"><thead><tr><th>NF</th><th>Item</th><th>Descrição</th><th>Volumes/Caixas</th><th>Unidades</th><th>NFD fornecedor</th><th>Obs.</th><th></th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td>${excelText(r.nf||'')}</td><td>${excelText(r.item||'')}</td><td style="text-align:left;color:#fff;font-weight:bold">${excelText(r.descricao||'')}</td><td>${prodFmt(r.qtdVolumes!==undefined?+r.qtdVolumes:+r.qtd||0,3)}</td><td>${prodFmt(+r.qtdUnidades||0,0)}</td><td>${r.nfdFornecedor?'Sim':'Não'}</td><td>${excelText(r.obs||'')}</td><td><button class="receb-arm-btn red" type="button" onclick="removeRecebArmPendencia('conf','${r.id}')">Excluir</button></td></tr>`).join(''):'<tr><td colspan="8">Sem pendência de conferência.</td></tr>'}</tbody></table>`;
   }
   if(arm){
     const rows=data.pendArm||[];
@@ -4704,8 +4731,8 @@ function exportRecebArmExcel(){
   (data.notas||[]).forEach(n=>{html+=`<tr><td>${excelText(n.nfNumero||'')}</td><td>${excelText(n.chave||'')}</td><td>${excelText(n.fornecedor||'')}</td><td>${excelText(n.protocolo||'')}</td><td>${excelText(RECEB_ARM_STATUS[recebArmNormalizeStatus(n.confStatus)])}</td><td>${excelText(RECEB_ARM_STATUS[recebArmNormalizeStatus(n.armStatus)])}</td><td>${(n.itens||[]).length}</td></tr>`;});
   html+='</table><h3>Itens da NF x 997</h3><table border="1"><tr><th>NF</th><th>Item</th><th>COD GAM</th><th>Código NF</th><th>EAN</th><th>Descrição</th><th>Caixas</th><th>Unidades</th><th>Lote</th><th>Validade</th><th>Armazenado</th><th>Pendente</th></tr>';
   (data.notas||[]).forEach(n=>(n.itens||[]).forEach(i=>{const entrou=i.caixas!==undefined?+i.caixas:+i.qtdEntrada||0,arm=+i.qtdArmazenada||0;html+=`<tr><td>${excelText(n.nfNumero||'')}</td><td>${excelText(i.nItem||'')}</td><td>${excelText(i.codGam||'')}</td><td>${excelText(i.codigo||'')}</td><td>${excelText(i.ean||'')}</td><td>${excelText(i.descricaoBase||i.descricao||'')}</td><td>${entrou}</td><td>${+i.unidades||0}</td><td>${excelText(i.lote||'')}</td><td>${excelText(i.validade||'')}</td><td>${arm}</td><td>${Math.max(entrou-arm,0)}</td></tr>`;}));
-  html+='</table><h3>Pendências Conferência</h3><table border="1"><tr><th>NF</th><th>Item</th><th>Descrição</th><th>Qtd</th><th>Obs.</th></tr>';
-  (data.pendConf||[]).forEach(r=>{html+=`<tr><td>${excelText(r.nf||'')}</td><td>${excelText(r.item||'')}</td><td>${excelText(r.descricao||'')}</td><td>${r.qtd||0}</td><td>${excelText(r.obs||'')}</td></tr>`;});
+  html+='</table><h3>Pendências Conferência</h3><table border="1"><tr><th>NF</th><th>Item</th><th>Descrição</th><th>Volumes/Caixas</th><th>Unidades</th><th>NFD fornecedor</th><th>Obs.</th></tr>';
+  (data.pendConf||[]).forEach(r=>{html+=`<tr><td>${excelText(r.nf||'')}</td><td>${excelText(r.item||'')}</td><td>${excelText(r.descricao||'')}</td><td>${r.qtdVolumes!==undefined?+r.qtdVolumes:+r.qtd||0}</td><td>${+r.qtdUnidades||0}</td><td>${r.nfdFornecedor?'Sim':'Não'}</td><td>${excelText(r.obs||'')}</td></tr>`;});
   html+='</table><h3>Pendências Armazenagem</h3><table border="1"><tr><th>NF</th><th>Item</th><th>Qtd</th><th>Endereço</th><th>Origem</th></tr>';
   (data.pendArm||[]).forEach(r=>{html+=`<tr><td>${excelText(r.nf||'')}</td><td>${excelText(r.item||'')}</td><td>${r.qtd||0}</td><td>${excelText(r.endereco||'')}</td><td>${excelText(r.origem||'manual')}</td></tr>`;});
   html+='</table></body></html>';
