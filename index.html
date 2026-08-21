@@ -1965,6 +1965,22 @@ function shouldRejectOlderCloud(remoteDays,source){
   return false;
 }
 
+function remoteDaysHaveBetterData(remoteDays){
+  if(!Array.isArray(remoteDays)||!remoteDays.length)return false;
+  const localDays=Array.isArray(db.days)?db.days:[];
+  return remoteDays.some(remoteDay=>{
+    if(!remoteDay||!remoteDay.date)return false;
+    const localDay=localDays.find(d=>d&&d.date===remoteDay.date);
+    if(!localDay)return true;
+    const remoteScore=dayDataScore(remoteDay);
+    const localScore=dayDataScore(localDay);
+    if(remoteScore>localScore)return true;
+    const remoteTs=+remoteDay._updatedAt||0;
+    const localTs=+localDay._updatedAt||0;
+    return remoteTs>localTs&&remoteScore>=localScore;
+  });
+}
+
 const DATA_SCORE_IGNORED_KEYS=new Set(['date','savedAt','_updatedAt','_fieldUpdatedAt','_correiaDirectHour','cod','cidade','destino','hPrev','recebArm','prodSetores','prodDiurno','productBase']);
 
 function dataScoreValue(v,key){
@@ -2437,7 +2453,7 @@ async function syncFromFirebaseRest(showOk){
     const localNewest=maxDayUpdatedAt(db.days);
     const remoteNewest=maxDayUpdatedAt(remoteDays);
     const remoteHash=cloudPayloadHash(remote);
-    const shouldApply=remoteHash!==fbRestLastHash||remoteDays.length>db.days.length||remoteNewest>localNewest;
+    const shouldApply=remoteHash!==fbRestLastHash||remoteDays.length>db.days.length||remoteNewest>localNewest||remoteDaysHaveBetterData(remoteDays);
     let updated=false;
     if(!isSaving&&shouldApply){
       const beforeHash=cloudPayloadHash({days:db.days,users:getLocalUsersCache()});
@@ -2614,16 +2630,19 @@ function initFirebase(){
           if(db.days&&db.days.length>0)save();
           return;
         }
-        fbRestLastHash=cloudPayloadHash(remote);
+        const remoteHash=cloudPayloadHash(remote);
         const remoteTs=remote.savedAt||0;
-        if(!isSaving&&remoteTs>lastSaveTs){
+        const shouldApply=!isSaving&&(remoteTs>lastSaveTs||remoteDaysHaveBetterData(remote.days)||remoteHash!==fbRestLastHash);
+        if(shouldApply){
           lastSaveTs=remoteTs;
           if(!shouldRejectOlderCloud(remote.days,'firebase-sdk'))applyRemoteData(remote);
+          fbRestLastHash=remoteHash;
           showSyncStatus('☁ Sincronizado ✓',false);
           setTimeout(()=>showSyncStatus('☁ Nuvem ativa ✓',false),2500);
         } else if(isSaving){
           // skip — we just saved
         } else {
+          fbRestLastHash=remoteHash;
           showSyncStatus('☁ Nuvem ativa ✓',false);
         }
       },
@@ -7356,7 +7375,7 @@ async function sbLoad(){
         if(currentUser&&currentUser.role==='admin')setTimeout(renderUsersList,0);
       }
     }
-    if(remoteDays.length&&!shouldRejectOlderCloud(remoteDays,'supabase')&&(remoteTs>localTs||remoteDays.length>db.days.length||remoteNewest>localNewest||remoteHash!==lastSyncHash)){
+    if(remoteDays.length&&!shouldRejectOlderCloud(remoteDays,'supabase')&&(remoteTs>localTs||remoteDays.length>db.days.length||remoteNewest>localNewest||remoteHash!==lastSyncHash||remoteDaysHaveBetterData(remoteDays))){
       db.days=mergeDays(db.days,remoteDays);
       saveLocalDb(db);
       changed=true;
