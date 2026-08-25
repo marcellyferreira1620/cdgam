@@ -4460,7 +4460,9 @@ function recebArm997VolumeFromRow(r){
   if(r.qtdVolume!==undefined&&r.qtdVolume!==null&&r.qtdVolume!=='')return +r.qtdVolume||0;
   const qtLocal=+r.qtdArmazenada||0;
   const qtEmb=+r.qtEmb||0;
-  return qtEmb>0?Math.floor(qtLocal/qtEmb):0;
+  if(qtLocal<=0)return 0;
+  if(qtEmb<=0)return Math.floor(qtLocal);
+  return Math.floor(qtLocal/qtEmb);
 }
 
 function recebArm997ItemCategory(date,dayDate){
@@ -4529,16 +4531,41 @@ function recebArm997StoredSincePrevious(prevItems,currentItems){
   return stored;
 }
 
+function recebArm997EnteredSincePrevious(prevItems,currentItems){
+  const prevByKey={};
+  (Array.isArray(prevItems)?prevItems:[]).forEach(item=>{prevByKey[item.key]=item;});
+  if(!Array.isArray(prevItems)||!prevItems.length)return recebArm997SummaryFromItems(currentItems);
+  const entered={today:{...recebArm997BlankBucket()},previous:{...recebArm997BlankBucket()},total:{...recebArm997BlankBucket()}};
+  const skuSets={today:new Set(),previous:new Set(),total:new Set()};
+  (Array.isArray(currentItems)?currentItems:[]).forEach(cur=>{
+    const prev=prevByKey[cur.key]||{};
+    const diffQty=Math.max((+cur.qtd||0)-(+prev.qtd||0),0);
+    const diffVol=Math.max((+cur.vol||0)-(+prev.vol||0),0);
+    if(!diffQty&&!diffVol)return;
+    const cat=cur.category==='today'?'today':'previous';
+    [cat,'total'].forEach(k=>{
+      entered[k].linhas++;
+      entered[k].qtd+=diffQty;
+      entered[k].vol+=diffVol;
+      skuSets[k].add(cur.sku);
+    });
+  });
+  Object.keys(entered).forEach(k=>{entered[k].skus=skuSets[k].size;});
+  return entered;
+}
+
 function recebArm997BuildImportRecord(rows,dayDate,fileName,endereco,prevItems){
   const items=recebArm997SnapshotItems(rows,dayDate);
   return{
     id:recebArmId('qrpimp'),
+    version:'997-hora-v2',
     importedAt:Date.now(),
     fileName:fileName||'997',
     endereco:endereco||'997',
     dayDate,
     rows:(Array.isArray(rows)?rows.length:0),
     pending:recebArm997SummaryFromItems(items),
+    entered:recebArm997EnteredSincePrevious(prevItems,items),
     stored:recebArm997StoredSincePrevious(prevItems,items),
     _updatedAt:Date.now(),
     items
@@ -5031,52 +5058,43 @@ function renderRecebArm997Report(){
   if(!el)return;
   const day=getDay(curDate)||emptyDay(curDate||today());
   const data=ensureRecebArm(day);
-  const rows=recebArm997ReportRows();
-  const totalSkus=new Set(rows.map(r=>r.sku)).size;
-  const totalQtd=rows.reduce((s,r)=>s+(+r.qtd||0),0);
-  const byDay=recebArm997Group(rows,'day');
-  const byMonth=recebArm997Group(rows,'month');
-  const byYear=recebArm997Group(rows,'year');
-  const detailRows=rows.slice(-120).reverse();
-  const imports=(data.qrpImports||[]).slice().sort((a,b)=>(+a.importedAt||0)-(+b.importedAt||0));
+  const imports=(data.qrpImports||[]).filter(r=>r&&r.version==='997-hora-v2').slice().sort((a,b)=>(+a.importedAt||0)-(+b.importedAt||0));
+  const last=imports[imports.length-1]||null;
+  const pending=last&&last.pending?last.pending:{today:{},previous:{},total:{}};
+  const stored=last&&last.stored?last.stored:{today:{},previous:{},total:{}};
+  const entered=last&&last.entered?last.entered:{today:{},previous:{},total:{}};
   const histRows=imports.map(r=>{
     const hour=r.importedAt?new Date(r.importedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'-';
     const pending=r.pending||{};
     const stored=r.stored||{};
+    const entered=r.entered||{};
     return `<tr>
       <td>${excelText(hour)}</td>
       <td>${excelText(r.fileName||'997')}</td>
       <td>${prodFmt(+r.rows||0,0)}</td>
-      <td>${prodFmt(+(pending.today&&pending.today.vol)||0,0)}</td>
-      <td>${prodFmt(+(pending.previous&&pending.previous.vol)||0,0)}</td>
+      <td style="font-weight:bold;color:#1e90ff">${prodFmt(+(entered.today&&entered.today.vol)||0,0)}</td>
+      <td style="font-weight:bold;color:#1e90ff">${prodFmt(+(entered.previous&&entered.previous.vol)||0,0)}</td>
+      <td style="font-weight:bold;color:#1e90ff">${prodFmt(+(entered.total&&entered.total.vol)||0,0)}</td>
       <td style="font-weight:bold;color:#00e676">${prodFmt(+(stored.today&&stored.today.vol)||0,0)}</td>
       <td style="font-weight:bold;color:#00e676">${prodFmt(+(stored.previous&&stored.previous.vol)||0,0)}</td>
-      <td>${prodFmt(+(stored.total&&stored.total.vol)||0,0)}</td>
+      <td style="font-weight:bold;color:#00e676">${prodFmt(+(stored.total&&stored.total.vol)||0,0)}</td>
+      <td>${prodFmt(+(pending.today&&pending.today.vol)||0,0)}</td>
+      <td>${prodFmt(+(pending.previous&&pending.previous.vol)||0,0)}</td>
+      <td>${prodFmt(+(pending.total&&pending.total.vol)||0,0)}</td>
     </tr>`;
   }).join('');
   el.innerHTML=`
-    <div class="receb-arm-head" style="border-top:1px solid #1a3550"><strong>Relatorio 997 pendente</strong><span>Consolidado por entrada da 997; lancamentos manuais entram na data da tela.</span></div>
+    <div class="receb-arm-head" style="border-top:1px solid #1a3550"><strong>Hora a hora da 997</strong><span>Cada arquivo anexado vira uma foto da hora; compara com a leitura anterior.</span></div>
     <div class="receb-arm-kpis" style="margin:8px 0">
-      <div><span>Linhas pendentes</span><b>${prodFmt(rows.length,0)}</b></div>
-      <div><span>SKUs pendentes</span><b style="color:#00e676">${prodFmt(totalSkus,0)}</b></div>
-      <div><span>Quantidade total</span><b style="color:#ffd700">${prodFmt(totalQtd,0)}</b></div>
-      <div><span>Dias com pendencia</span><b style="color:#1e90ff">${prodFmt(byDay.length,0)}</b></div>
-    </div>
-    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
-      ${recebArm997SummaryTable('SKUs por dia',byDay,'day')}
-      ${recebArm997SummaryTable('SKUs por mes',byMonth,'month')}
-      ${recebArm997SummaryTable('SKUs por ano',byYear,'year')}
+      <div><span>Linhas da ultima 997</span><b>${prodFmt(last?+last.rows||0:0,0)}</b></div>
+      <div><span>Entrou novo desde leitura anterior</span><b style="color:#1e90ff">${prodFmt(+(entered.total&&entered.total.vol)||0,0)}</b></div>
+      <div><span>Armazenado desde leitura anterior</span><b style="color:#00e676">${prodFmt(+(stored.total&&stored.total.vol)||0,0)}</b></div>
+      <div><span>Saldo atual na 997</span><b style="color:#ffd700">${prodFmt(+(pending.total&&pending.total.vol)||0,0)}</b></div>
     </div>
     <div style="overflow-x:auto;margin-top:8px">
       <table class="receb-arm-tbl">
-        <thead><tr><th colspan="8">Hora a hora da 997</th></tr><tr><th>Hora importada</th><th>Arquivo</th><th>Linhas</th><th>Pendente vol. entrada do dia</th><th>Pendente vol. dias anteriores</th><th>Armazenado vol. entrada do dia</th><th>Armazenado vol. dias anteriores</th><th>Armazenado vol. total</th></tr></thead>
-        <tbody>${histRows||'<tr><td colspan="8">Anexe a 997 a cada hora para montar o histórico.</td></tr>'}</tbody>
-      </table>
-    </div>
-    <div style="overflow-x:auto;margin-top:8px;max-height:320px">
-      <table class="receb-arm-tbl">
-        <thead><tr><th>Data</th><th>SKU</th><th>Descricao</th><th>Qtd</th><th>Endereco</th><th>Origem</th><th>NF</th></tr></thead>
-        <tbody>${detailRows.length?detailRows.map(r=>`<tr><td>${excelText(fmtDateShort(r.date))}</td><td>${excelText(r.sku)}</td><td style="text-align:left;color:#fff;font-weight:bold">${excelText(r.descricao||'')}</td><td>${prodFmt(+r.qtd||0,0)}</td><td>${excelText(r.endereco||'997')}</td><td>${excelText(r.origem||'')}</td><td>${excelText(r.nf||'')}</td></tr>`).join(''):'<tr><td colspan="7">Importe a 997 para abrir o relatorio.</td></tr>'}</tbody>
+        <thead><tr><th colspan="12">Hora a hora da 997</th></tr><tr><th>Hora importada</th><th>Arquivo</th><th>Linhas</th><th>Entrou novo vol. entrada do dia</th><th>Entrou novo vol. dias anteriores</th><th>Entrou novo vol. total</th><th>Armazenado vol. entrada do dia</th><th>Armazenado vol. dias anteriores</th><th>Armazenado vol. total</th><th>Saldo 997 vol. entrada do dia</th><th>Saldo 997 vol. dias anteriores</th><th>Saldo 997 vol. total</th></tr></thead>
+        <tbody>${histRows||'<tr><td colspan="12">Anexe a 997 a cada hora para montar o histórico.</td></tr>'}</tbody>
       </table>
     </div>`;
 }
@@ -5159,22 +5177,12 @@ function exportRecebArmExcel(){
   (data.pendConf||[]).forEach(r=>{html+=`<tr><td>${excelText(r.nf||'')}</td><td>${excelText(r.item||'')}</td><td>${excelText(r.descricao||'')}</td><td>${r.qtdVolumes!==undefined?+r.qtdVolumes:+r.qtd||0}</td><td>${+r.qtdUnidades||0}</td><td>${r.nfdFornecedor?'Sim':'Não'}</td><td>${excelText(r.obs||'')}</td></tr>`;});
   html+='</table><h3>Pendências Armazenagem</h3><table border="1"><tr><th>NF</th><th>Item</th><th>Qtd</th><th>Endereço</th><th>Origem</th></tr>';
   (data.pendArm||[]).forEach(r=>{html+=`<tr><td>${excelText(r.nf||'')}</td><td>${excelText(r.item||'')}</td><td>${r.qtd||0}</td><td>${excelText(r.endereco||'')}</td><td>${excelText(r.origem||'manual')}</td></tr>`;});
-  html+='</table><h3>997 - Hora a hora</h3><table border="1"><tr><th>Hora importada</th><th>Arquivo</th><th>Linhas</th><th>Pendente vol. entrada do dia</th><th>Pendente vol. dias anteriores</th><th>Armazenado vol. entrada do dia</th><th>Armazenado vol. dias anteriores</th><th>Armazenado vol. total</th></tr>';
-  (data.qrpImports||[]).forEach(r=>{
+  html+='</table><h3>997 - Hora a hora</h3><table border="1"><tr><th>Hora importada</th><th>Arquivo</th><th>Linhas</th><th>Entrou novo vol. entrada do dia</th><th>Entrou novo vol. dias anteriores</th><th>Entrou novo vol. total</th><th>Armazenado vol. entrada do dia</th><th>Armazenado vol. dias anteriores</th><th>Armazenado vol. total</th><th>Saldo 997 vol. entrada do dia</th><th>Saldo 997 vol. dias anteriores</th><th>Saldo 997 vol. total</th></tr>';
+  (data.qrpImports||[]).filter(r=>r&&r.version==='997-hora-v2').forEach(r=>{
     const hour=r.importedAt?new Date(r.importedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'';
-    const pending=r.pending||{},stored=r.stored||{};
-    html+=`<tr><td>${excelText(hour)}</td><td>${excelText(r.fileName||'997')}</td><td>${+r.rows||0}</td><td>${+(pending.today&&pending.today.vol)||0}</td><td>${+(pending.previous&&pending.previous.vol)||0}</td><td>${+(stored.today&&stored.today.vol)||0}</td><td>${+(stored.previous&&stored.previous.vol)||0}</td><td>${+(stored.total&&stored.total.vol)||0}</td></tr>`;
+    const pending=r.pending||{},stored=r.stored||{},entered=r.entered||{};
+    html+=`<tr><td>${excelText(hour)}</td><td>${excelText(r.fileName||'997')}</td><td>${+r.rows||0}</td><td>${+(entered.today&&entered.today.vol)||0}</td><td>${+(entered.previous&&entered.previous.vol)||0}</td><td>${+(entered.total&&entered.total.vol)||0}</td><td>${+(stored.today&&stored.today.vol)||0}</td><td>${+(stored.previous&&stored.previous.vol)||0}</td><td>${+(stored.total&&stored.total.vol)||0}</td><td>${+(pending.today&&pending.today.vol)||0}</td><td>${+(pending.previous&&pending.previous.vol)||0}</td><td>${+(pending.total&&pending.total.vol)||0}</td></tr>`;
   });
-  const reportRows=recebArm997ReportRows();
-  const addReportGroup=(title,items,mode)=>{
-    html+=`</table><h3>${title}</h3><table border="1"><tr><th>${mode==='day'?'Dia':mode==='month'?'Mes':'Ano'}</th><th>Linhas</th><th>SKUs</th><th>Quantidade</th></tr>`;
-    items.forEach(i=>{html+=`<tr><td>${excelText(recebArm997KeyLabel(i.key,mode))}</td><td>${i.linhas}</td><td>${i.skus.size}</td><td>${i.qtd}</td></tr>`;});
-  };
-  addReportGroup('Relatorio 997 - SKUs por dia',recebArm997Group(reportRows,'day'),'day');
-  addReportGroup('Relatorio 997 - SKUs por mes',recebArm997Group(reportRows,'month'),'month');
-  addReportGroup('Relatorio 997 - SKUs por ano',recebArm997Group(reportRows,'year'),'year');
-  html+='</table><h3>Relatorio 997 - Detalhe pendente</h3><table border="1"><tr><th>Data</th><th>SKU</th><th>Descricao</th><th>Qtd</th><th>Endereco</th><th>Origem</th><th>NF</th><th>Lote</th><th>Validade</th></tr>';
-  reportRows.forEach(r=>{html+=`<tr><td>${excelText(fmtDateShort(r.date))}</td><td>${excelText(r.sku)}</td><td>${excelText(r.descricao||'')}</td><td>${+r.qtd||0}</td><td>${excelText(r.endereco||'997')}</td><td>${excelText(r.origem||'')}</td><td>${excelText(r.nf||'')}</td><td>${excelText(r.lote||'')}</td><td>${excelText(r.validade||'')}</td></tr>`;});
   html+='</table></body></html>';
   const blob=new Blob([html],{type:'application/vnd.ms-excel;charset=utf-8'});
   const url=URL.createObjectURL(blob);
