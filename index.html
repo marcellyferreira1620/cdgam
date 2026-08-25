@@ -5075,7 +5075,34 @@ function recebArm997CurrentSummaryRows(data){
 }
 
 function recebArm997DetailSummaryTable(title,items,mode){
-  return `<div style="overflow-x:auto"><table class="receb-arm-tbl"><thead><tr><th colspan="4">${title}</th></tr><tr><th>${mode==='month'?'Mês':'Dia'}</th><th>Itens</th><th>SKUs</th><th>Volumes</th></tr></thead><tbody>${items.length?items.map(i=>`<tr><td>${excelText(recebArm997KeyLabel(i.key,mode))}</td><td>${prodFmt(i.linhas,0)}</td><td>${prodFmt(i.skus,0)}</td><td style="font-weight:bold;color:#ffd700">${prodFmt(i.vol,0)}</td></tr>`).join(''):'<tr><td colspan="4">Sem dados da 997.</td></tr>'}</tbody></table></div>`;
+  const total=items.reduce((acc,i)=>({skus:acc.skus+(+i.skus||0),vol:acc.vol+(+i.vol||0)}),{skus:0,vol:0});
+  const rows=items.length?items.map(i=>`<tr><td>${excelText(recebArm997KeyLabel(i.key,mode))}</td><td>${prodFmt(i.skus,0)}</td><td style="font-weight:bold;color:#ffd700">${prodFmt(i.vol,0)}</td></tr>`).join(''):'<tr><td colspan="3">Sem dados da 997.</td></tr>';
+  const totalRow=items.length?`<tr><th>Total</th><th>${prodFmt(total.skus,0)}</th><th style="color:#ffd700">${prodFmt(total.vol,0)}</th></tr>`:'';
+  return `<div style="overflow-x:auto"><table class="receb-arm-tbl"><thead><tr><th colspan="3">${title}</th></tr><tr><th>${mode==='month'?'Mês':'Dia'}</th><th>SKUs/Códigos</th><th>Volumes</th></tr></thead><tbody>${rows}${totalRow}</tbody></table></div>`;
+}
+
+function recebArm997MovementSummaryTable(entered,stored,pending){
+  const rows=[
+    {label:'Entraram',data:entered,color:'#1e90ff'},
+    {label:'Armazenados',data:stored,color:'#00e676'},
+    {label:'Pendentes',data:pending,color:'#ffd700'}
+  ];
+  return `<div style="overflow-x:auto;margin:8px 0"><table class="receb-arm-tbl"><thead><tr><th colspan="3">Resumo do dia - 997</th></tr><tr><th>Indicador</th><th>SKUs/Códigos</th><th>Volumes</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r.label}</td><td>${prodFmt(+(r.data.total&&r.data.total.skus)||0,0)}</td><td style="font-weight:bold;color:${r.color}">${prodFmt(+(r.data.total&&r.data.total.vol)||0,0)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+function recebArm997DayMovementSummary(imports,pending){
+  const empty={total:{skus:0,vol:0}};
+  const entered={total:{skus:0,vol:0}};
+  const stored={total:{skus:0,vol:0}};
+  (Array.isArray(imports)?imports:[]).forEach(r=>{
+    const e=r&&r.entered&&r.entered.total?r.entered.total:null;
+    const s=r&&r.stored&&r.stored.total?r.stored.total:null;
+    entered.total.skus+=+(e&&e.skus)||0;
+    entered.total.vol+=+(e&&e.vol)||0;
+    stored.total.skus+=+(s&&s.skus)||0;
+    stored.total.vol+=+(s&&s.vol)||0;
+  });
+  return{entered,stored,pending:pending||empty};
 }
 
 function renderRecebArm997Report(){
@@ -5088,6 +5115,7 @@ function renderRecebArm997Report(){
   const pending=last&&last.pending?last.pending:{today:{},previous:{},total:{}};
   const stored=last&&last.stored?last.stored:{today:{},previous:{},total:{}};
   const entered=last&&last.entered?last.entered:{today:{},previous:{},total:{}};
+  const daySummary=recebArm997DayMovementSummary(imports,pending);
   const detail=recebArm997CurrentSummaryRows(data);
   const histRows=imports.map(r=>{
     const hour=r.importedAt?new Date(r.importedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'-';
@@ -5111,12 +5139,7 @@ function renderRecebArm997Report(){
   }).join('');
   el.innerHTML=`
     <div class="receb-arm-head" style="border-top:1px solid #1a3550"><strong>Hora a hora da 997</strong></div>
-    <div class="receb-arm-kpis" style="margin:8px 0">
-      <div><span>Linhas da ultima 997</span><b>${prodFmt(last?+last.rows||0:0,0)}</b></div>
-      <div><span>Entrou novo desde leitura anterior</span><b style="color:#1e90ff">${prodFmt(+(entered.total&&entered.total.vol)||0,0)}</b></div>
-      <div><span>Armazenado desde leitura anterior</span><b style="color:#00e676">${prodFmt(+(stored.total&&stored.total.vol)||0,0)}</b></div>
-      <div><span>Saldo atual na 997</span><b style="color:#ffd700">${prodFmt(+(pending.total&&pending.total.vol)||0,0)}</b></div>
-    </div>
+    ${recebArm997MovementSummaryTable(daySummary.entered,daySummary.stored,daySummary.pending)}
     <div style="overflow-x:auto;margin-top:8px">
       <table class="receb-arm-tbl">
         <thead><tr><th colspan="12">Hora a hora da 997</th></tr><tr><th>Hora importada</th><th>Arquivo</th><th>Linhas</th><th>Entrou novo vol. entrada do dia</th><th>Entrou novo vol. dias anteriores</th><th>Entrou novo vol. total</th><th>Armazenado vol. entrada do dia</th><th>Armazenado vol. dias anteriores</th><th>Armazenado vol. total</th><th>Saldo 997 vol. entrada do dia</th><th>Saldo 997 vol. dias anteriores</th><th>Saldo 997 vol. total</th></tr></thead>
