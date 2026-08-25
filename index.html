@@ -1105,6 +1105,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
           <button class="receb-arm-btn gray" type="button" onclick="clearRecebArm997()">Limpar 997</button>
         </div>
         <div class="receb-arm-msg" id="recebArm997Msg"></div>
+        <div id="recebArm997Report" style="margin-top:10px"></div>
       </div>
     </div>
 
@@ -1513,6 +1514,9 @@ const MEDIA_HORA_AUTO=[
 
 const SK='cdgam_v6';
 const SK_BACKUPS='cdgam_v6_backups';
+const LOCAL_CACHE_DAYS=21;
+const LOCAL_CACHE_FALLBACK_DAYS=7;
+const LOCAL_BACKUP_DAYS=10;
 const PWD='gam2025';
 const NEW_RULES_FROM='2026-06-02';
 const SIMPLE_OPERATIONAL_FROM='2026-06-16';
@@ -1843,30 +1847,34 @@ function compactDayForLocal(day){
 function compactDbForLocalStorage(snapshot,limitDays){
   const src=snapshot&&Array.isArray(snapshot.days)?snapshot:{days:[]};
   let days=src.days.map(compactDayForLocal);
-  if(limitDays&&days.length>limitDays)days=days.sort((a,b)=>(a.date||'').localeCompare(b.date||'')).slice(-limitDays);
+  const maxDays=limitDays||LOCAL_CACHE_DAYS;
+  if(maxDays&&days.length>maxDays)days=days.sort((a,b)=>(a.date||'').localeCompare(b.date||'')).slice(-maxDays);
   return{...src,days};
 }
 
 function saveLocalDb(snapshot=db){
+  const writeCompact=(limit)=>{
+    const encoded=JSON.stringify(compactDbForLocalStorage(snapshot,limit));
+    try{localStorage.setItem(SK,encoded);}
+    catch(e){
+      localStorage.removeItem(SK);
+      localStorage.setItem(SK,encoded);
+    }
+  };
   try{
-    localStorage.setItem(SK,JSON.stringify(compactDbForLocalStorage(snapshot)));
+    writeCompact(LOCAL_CACHE_DAYS);
     return true;
   }catch(e){
     try{
       localStorage.removeItem(SK_BACKUPS);
-      localStorage.setItem(SK,JSON.stringify(compactDbForLocalStorage(snapshot)));
+      writeCompact(LOCAL_CACHE_FALLBACK_DAYS);
       console.warn('Backups locais limpos para liberar espaco:',e.message);
       return true;
     }catch(e2){
-      try{
-        localStorage.setItem(SK,JSON.stringify(compactDbForLocalStorage(snapshot,45)));
-        console.warn('Cache local reduzido para os ultimos dias:',e2.message);
-        return true;
-      }catch(e3){
-        console.error('Falha ao salvar cache local:',e3);
-        showSyncStatus('Nuvem ativa - cache local cheio',false);
-        return false;
-      }
+      try{localStorage.removeItem(SK);}catch(_){}
+      console.error('Falha ao salvar cache local:',e2);
+      showSyncStatus('Nuvem ativa - cache local cheio',false);
+      return false;
     }
   }
 }
@@ -1874,7 +1882,7 @@ function saveLocalDb(snapshot=db){
 function saveLocalBackup(snapshot,label){
   try{
     if(!snapshot||!Array.isArray(snapshot.days)||!snapshot.days.length)return;
-    const payload={...compactDbForLocalStorage(snapshot,45),savedAt:snapshot.savedAt||0,label:label||'auto'};
+    const payload={...compactDbForLocalStorage(snapshot,LOCAL_BACKUP_DAYS),savedAt:snapshot.savedAt||0,label:label||'auto'};
     const encoded=JSON.stringify(payload);
     const raw=localStorage.getItem(SK_BACKUPS);
     const current=raw?JSON.parse(raw):null;
@@ -2450,18 +2458,11 @@ async function syncFromFirebaseRest(showOk){
     }
     const remoteDays=remote.days;
     if(shouldRejectOlderCloud(remoteDays,'firebase-rest'))return false;
-    const localNewest=maxDayUpdatedAt(db.days);
-    const remoteNewest=maxDayUpdatedAt(remoteDays);
     const remoteHash=cloudPayloadHash(remote);
-    const shouldApply=remoteHash!==fbRestLastHash||remoteDays.length>db.days.length||remoteNewest>localNewest||remoteDaysHaveBetterData(remoteDays);
     let updated=false;
-    if(!isSaving&&shouldApply){
-      const beforeHash=cloudPayloadHash({days:db.days,users:getLocalUsersCache()});
-      applyRemoteData(remote);
-      const afterHash=cloudPayloadHash({days:db.days,users:getLocalUsersCache()});
-      updated=beforeHash!==afterHash;
+    if(!isSaving){
+      updated=!!applyRemoteData(remote);
       fbRestLastHash=remoteHash;
-      if(updated)refreshFromDb();
     }
     if(showOk)showSyncStatus(updated?'Sincronizado':'Nuvem ativa',false);
     return updated;
@@ -2550,15 +2551,25 @@ function showSyncStatus(msg,isErr){
 }
 
 function applyRemoteData(remote){
-  if(!remote)return;
+  if(!remote)return false;
+  let changed=false;
   if(remote.users&&typeof remote.users==='object'&&!Array.isArray(remote.users)){
-    setLocalUsersCache(remote.users);
+    const localUsers=getLocalUsersCache();
+    if(JSON.stringify(remote.users)!==JSON.stringify(localUsers)){
+      setLocalUsersCache(remote.users);
+      changed=true;
+    }
   }
-  if(!remote.days||!Array.isArray(remote.days))return;
-  if(shouldRejectOlderCloud(remote.days,'remote-apply'))return;
-  db.days=mergeDays(db.days,JSON.parse(JSON.stringify(remote.days)));
+  if(!remote.days||!Array.isArray(remote.days))return changed;
+  if(shouldRejectOlderCloud(remote.days,'remote-apply'))return changed;
+  const beforeHash=payloadDaysHash(db.days);
+  const mergedDays=mergeDays(db.days,JSON.parse(JSON.stringify(remote.days)));
+  const afterHash=payloadDaysHash(mergedDays);
+  if(beforeHash===afterHash)return changed;
+  db.days=mergedDays;
   db.days.sort((a,b)=>a.date.localeCompare(b.date));
   saveLocalDb(db);
+  changed=true;
   buildDayNav();
   const day=getDay(curDate)||latestDay();
   if(day){
@@ -2575,6 +2586,7 @@ function applyRemoteData(remote){
     if(tab==='proddia'&&!editing)renderProdDiurno();
     if(tab==='recebarm'&&!editing)renderRecebArm();
   }
+  return changed;
 }
 
 function save(replaceDays=false){
@@ -4745,6 +4757,115 @@ function renderRecebArmPendTables(data){
   }
 }
 
+function recebArmIsoFromDate(value,fallback){
+  const t=String(value||'').trim();
+  const br=t.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if(br)return `${br[3]}-${br[2]}-${br[1]}`;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(t))return t;
+  return fallback||today();
+}
+
+function recebArm997ReportRows(){
+  const rows=[];
+  const seenQrp=new Set();
+  (Array.isArray(db.days)?db.days:[]).forEach(day=>{
+    if(!day||!day.date||!day.recebArm)return;
+    const data=day.recebArm;
+    (Array.isArray(data.qrpRows)?data.qrpRows:[]).forEach(r=>{
+      const sku=String(r.codigo||'').trim();
+      if(!sku)return;
+      const date=recebArmIsoFromDate(r.entrada,day.date);
+      const key=['qrp',date,sku,r.lote||'',r.validade||'',r.qtdArmazenada||0,r.descricao||''].join('|');
+      if(seenQrp.has(key))return;
+      seenQrp.add(key);
+      rows.push({
+        date,
+        sku,
+        descricao:r.descricao||'',
+        qtd:+r.qtdArmazenada||0,
+        endereco:r.endereco||'997',
+        origem:'997',
+        nf:'',
+        lote:r.lote||'',
+        validade:r.validade||''
+      });
+    });
+    (Array.isArray(data.pendArm)?data.pendArm:[]).forEach(r=>{
+      const sku=String(r.item||'').trim();
+      if(!sku)return;
+      rows.push({
+        date:day.date,
+        sku,
+        descricao:r.descricao||'',
+        qtd:+r.qtd||0,
+        endereco:r.endereco||'997',
+        origem:r.origem||'manual',
+        nf:r.nf||'',
+        lote:'',
+        validade:''
+      });
+    });
+  });
+  rows.sort((a,b)=>a.date.localeCompare(b.date)||a.sku.localeCompare(b.sku));
+  return rows;
+}
+
+function recebArm997Group(rows,mode){
+  const map={};
+  rows.forEach(r=>{
+    const key=mode==='year'?r.date.slice(0,4):(mode==='month'?r.date.slice(0,7):r.date);
+    if(!map[key])map[key]={key,linhas:0,skus:new Set(),qtd:0};
+    map[key].linhas++;
+    map[key].skus.add(r.sku);
+    map[key].qtd+=+r.qtd||0;
+  });
+  return Object.values(map).sort((a,b)=>a.key.localeCompare(b.key));
+}
+
+function recebArm997KeyLabel(key,mode){
+  if(mode==='year')return key;
+  if(mode==='month'){
+    const [y,m]=key.split('-');
+    return `${m}/${y}`;
+  }
+  return fmtDateShort(key);
+}
+
+function recebArm997SummaryTable(title,items,mode){
+  return `<div style="overflow-x:auto"><table class="receb-arm-tbl"><thead><tr><th colspan="4">${title}</th></tr><tr><th>${mode==='day'?'Dia':mode==='month'?'Mes':'Ano'}</th><th>Linhas</th><th>SKUs</th><th>Quantidade</th></tr></thead><tbody>${items.length?items.map(i=>`<tr><td>${excelText(recebArm997KeyLabel(i.key,mode))}</td><td>${prodFmt(i.linhas,0)}</td><td>${prodFmt(i.skus.size,0)}</td><td>${prodFmt(i.qtd,0)}</td></tr>`).join(''):'<tr><td colspan="4">Sem dados da 997.</td></tr>'}</tbody></table></div>`;
+}
+
+function renderRecebArm997Report(){
+  const el=document.getElementById('recebArm997Report');
+  if(!el)return;
+  const rows=recebArm997ReportRows();
+  const totalSkus=new Set(rows.map(r=>r.sku)).size;
+  const totalQtd=rows.reduce((s,r)=>s+(+r.qtd||0),0);
+  const byDay=recebArm997Group(rows,'day');
+  const byMonth=recebArm997Group(rows,'month');
+  const byYear=recebArm997Group(rows,'year');
+  const detailRows=rows.slice(-120).reverse();
+  el.innerHTML=`
+    <div class="receb-arm-head" style="border-top:1px solid #1a3550"><strong>Relatorio 997 pendente</strong><span>Consolidado por entrada da 997; lancamentos manuais entram na data da tela.</span></div>
+    <div class="receb-arm-kpis" style="margin:8px 0">
+      <div><span>Linhas pendentes</span><b>${prodFmt(rows.length,0)}</b></div>
+      <div><span>SKUs pendentes</span><b style="color:#00e676">${prodFmt(totalSkus,0)}</b></div>
+      <div><span>Quantidade total</span><b style="color:#ffd700">${prodFmt(totalQtd,0)}</b></div>
+      <div><span>Dias com pendencia</span><b style="color:#1e90ff">${prodFmt(byDay.length,0)}</b></div>
+    </div>
+    <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px">
+      ${recebArm997SummaryTable('SKUs por dia',byDay,'day')}
+      ${recebArm997SummaryTable('SKUs por mes',byMonth,'month')}
+      ${recebArm997SummaryTable('SKUs por ano',byYear,'year')}
+    </div>
+    <div style="overflow-x:auto;margin-top:8px;max-height:320px">
+      <table class="receb-arm-tbl">
+        <thead><tr><th>Data</th><th>SKU</th><th>Descricao</th><th>Qtd</th><th>Endereco</th><th>Origem</th><th>NF</th></tr></thead>
+        <tbody>${detailRows.length?detailRows.map(r=>`<tr><td>${excelText(fmtDateShort(r.date))}</td><td>${excelText(r.sku)}</td><td style="text-align:left;color:#fff;font-weight:bold">${excelText(r.descricao||'')}</td><td>${prodFmt(+r.qtd||0,0)}</td><td>${excelText(r.endereco||'997')}</td><td>${excelText(r.origem||'')}</td><td>${excelText(r.nf||'')}</td></tr>`).join(''):'<tr><td colspan="7">Importe a 997 para abrir o relatorio.</td></tr>'}</tbody>
+      </table>
+    </div>`;
+}
+
 function renderRecebArm(){
   const wrap=document.getElementById('tb-recebarm');
   if(!wrap)return;
@@ -4754,6 +4875,7 @@ function renderRecebArm(){
   renderRecebArmAgenda(data);
   renderRecebArmFluxo(data);
   renderRecebArmPendTables(data);
+  renderRecebArm997Report();
 }
 
 function exportRecebArmExcel(){
@@ -4777,6 +4899,16 @@ function exportRecebArmExcel(){
   (data.pendConf||[]).forEach(r=>{html+=`<tr><td>${excelText(r.nf||'')}</td><td>${excelText(r.item||'')}</td><td>${excelText(r.descricao||'')}</td><td>${r.qtdVolumes!==undefined?+r.qtdVolumes:+r.qtd||0}</td><td>${+r.qtdUnidades||0}</td><td>${r.nfdFornecedor?'Sim':'Não'}</td><td>${excelText(r.obs||'')}</td></tr>`;});
   html+='</table><h3>Pendências Armazenagem</h3><table border="1"><tr><th>NF</th><th>Item</th><th>Qtd</th><th>Endereço</th><th>Origem</th></tr>';
   (data.pendArm||[]).forEach(r=>{html+=`<tr><td>${excelText(r.nf||'')}</td><td>${excelText(r.item||'')}</td><td>${r.qtd||0}</td><td>${excelText(r.endereco||'')}</td><td>${excelText(r.origem||'manual')}</td></tr>`;});
+  const reportRows=recebArm997ReportRows();
+  const addReportGroup=(title,items,mode)=>{
+    html+=`</table><h3>${title}</h3><table border="1"><tr><th>${mode==='day'?'Dia':mode==='month'?'Mes':'Ano'}</th><th>Linhas</th><th>SKUs</th><th>Quantidade</th></tr>`;
+    items.forEach(i=>{html+=`<tr><td>${excelText(recebArm997KeyLabel(i.key,mode))}</td><td>${i.linhas}</td><td>${i.skus.size}</td><td>${i.qtd}</td></tr>`;});
+  };
+  addReportGroup('Relatorio 997 - SKUs por dia',recebArm997Group(reportRows,'day'),'day');
+  addReportGroup('Relatorio 997 - SKUs por mes',recebArm997Group(reportRows,'month'),'month');
+  addReportGroup('Relatorio 997 - SKUs por ano',recebArm997Group(reportRows,'year'),'year');
+  html+='</table><h3>Relatorio 997 - Detalhe pendente</h3><table border="1"><tr><th>Data</th><th>SKU</th><th>Descricao</th><th>Qtd</th><th>Endereco</th><th>Origem</th><th>NF</th><th>Lote</th><th>Validade</th></tr>';
+  reportRows.forEach(r=>{html+=`<tr><td>${excelText(fmtDateShort(r.date))}</td><td>${excelText(r.sku)}</td><td>${excelText(r.descricao||'')}</td><td>${+r.qtd||0}</td><td>${excelText(r.endereco||'997')}</td><td>${excelText(r.origem||'')}</td><td>${excelText(r.nf||'')}</td><td>${excelText(r.lote||'')}</td><td>${excelText(r.validade||'')}</td></tr>`;});
   html+='</table></body></html>';
   const blob=new Blob([html],{type:'application/vnd.ms-excel;charset=utf-8'});
   const url=URL.createObjectURL(blob);
@@ -7363,8 +7495,6 @@ async function sbLoad(){
     // Sempre aplicar se remoto tem dados e é diferente do que temos
     const localTs=sbLastTs||0;
     const remoteDays=Array.isArray(remote.days)?remote.days:[];
-    const localNewest=maxDayUpdatedAt(db.days);
-    const remoteNewest=maxDayUpdatedAt(remoteDays);
     const remoteHash=simpleHash(JSON.stringify({days:remoteDays,users:remote.users||{}}));
     let changed=false;
     if(remote.users&&typeof remote.users==='object'&&!Array.isArray(remote.users)){
@@ -7375,10 +7505,18 @@ async function sbLoad(){
         if(currentUser&&currentUser.role==='admin')setTimeout(renderUsersList,0);
       }
     }
-    if(remoteDays.length&&!shouldRejectOlderCloud(remoteDays,'supabase')&&(remoteTs>localTs||remoteDays.length>db.days.length||remoteNewest>localNewest||remoteHash!==lastSyncHash||remoteDaysHaveBetterData(remoteDays))){
-      db.days=mergeDays(db.days,remoteDays);
-      saveLocalDb(db);
-      changed=true;
+    if(remoteDays.length&&!shouldRejectOlderCloud(remoteDays,'supabase')){
+      const beforeHash=payloadDaysHash(db.days);
+      const mergedDays=mergeDays(db.days,remoteDays);
+      const afterHash=payloadDaysHash(mergedDays);
+      if(afterHash!==beforeHash||remoteTs>localTs||remoteHash!==lastSyncHash||remoteDaysHaveBetterData(remoteDays)){
+        if(afterHash!==beforeHash){
+          db.days=mergedDays;
+          db.days.sort((a,b)=>a.date.localeCompare(b.date));
+          saveLocalDb(db);
+          changed=true;
+        }
+      }
     }
     if(remoteTs>sbLastTs)sbLastTs=remoteTs;
     if(changed||remoteHash!==lastSyncHash)lastSyncHash=remoteHash;
