@@ -4336,6 +4336,66 @@ function parseRecebArmQrpText(text,endereco){
   return rows;
 }
 
+function parseRecebArmQrpText(text,endereco){
+  const raw=String(text||'');
+  const skip=/^(Arial|Arial Narrow|Courier New|MS Sans Serif|Lista de Conferencia WMS \(PALETE\)|Local|C.digo|Codigo|Nome|Apresenta..o|Apresentacao|Entrada|Lote|Tipo|QT\. EMB|Validade|Prob\.|Venc\.|QT\. LOCAL|Reserva----|C\. Cx\. Lab\.|Gen.sio A\. Mendes & Cia\. Ltda\.)$/i;
+  const tokens=(raw.match(/[0-9A-Z\u00C0-\u017F+&./ -]{1,90}/gi)||[])
+    .map(s=>s.replace(/\s+/g,' ').trim())
+    .filter(s=>s&&!skip.test(s)&&(s.length>1||/^\d$/.test(s)));
+  const parseQty=t=>{
+    const v=String(t||'').trim();
+    if(!v)return 0;
+    if(/^\d{1,3}(\.\d{3})+$/.test(v))return +v.replace(/\./g,'')||0;
+    return +v.replace(',','.')||0;
+  };
+  const isLocal=t=>/^\d{2}\s+\d{2}\s+\d{3}\s+\d{2}/.test(t);
+  const isCode=t=>/^\d{3,8}(?:\/\d{1,2})?[A-Z\u00C0-\u017F]?$/i.test(t);
+  const isDate=t=>/^\d{2}\/\d{2}\/\d{4}$/.test(t);
+  const hasLetter=t=>/[A-Z\u00C0-\u017F]/i.test(t);
+  const isNumeric=t=>/^\d+(?:[.,]\d+)?$/.test(String(t||'').trim());
+  const rows=[];
+  for(let i=0;i<tokens.length;i++){
+    if(!isLocal(tokens[i]))continue;
+    const nextLocal=tokens.findIndex((t,idx)=>idx>i&&isLocal(t));
+    const end=nextLocal>i?nextLocal:Math.min(tokens.length,i+40);
+    const chunk=tokens.slice(i,end);
+    const codeRel=chunk.findIndex((t,idx)=>idx>0&&isCode(t)&&hasLetter(chunk[idx+1]||''));
+    if(codeRel<0)continue;
+    const dateRel=chunk.findIndex((t,idx)=>idx>codeRel+2&&isDate(t));
+    if(dateRel<0)continue;
+    const code=String(chunk[codeRel]||'').replace(/[A-Z\u00C0-\u017F]+$/i,'');
+    const beforeDate=chunk.slice(codeRel+1,dateRel);
+    const nome=beforeDate[0]||'';
+    const apresentacao=beforeDate[1]||'';
+    const qtyCandidates=beforeDate
+      .map((t,idx)=>({t,idx,q:parseQty(t)}))
+      .filter(x=>isNumeric(x.t)&&!(/^\d{8}$/.test(x.t)&&isDate(chunk[dateRel]||'')));
+    const qtdLocal=qtyCandidates.length>=2?qtyCandidates[qtyCandidates.length-2]:qtyCandidates[qtyCandidates.length-1];
+    const qtEmb=qtyCandidates.length>=2?qtyCandidates[qtyCandidates.length-1]:null;
+    const loteEnd=qtdLocal?qtdLocal.idx:beforeDate.length;
+    const loteText=beforeDate.slice(2,loteEnd).filter(t=>!isNumeric(t)).join(' ');
+    rows.push({
+      id:recebArmId('qrp'),
+      endereco:endereco||'997',
+      codigo:code,
+      nome,
+      descricao:[nome,apresentacao].filter(Boolean).join(' - '),
+      apresentacao,
+      lote:loteText,
+      qtdArmazenada:qtdLocal?qtdLocal.q:0,
+      qtEmb:qtEmb?qtEmb.q:0,
+      validade:chunk[dateRel]||'',
+      entrada:isDate(chunk[dateRel+1]||'')?chunk[dateRel+1]:'',
+      tipo:isNumeric(chunk[dateRel+2])?chunk[dateRel+2]:'',
+      prob:isNumeric(chunk[dateRel+3])?chunk[dateRel+3]:'',
+      venc:isNumeric(chunk[dateRel+4])?chunk[dateRel+4]:'',
+      caixaLab:chunk[dateRel+5]||'',
+      _updatedAt:Date.now()+rows.length
+    });
+  }
+  return rows;
+}
+
 function parseRecebArmExcel997(workbook,endereco){
   const rows=recebArmSheetRows(workbook);
   const headerIndex=recebArmFindHeader(rows,['codigo']);
