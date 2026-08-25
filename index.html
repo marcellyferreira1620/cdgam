@@ -1102,6 +1102,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
             <input id="recebArmEndereco" value="997">
           </label>
           <button class="receb-arm-btn purple" type="button" onclick="compareRecebArmStorage()">Atualizar pendências</button>
+          <button class="receb-arm-btn" type="button" onclick="exportRecebArm997Convertida()">Exportar 997 convertida</button>
           <button class="receb-arm-btn gray" type="button" onclick="clearRecebArm997()">Limpar 997</button>
         </div>
         <div class="receb-arm-msg" id="recebArm997Msg"></div>
@@ -1833,7 +1834,8 @@ function compactRecebArmForLocal(data){
     ...data,
     // Bases importadas podem passar do limite do navegador; a nuvem continua sendo a fonte principal.
     productBase:[],
-    qrpRows:[]
+    qrpRows:[],
+    qrpLastItems:[]
   };
 }
 
@@ -2296,6 +2298,8 @@ function mergeRecebArm(current,next){
     pendConf:mergeByIdOrIndex(a.pendConf,b.pendConf,'id'),
     pendArm:mergeByIdOrIndex(a.pendArm,b.pendArm,'id'),
     qrpRows:mergeByIdOrIndex(a.qrpRows,b.qrpRows,'id'),
+    qrpImports:mergeByIdOrIndex(a.qrpImports,b.qrpImports,'id'),
+    qrpLastItems:(+b._updatedAt||0)>=(+a._updatedAt||0)?(b.qrpLastItems||a.qrpLastItems||[]):(a.qrpLastItems||b.qrpLastItems||[]),
     productBase:mergeByIdOrIndex(a.productBase,b.productBase,'codigo'),
     _updatedAt:Math.max(+a._updatedAt||0,+b._updatedAt||0)
   };
@@ -3807,13 +3811,13 @@ function exportProdDiurnoExcel(){
 
 // Recebimento / Armazenagem
 function emptyRecebArm(){
-  return{agendaRows:[],notas:[],pendConf:[],pendArm:[],qrpRows:[],productBase:[],_updatedAt:0};
+  return{agendaRows:[],notas:[],pendConf:[],pendArm:[],qrpRows:[],qrpImports:[],qrpLastItems:[],productBase:[],_updatedAt:0};
 }
 
 function ensureRecebArm(day){
   if(!day.recebArm||typeof day.recebArm!=='object')day.recebArm=emptyRecebArm();
   const data=day.recebArm;
-  ['agendaRows','notas','pendConf','pendArm','qrpRows','productBase'].forEach(k=>{if(!Array.isArray(data[k]))data[k]=[];});
+  ['agendaRows','notas','pendConf','pendArm','qrpRows','qrpImports','qrpLastItems','productBase'].forEach(k=>{if(!Array.isArray(data[k]))data[k]=[];});
   return data;
 }
 
@@ -3999,8 +4003,9 @@ function parseRecebArmProductBaseRows(rows){
       const codigo=String(recebArmCell(row,headers,['cod gam','codigo gam','código gam','codigo','código','cod'])||'').trim();
       const descricao=String(recebArmCell(row,headers,['descricao','descrição','nome','produto','mercadoria'])||'').trim();
       const ean=String(recebArmCell(row,headers,['ean','codigo de barras','código de barras','barra','barras'])||'').replace(/\D/g,'');
+      const fornecedor=String(recebArmCell(row,headers,['nome fornec','nome.fornec','fornecedor','fornec'])||'').trim();
       if(!codigo||!descricao)return null;
-      return{id:codigo,codigo,descricao,ean,_updatedAt:Date.now()+i};
+      return{id:codigo,codigo,descricao,ean,fornecedor,_updatedAt:Date.now()+i};
     }).filter(Boolean);
   }
   if(!productRows.length){
@@ -4022,8 +4027,11 @@ async function importRecebArmProductBase(ev){
   if(typeof XLSX==='undefined'){recebArmMsg('recebArmBaseMsg','Leitor de Excel não carregou. Reabra a página e tente novamente.',true);return;}
   try{
     const wb=XLSX.read(await readFileBuffer(file),{type:'array'});
-    const rows=recebArmSheetRows(wb);
-    const productBase=parseRecebArmProductBaseRows(rows);
+    const productBaseRaw=wb.SheetNames.flatMap(name=>{
+      const rows=XLSX.utils.sheet_to_json(wb.Sheets[name],{header:1,defval:''});
+      return parseRecebArmProductBaseRows(rows);
+    });
+    const productBase=Object.values(productBaseRaw.reduce((acc,p)=>{if(p&&p.codigo&&!acc[p.codigo])acc[p.codigo]=p;return acc;},{}));
     if(!productBase.length)throw new Error('Base sem código/descrição');
     const day=recebArmDay();
     const data=ensureRecebArm(day);
@@ -4294,8 +4302,10 @@ function parseRecebArmQrpText(text,endereco){
     .map(s=>s.replace(/\s+/g,' ').trim())
     .filter(s=>s&&!skip.test(s)&&(s.length>1||/^\d$/.test(s)));
   const parseQty=t=>{
-    const v=String(t||'').trim();
+    let v=String(t||'').trim();
     if(!v)return 0;
+    const m=v.match(/^\d+(?:[.,]\d+)?/);
+    if(m)v=m[0];
     if(/^\d{1,3}(\.\d{3})+$/.test(v))return +v.replace(/\./g,'')||0;
     return +v.replace(',','.')||0;
   };
@@ -4352,7 +4362,7 @@ function parseRecebArmQrpText(text,endereco){
   const isCode=t=>/^\d{3,8}(?:\/\d{1,2})?[A-Z\u00C0-\u017F]?$/i.test(t);
   const isDate=t=>/^\d{2}\/\d{2}\/\d{4}$/.test(t);
   const hasLetter=t=>/[A-Z\u00C0-\u017F]/i.test(t);
-  const isNumeric=t=>/^\d+(?:[.,]\d+)?$/.test(String(t||'').trim());
+  const isNumeric=t=>/^\d+(?:[.,]\d+)?/.test(String(t||'').trim());
   const rows=[];
   for(let i=0;i<tokens.length;i++){
     if(!isLocal(tokens[i]))continue;
@@ -4419,6 +4429,122 @@ function parseRecebArmExcel997(workbook,endereco){
   }).filter(Boolean);
 }
 
+function parseRecebArmExcel997(workbook,endereco){
+  const rows=recebArmSheetRows(workbook);
+  const headerIndex=recebArmFindHeader(rows,['codigo']);
+  if(headerIndex<0)return [];
+  const headers=rows[headerIndex];
+  return rows.slice(headerIndex+1).map((row,i)=>{
+    const codigo=recebArmCell(row,headers,['codigo','código','cod']);
+    if(!String(codigo||'').trim())return null;
+    const nome=String(recebArmCell(row,headers,['nome do produto','nome','produto'])||'').trim();
+    return{
+      id:recebArmId('qrp'),
+      endereco:endereco||recebArmCell(row,headers,['local','endereco','endereço'])||'997',
+      codigo:String(codigo).trim(),
+      nome,
+      descricao:String(recebArmCell(row,headers,['nome do produto','nome','descricao','descrição','produto'])||nome).trim(),
+      apresentacao:String(recebArmCell(row,headers,['apresentacao','apresentação'])||'').trim(),
+      lote:String(recebArmCell(row,headers,['lote'])||'').trim(),
+      qtdArmazenada:+recebArmCell(row,headers,['quantidade local','qt. local','qt local','quantidade','qtd'])||0,
+      qtdVolume:+recebArmCell(row,headers,['quantidade de volume','volumes','volume'])||0,
+      fornecedor:String(recebArmCell(row,headers,['nome fornec','nome.fornec','fornecedor','fornec'])||'').trim(),
+      validade:String(recebArmCell(row,headers,['validade'])||'').trim(),
+      entrada:String(recebArmCell(row,headers,['data de entrada','entrada'])||'').trim(),
+      _updatedAt:Date.now()+i
+    };
+  }).filter(Boolean);
+}
+
+function recebArm997VolumeFromRow(r){
+  if(r.qtdVolume!==undefined&&r.qtdVolume!==null&&r.qtdVolume!=='')return +r.qtdVolume||0;
+  const qtLocal=+r.qtdArmazenada||0;
+  const qtEmb=+r.qtEmb||0;
+  return qtEmb>0?Math.floor(qtLocal/qtEmb):0;
+}
+
+function recebArm997ItemCategory(date,dayDate){
+  return date===dayDate?'today':'previous';
+}
+
+function recebArm997SnapshotItems(rows,dayDate){
+  const byKey={};
+  (Array.isArray(rows)?rows:[]).forEach(r=>{
+    const sku=String(r.codigo||'').trim();
+    if(!sku)return;
+    const date=recebArmIsoFromDate(r.entrada,dayDate);
+    const key=[date,sku,r.lote||'',r.validade||''].join('|');
+    if(!byKey[key]){
+      byKey[key]={
+        key,date,sku,
+        qtd:0,vol:0,
+        category:recebArm997ItemCategory(date,dayDate)
+      };
+    }
+    byKey[key].qtd+=+r.qtdArmazenada||0;
+    byKey[key].vol+=recebArm997VolumeFromRow(r);
+  });
+  return Object.values(byKey);
+}
+
+function recebArm997BlankBucket(){
+  return{linhas:0,skus:0,qtd:0,vol:0};
+}
+
+function recebArm997SummaryFromItems(items){
+  const base={today:{...recebArm997BlankBucket()},previous:{...recebArm997BlankBucket()},total:{...recebArm997BlankBucket()}};
+  const skuSets={today:new Set(),previous:new Set(),total:new Set()};
+  (Array.isArray(items)?items:[]).forEach(item=>{
+    const cat=item.category==='today'?'today':'previous';
+    [cat,'total'].forEach(k=>{
+      base[k].linhas++;
+      base[k].qtd+=+item.qtd||0;
+      base[k].vol+=+item.vol||0;
+      skuSets[k].add(item.sku);
+    });
+  });
+  Object.keys(base).forEach(k=>{base[k].skus=skuSets[k].size;});
+  return base;
+}
+
+function recebArm997StoredSincePrevious(prevItems,currentItems){
+  const currentByKey={};
+  (Array.isArray(currentItems)?currentItems:[]).forEach(item=>{currentByKey[item.key]=item;});
+  const stored={today:{...recebArm997BlankBucket()},previous:{...recebArm997BlankBucket()},total:{...recebArm997BlankBucket()}};
+  const skuSets={today:new Set(),previous:new Set(),total:new Set()};
+  (Array.isArray(prevItems)?prevItems:[]).forEach(prev=>{
+    const cur=currentByKey[prev.key]||{};
+    const diffQty=Math.max((+prev.qtd||0)-(+cur.qtd||0),0);
+    const diffVol=Math.max((+prev.vol||0)-(+cur.vol||0),0);
+    if(!diffQty&&!diffVol)return;
+    const cat=prev.category==='today'?'today':'previous';
+    [cat,'total'].forEach(k=>{
+      stored[k].linhas++;
+      stored[k].qtd+=diffQty;
+      stored[k].vol+=diffVol;
+      skuSets[k].add(prev.sku);
+    });
+  });
+  Object.keys(stored).forEach(k=>{stored[k].skus=skuSets[k].size;});
+  return stored;
+}
+
+function recebArm997BuildImportRecord(rows,dayDate,fileName,endereco,prevItems){
+  const items=recebArm997SnapshotItems(rows,dayDate);
+  return{
+    id:recebArmId('qrpimp'),
+    importedAt:Date.now(),
+    fileName:fileName||'997',
+    endereco:endereco||'997',
+    dayDate,
+    rows:(Array.isArray(rows)?rows.length:0),
+    pending:recebArm997SummaryFromItems(items),
+    stored:recebArm997StoredSincePrevious(prevItems,items),
+    _updatedAt:Date.now(),
+    items
+  };
+}
+
 async function importRecebArm997(ev){
   const file=ev.target.files&&ev.target.files[0];
   if(!file)return;
@@ -4436,10 +4562,13 @@ async function importRecebArm997(ev){
     if(!rows.length)throw new Error('Nenhuma linha encontrada');
     const day=recebArmDay();
     const data=ensureRecebArm(day);
+    const importRecord=recebArm997BuildImportRecord(rows,day.date,file.name,endereco,data.qrpLastItems||[]);
     data.qrpRows=rows;
+    data.qrpLastItems=importRecord.items;
+    data.qrpImports=[...(data.qrpImports||[]),{...importRecord,items:undefined}].slice(-36);
     recebArmTouch(day);
     compareRecebArmStorage(false);
-    recebArmMsg('recebArm997Msg',`${rows.length} linha(s) da 997 importadas.`,false);
+    recebArmMsg('recebArm997Msg',`${rows.length} linha(s) da 997 importadas. Leitura ${new Date(importRecord.importedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} salva no histórico.`,false);
     renderRecebArm();
   }catch(e){
     console.error(e);
@@ -4454,6 +4583,8 @@ function clearRecebArm997(){
   const day=recebArmDay();
   const data=ensureRecebArm(day);
   data.qrpRows=[];
+  data.qrpLastItems=[];
+  data.qrpImports=[];
   recebArmTouch(day);
   renderRecebArm();
 }
@@ -4898,6 +5029,8 @@ function recebArm997SummaryTable(title,items,mode){
 function renderRecebArm997Report(){
   const el=document.getElementById('recebArm997Report');
   if(!el)return;
+  const day=getDay(curDate)||emptyDay(curDate||today());
+  const data=ensureRecebArm(day);
   const rows=recebArm997ReportRows();
   const totalSkus=new Set(rows.map(r=>r.sku)).size;
   const totalQtd=rows.reduce((s,r)=>s+(+r.qtd||0),0);
@@ -4905,6 +5038,22 @@ function renderRecebArm997Report(){
   const byMonth=recebArm997Group(rows,'month');
   const byYear=recebArm997Group(rows,'year');
   const detailRows=rows.slice(-120).reverse();
+  const imports=(data.qrpImports||[]).slice().sort((a,b)=>(+a.importedAt||0)-(+b.importedAt||0));
+  const histRows=imports.map(r=>{
+    const hour=r.importedAt?new Date(r.importedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'-';
+    const pending=r.pending||{};
+    const stored=r.stored||{};
+    return `<tr>
+      <td>${excelText(hour)}</td>
+      <td>${excelText(r.fileName||'997')}</td>
+      <td>${prodFmt(+r.rows||0,0)}</td>
+      <td>${prodFmt(+(pending.today&&pending.today.vol)||0,0)}</td>
+      <td>${prodFmt(+(pending.previous&&pending.previous.vol)||0,0)}</td>
+      <td style="font-weight:bold;color:#00e676">${prodFmt(+(stored.today&&stored.today.vol)||0,0)}</td>
+      <td style="font-weight:bold;color:#00e676">${prodFmt(+(stored.previous&&stored.previous.vol)||0,0)}</td>
+      <td>${prodFmt(+(stored.total&&stored.total.vol)||0,0)}</td>
+    </tr>`;
+  }).join('');
   el.innerHTML=`
     <div class="receb-arm-head" style="border-top:1px solid #1a3550"><strong>Relatorio 997 pendente</strong><span>Consolidado por entrada da 997; lancamentos manuais entram na data da tela.</span></div>
     <div class="receb-arm-kpis" style="margin:8px 0">
@@ -4917,6 +5066,12 @@ function renderRecebArm997Report(){
       ${recebArm997SummaryTable('SKUs por dia',byDay,'day')}
       ${recebArm997SummaryTable('SKUs por mes',byMonth,'month')}
       ${recebArm997SummaryTable('SKUs por ano',byYear,'year')}
+    </div>
+    <div style="overflow-x:auto;margin-top:8px">
+      <table class="receb-arm-tbl">
+        <thead><tr><th colspan="8">Hora a hora da 997</th></tr><tr><th>Hora importada</th><th>Arquivo</th><th>Linhas</th><th>Pendente vol. entrada do dia</th><th>Pendente vol. dias anteriores</th><th>Armazenado vol. entrada do dia</th><th>Armazenado vol. dias anteriores</th><th>Armazenado vol. total</th></tr></thead>
+        <tbody>${histRows||'<tr><td colspan="8">Anexe a 997 a cada hora para montar o histórico.</td></tr>'}</tbody>
+      </table>
     </div>
     <div style="overflow-x:auto;margin-top:8px;max-height:320px">
       <table class="receb-arm-tbl">
@@ -4936,6 +5091,51 @@ function renderRecebArm(){
   renderRecebArmFluxo(data);
   renderRecebArmPendTables(data);
   renderRecebArm997Report();
+}
+
+function recebArm997ConvertedRows(data){
+  const baseRows=recebArmProductBaseRows(data);
+  const baseByCode={};
+  baseRows.forEach(p=>{
+    const code=String(p&&p.codigo||'').trim().replace(/^0+/,'');
+    if(code&&!baseByCode[code])baseByCode[code]=p;
+  });
+  return (Array.isArray(data&&data.qrpRows)?data.qrpRows:[]).map(r=>{
+    const code=String(r.codigo||'').trim();
+    const base=baseByCode[code.replace(/^0+/,'')]||{};
+    const qtLocal=+r.qtdArmazenada||0;
+    const qtEmb=+r.qtEmb||0;
+    return{
+      codigo:code,
+      nome:r.nome||String(r.descricao||'').split(' - ')[0]||base.descricao||'',
+      entrada:recebArmIsoFromDate(r.entrada,'').replace(/^(\d{4})-(\d{2})-(\d{2})$/,'$3/$2/$1')||r.entrada||'',
+      qtLocal,
+      qtVolume:recebArm997VolumeFromRow(r),
+      fornecedor:r.fornecedor||base.fornecedor||''
+    };
+  });
+}
+
+function exportRecebArm997Convertida(){
+  const day=getDay(curDate)||emptyDay(curDate||today());
+  const data=ensureRecebArm(day);
+  const rows=recebArm997ConvertedRows(data);
+  if(!rows.length){alert('Importe a 997 antes de exportar.');return;}
+  let html='<!doctype html><html><head><meta charset="utf-8"></head><body>';
+  html+='<table border="1"><tr><th>Código</th><th>Nome do Produto</th><th>Data de Entrada</th><th>Quantidade Local</th><th>Quantidade de Volume</th><th>NOME.FORNEC</th></tr>';
+  rows.forEach(r=>{
+    html+=`<tr><td>${excelText(r.codigo)}</td><td>${excelText(r.nome)}</td><td>${excelText(r.entrada)}</td><td>${+r.qtLocal||0}</td><td>${+r.qtVolume||0}</td><td>${excelText(r.fornecedor||'')}</td></tr>`;
+  });
+  html+='</table></body></html>';
+  const blob=new Blob([html],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`997-convertida-${(day.date||curDate||today()).replaceAll('-','')}.xls`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
 function exportRecebArmExcel(){
@@ -4959,6 +5159,12 @@ function exportRecebArmExcel(){
   (data.pendConf||[]).forEach(r=>{html+=`<tr><td>${excelText(r.nf||'')}</td><td>${excelText(r.item||'')}</td><td>${excelText(r.descricao||'')}</td><td>${r.qtdVolumes!==undefined?+r.qtdVolumes:+r.qtd||0}</td><td>${+r.qtdUnidades||0}</td><td>${r.nfdFornecedor?'Sim':'Não'}</td><td>${excelText(r.obs||'')}</td></tr>`;});
   html+='</table><h3>Pendências Armazenagem</h3><table border="1"><tr><th>NF</th><th>Item</th><th>Qtd</th><th>Endereço</th><th>Origem</th></tr>';
   (data.pendArm||[]).forEach(r=>{html+=`<tr><td>${excelText(r.nf||'')}</td><td>${excelText(r.item||'')}</td><td>${r.qtd||0}</td><td>${excelText(r.endereco||'')}</td><td>${excelText(r.origem||'manual')}</td></tr>`;});
+  html+='</table><h3>997 - Hora a hora</h3><table border="1"><tr><th>Hora importada</th><th>Arquivo</th><th>Linhas</th><th>Pendente vol. entrada do dia</th><th>Pendente vol. dias anteriores</th><th>Armazenado vol. entrada do dia</th><th>Armazenado vol. dias anteriores</th><th>Armazenado vol. total</th></tr>';
+  (data.qrpImports||[]).forEach(r=>{
+    const hour=r.importedAt?new Date(r.importedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'';
+    const pending=r.pending||{},stored=r.stored||{};
+    html+=`<tr><td>${excelText(hour)}</td><td>${excelText(r.fileName||'997')}</td><td>${+r.rows||0}</td><td>${+(pending.today&&pending.today.vol)||0}</td><td>${+(pending.previous&&pending.previous.vol)||0}</td><td>${+(stored.today&&stored.today.vol)||0}</td><td>${+(stored.previous&&stored.previous.vol)||0}</td><td>${+(stored.total&&stored.total.vol)||0}</td></tr>`;
+  });
   const reportRows=recebArm997ReportRows();
   const addReportGroup=(title,items,mode)=>{
     html+=`</table><h3>${title}</h3><table border="1"><tr><th>${mode==='day'?'Dia':mode==='month'?'Mes':'Ano'}</th><th>Linhas</th><th>SKUs</th><th>Quantidade</th></tr>`;
