@@ -5053,6 +5053,31 @@ function recebArm997SummaryTable(title,items,mode){
   return `<div style="overflow-x:auto"><table class="receb-arm-tbl"><thead><tr><th colspan="4">${title}</th></tr><tr><th>${mode==='day'?'Dia':mode==='month'?'Mes':'Ano'}</th><th>Linhas</th><th>SKUs</th><th>Quantidade</th></tr></thead><tbody>${items.length?items.map(i=>`<tr><td>${excelText(recebArm997KeyLabel(i.key,mode))}</td><td>${prodFmt(i.linhas,0)}</td><td>${prodFmt(i.skus.size,0)}</td><td>${prodFmt(i.qtd,0)}</td></tr>`).join(''):'<tr><td colspan="4">Sem dados da 997.</td></tr>'}</tbody></table></div>`;
 }
 
+function recebArm997CurrentSummaryRows(data){
+  const source=(Array.isArray(data&&data.qrpRows)&&data.qrpRows.length)?data.qrpRows:[];
+  const mapDay={},mapMonth={};
+  source.forEach(r=>{
+    const sku=String(r.codigo||'').trim();
+    if(!sku)return;
+    const date=recebArmIsoFromDate(r.entrada,curDate||today());
+    const month=date.slice(0,7);
+    const vol=recebArm997VolumeFromRow(r);
+    if(!mapDay[date])mapDay[date]={key:date,linhas:0,skus:new Set(),vol:0};
+    if(!mapMonth[month])mapMonth[month]={key:month,linhas:0,skus:new Set(),vol:0};
+    [mapDay[date],mapMonth[month]].forEach(item=>{
+      item.linhas++;
+      item.skus.add(sku);
+      item.vol+=vol;
+    });
+  });
+  const finish=arr=>arr.map(item=>({key:item.key,linhas:item.linhas,skus:item.skus.size,vol:item.vol})).sort((a,b)=>a.key.localeCompare(b.key));
+  return{days:finish(Object.values(mapDay)),months:finish(Object.values(mapMonth))};
+}
+
+function recebArm997DetailSummaryTable(title,items,mode){
+  return `<div style="overflow-x:auto"><table class="receb-arm-tbl"><thead><tr><th colspan="4">${title}</th></tr><tr><th>${mode==='month'?'Mês':'Dia'}</th><th>Itens</th><th>SKUs</th><th>Volumes</th></tr></thead><tbody>${items.length?items.map(i=>`<tr><td>${excelText(recebArm997KeyLabel(i.key,mode))}</td><td>${prodFmt(i.linhas,0)}</td><td>${prodFmt(i.skus,0)}</td><td style="font-weight:bold;color:#ffd700">${prodFmt(i.vol,0)}</td></tr>`).join(''):'<tr><td colspan="4">Sem dados da 997.</td></tr>'}</tbody></table></div>`;
+}
+
 function renderRecebArm997Report(){
   const el=document.getElementById('recebArm997Report');
   if(!el)return;
@@ -5063,6 +5088,7 @@ function renderRecebArm997Report(){
   const pending=last&&last.pending?last.pending:{today:{},previous:{},total:{}};
   const stored=last&&last.stored?last.stored:{today:{},previous:{},total:{}};
   const entered=last&&last.entered?last.entered:{today:{},previous:{},total:{}};
+  const detail=recebArm997CurrentSummaryRows(data);
   const histRows=imports.map(r=>{
     const hour=r.importedAt?new Date(r.importedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'-';
     const pending=r.pending||{};
@@ -5084,7 +5110,7 @@ function renderRecebArm997Report(){
     </tr>`;
   }).join('');
   el.innerHTML=`
-    <div class="receb-arm-head" style="border-top:1px solid #1a3550"><strong>Hora a hora da 997</strong><span>Cada arquivo anexado vira uma foto da hora; compara com a leitura anterior.</span></div>
+    <div class="receb-arm-head" style="border-top:1px solid #1a3550"><strong>Hora a hora da 997</strong></div>
     <div class="receb-arm-kpis" style="margin:8px 0">
       <div><span>Linhas da ultima 997</span><b>${prodFmt(last?+last.rows||0:0,0)}</b></div>
       <div><span>Entrou novo desde leitura anterior</span><b style="color:#1e90ff">${prodFmt(+(entered.total&&entered.total.vol)||0,0)}</b></div>
@@ -5096,6 +5122,10 @@ function renderRecebArm997Report(){
         <thead><tr><th colspan="12">Hora a hora da 997</th></tr><tr><th>Hora importada</th><th>Arquivo</th><th>Linhas</th><th>Entrou novo vol. entrada do dia</th><th>Entrou novo vol. dias anteriores</th><th>Entrou novo vol. total</th><th>Armazenado vol. entrada do dia</th><th>Armazenado vol. dias anteriores</th><th>Armazenado vol. total</th><th>Saldo 997 vol. entrada do dia</th><th>Saldo 997 vol. dias anteriores</th><th>Saldo 997 vol. total</th></tr></thead>
         <tbody>${histRows||'<tr><td colspan="12">Anexe a 997 a cada hora para montar o histórico.</td></tr>'}</tbody>
       </table>
+    </div>
+    <div class="receb-arm-grid" style="margin-top:10px">
+      ${recebArm997DetailSummaryTable('Detalhamento por dia - 997 pendente',detail.days,'day')}
+      ${recebArm997DetailSummaryTable('Detalhamento por mês - 997 pendente',detail.months,'month')}
     </div>`;
 }
 
