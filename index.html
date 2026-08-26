@@ -2010,6 +2010,11 @@ function shouldRejectOlderCloud(remoteDays,source){
   return false;
 }
 
+function shouldAutoSelectCloudDate(previousCurrent,previousLatest,remoteLatest){
+  if(!remoteLatest||remoteLatest<=previousLatest)return false;
+  return !previousCurrent||previousCurrent===previousLatest||!getDay(previousCurrent);
+}
+
 function remoteDaysHaveBetterData(remoteDays){
   if(!Array.isArray(remoteDays)||!remoteDays.length)return false;
   const localDays=Array.isArray(db.days)?db.days:[];
@@ -2608,12 +2613,16 @@ function applyRemoteData(remote){
   }
   if(!remote.days||!Array.isArray(remote.days))return changed;
   if(shouldRejectOlderCloud(remote.days,'remote-apply'))return changed;
+  const previousLatest=maxDayDate(db.days);
+  const previousCurrent=curDate;
+  const remoteLatest=maxDayDate(remote.days);
   const beforeHash=payloadDaysHash(db.days);
   const mergedDays=mergeDays(db.days,JSON.parse(JSON.stringify(remote.days)));
   const afterHash=payloadDaysHash(mergedDays);
   if(beforeHash===afterHash)return changed;
   db.days=mergedDays;
   db.days.sort((a,b)=>a.date.localeCompare(b.date));
+  if(shouldAutoSelectCloudDate(previousCurrent,previousLatest,remoteLatest))curDate=remoteLatest;
   saveLocalDb(db);
   changed=true;
   buildDayNav();
@@ -8013,6 +8022,9 @@ async function sbLoad(){
       }
     }
     if(remoteDays.length&&!shouldRejectOlderCloud(remoteDays,'supabase')){
+      const previousLatest=maxDayDate(db.days);
+      const previousCurrent=curDate;
+      const remoteLatest=maxDayDate(remoteDays);
       const beforeHash=payloadDaysHash(db.days);
       const mergedDays=mergeDays(db.days,remoteDays);
       const afterHash=payloadDaysHash(mergedDays);
@@ -8020,6 +8032,7 @@ async function sbLoad(){
         if(afterHash!==beforeHash){
           db.days=mergedDays;
           db.days.sort((a,b)=>a.date.localeCompare(b.date));
+          if(shouldAutoSelectCloudDate(previousCurrent,previousLatest,remoteLatest))curDate=remoteLatest;
           saveLocalDb(db);
           changed=true;
         }
