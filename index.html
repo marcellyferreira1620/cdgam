@@ -75,13 +75,24 @@ body.privacy-lock::after{content:attr(data-watermark);position:fixed;right:16px;
 .tab:hover{color:#aad4f0}
 .tab.act{background:#0e1621;color:#ffd700;font-weight:bold;border-color:#ffd700;border-bottom:2px solid #0e1621}
 .tab-body{display:none}.tab-body.act{display:block}
+body.area-home-view #kpiBar1,
+body.area-home-view #flowBar,
+body.area-home-view #prevEncPanel,
+body.area-home-view .day-nav{display:none!important}
+.area-hub{min-height:calc(100vh - 74px);background:#071525;padding:22px 0 40px;border-top:2px solid #eaf7ff}
+.area-panel{width:min(520px,calc(100% - 28px));margin:0 auto;background:#fff;border:2px solid #2c9827}
+.area-choice{width:100%;display:block;text-align:left;background:#fff;color:#111;border:0;border-bottom:4px solid #2c9827;padding:13px 16px;font-size:19px;line-height:1.15;font-weight:500;cursor:pointer;text-transform:uppercase}
+.area-choice:last-child{border-bottom:0}
+.area-choice:hover{background:#eefbea}
+.area-choice.disabled{cursor:default;opacity:.72}
+.area-choice.disabled:hover{background:#fff}
 body.recebarm-view #kpiBar1,
 body.recebarm-view #flowBar,
 body.recebarm-view #prevEncPanel{display:none!important}
 body.recebarm-view .day-nav button{display:none!important}
 body.recebarm-view .hdr{position:static}
 body.recebarm-view .tabs{padding-top:8px;background:#071525}
-body.recebarm-view .tabs .tab:not(#tabRecebArm){display:none!important}
+body.recebarm-view .tabs .tab:not(#tabAreas):not(#tabRecebArm):not(#tabProdDashDia):not(#tabProdDia){display:none!important}
 body.recebarm-view #tabRecebArm{font-size:13px;padding:10px 18px}
 body.recebarm-view .day-nav{justify-content:flex-start;padding:8px 14px}
 body.recebarm-view .receb-arm-page{padding:12px 14px}
@@ -766,7 +777,8 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 
 <!-- TABS -->
 <div class="tabs">
-  <div class="tab act" id="tabDash"    onclick="switchTab('dash')">📊 Dashboard</div>
+  <div class="tab act" id="tabAreas"   onclick="showAreaHub()">Áreas</div>
+  <div class="tab"     id="tabDash"    onclick="switchTab('dash')">📊 Dashboard</div>
   <div class="tab"     id="tabHist"    onclick="switchTab('hist')">📅 Histórico</div>
   <div class="tab"     id="tabComp"    onclick="switchTab('comp')">📈 Comparativo</div>
   <div class="tab"     id="tabRotas"   onclick="switchTab('rotas')">🚛 Rotas</div>
@@ -779,8 +791,24 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
   <div class="tab"     id="tabRecebArm" onclick="switchTab('recebarm')" style="display:none">Recebimento/Armazenagem</div>
 </div>
 
+<!-- TAB AREAS -->
+<div class="tab-body act" id="tb-areas">
+  <div class="area-hub">
+    <div class="area-panel">
+      <button type="button" class="area-choice" onclick="selectArea('noturno','dash')">PRODUÇÃO NOTURNA</button>
+      <button type="button" class="area-choice" onclick="selectArea('recebimento','recebarm')">RECEBIMENTO</button>
+      <button type="button" class="area-choice disabled" aria-disabled="true">ABASTECIMENTO</button>
+      <button type="button" class="area-choice disabled" aria-disabled="true">INVENTÁRIO</button>
+      <button type="button" class="area-choice disabled" aria-disabled="true">DEVOLUÇÃO</button>
+      <button type="button" class="area-choice disabled" aria-disabled="true">FLUXOGRAMAS</button>
+      <button type="button" class="area-choice disabled" aria-disabled="true">PRODUTIVIDADE INDIVIDUAL</button>
+      <button type="button" class="area-choice disabled" aria-disabled="true">BOLETIM INTERNO CD DIÁRIO</button>
+    </div>
+  </div>
+</div>
+
 <!-- TAB DASHBOARD -->
-<div class="tab-body act" id="tb-dash">
+<div class="tab-body" id="tb-dash">
   <div class="chart-grid" id="productionChartsGrid">
     <div class="chart-box" id="horaCombinedBox">
       <div class="chart-ttl">Produção hora a hora — Correia Med. / Perf. / Vol. Checkout</div>
@@ -3069,7 +3097,7 @@ function sumHoraInput(metric){
 }
 
 // ── AUTH (novo sistema — mantido para compatibilidade interna) ──
-function openAdmin(){if(adminOk)switchTab('adm');}
+function openAdmin(){if(adminOk){applyAreaTabs('noturno');switchTab('adm');}}
 
 // ── LIVE UPDATE ───────────────────────────────────────────
 function liveUpdate(){
@@ -3142,6 +3170,7 @@ function updateMediaHoraAuto(){
 
 // ── TABS ──────────────────────────────────────────────────
 function updateRecebArmViewMode(id){
+  document.body.classList.toggle('area-home-view',id==='areas');
   document.body.classList.toggle('recebarm-view',id==='recebarm');
   if(id==='recebarm'){
     const panel=document.getElementById('prevEncPanel');
@@ -3149,12 +3178,55 @@ function updateRecebArmViewMode(id){
   }
 }
 
+let currentAreaMode='home';
+const AREA_TAB_IDS={
+  noturno:['tabDash','tabHist','tabComp','tabRotas','tabPreench','tabAdm','tabProdDash','tabProdSetores'],
+  recebimento:['tabRecebArm','tabProdDashDia','tabProdDia']
+};
+const TAB_ID_BY_BODY={
+  areas:'tabAreas',
+  dash:'tabDash',
+  hist:'tabHist',
+  comp:'tabComp',
+  rotas:'tabRotas',
+  preench:'tabPreench',
+  adm:'tabAdm',
+  proddash:'tabProdDash',
+  prodsetores:'tabProdSetores',
+  proddashdia:'tabProdDashDia',
+  proddia:'tabProdDia',
+  recebarm:'tabRecebArm'
+};
+function captureRoleTabs(){
+  document.querySelectorAll('.tab').forEach(tab=>{
+    tab.dataset.roleAllowed=(tab.style.display==='none'&&tab.id!=='tabAreas')?'0':'1';
+  });
+}
+function applyAreaTabs(area){
+  currentAreaMode=area||'home';
+  const activeSet=new Set(area&&AREA_TAB_IDS[area]?AREA_TAB_IDS[area]:[]);
+  document.querySelectorAll('.tab').forEach(tab=>{
+    if(tab.id==='tabAreas'){
+      tab.style.display='';
+      return;
+    }
+    const allowed=tab.dataset.roleAllowed!=='0';
+    tab.style.display=(allowed&&activeSet.has(tab.id))?'':'none';
+  });
+}
+function showAreaHub(){
+  applyAreaTabs('home');
+  switchTab('areas');
+}
+function selectArea(area,initialTab){
+  if(!AREA_TAB_IDS[area])return;
+  applyAreaTabs(area);
+  switchTab(initialTab||(area==='recebimento'?'recebarm':'dash'));
+}
+
 function switchTab(id){
   updateRecebArmViewMode(id);
-  document.querySelectorAll('.tab').forEach((t,i)=>{
-    const ids=['dash','hist','comp','rotas','preench','adm','proddash','prodsetores','proddashdia','proddia','recebarm'];
-    t.classList.toggle('act',ids[i]===id);
-  });
+  document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('act',t.id===TAB_ID_BY_BODY[id]));
   document.querySelectorAll('.tab-body').forEach(t=>t.classList.remove('act'));
   const el=document.getElementById('tb-'+id);if(el)el.classList.add('act');
   if(id==='hist')renderHist();
@@ -8498,6 +8570,8 @@ function afterLogin(){
   enablePrivacyLock();
   updateUserBadge();
   applyRoleUI();
+  captureRoleTabs();
+  showAreaHub();
   const day=getDay(curDate)||emptyDay(curDate||today());
   loadFormFrom(day);
   startCloudSyncAfterLogin();
@@ -8539,7 +8613,6 @@ function applyRoleUI(){
     show('tabPreench');show('tabAdm');show('tabProdDash');show('tabProdSetores');show('tabProdDashDia');show('tabProdDia');show('tabRecebArm');
     hide('floatBtn');hide('tabHist');hide('tabComp');hide('tabRotas');
     document.querySelectorAll('.adm-restricted').forEach(e=>e.style.display='none');
-    setTimeout(()=>switchTab('preench'),80);
   }
 }
 
