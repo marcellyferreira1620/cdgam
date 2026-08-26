@@ -79,13 +79,16 @@ body.area-home-view #kpiBar1,
 body.area-home-view #flowBar,
 body.area-home-view #prevEncPanel,
 body.area-home-view .day-nav{display:none!important}
-.area-hub{min-height:calc(100vh - 74px);background:#071525;padding:22px 0 40px;border-top:2px solid #eaf7ff}
-.area-panel{width:min(520px,calc(100% - 28px));margin:0 auto;background:#fff;border:2px solid #2c9827}
-.area-choice{width:100%;display:block;text-align:left;background:#fff;color:#111;border:0;border-bottom:4px solid #2c9827;padding:13px 16px;font-size:19px;line-height:1.15;font-weight:500;cursor:pointer;text-transform:uppercase}
+.area-hub{min-height:calc(100vh - 74px);background:linear-gradient(180deg,#071525 0%,#0a1724 100%);padding:26px 0 44px;border-top:2px solid #eaf7ff}
+.area-panel{width:min(620px,calc(100% - 32px));margin:0 auto;background:#f8fbff;border:1px solid rgba(137,180,212,.45);box-shadow:0 18px 38px rgba(0,0,0,.28);overflow:hidden}
+.area-choice{width:100%;display:flex;align-items:center;justify-content:space-between;gap:16px;text-align:left;background:#f8fbff;color:#0a2340;border:0;border-bottom:1px solid #d8e8f5;padding:16px 22px;font-size:20px;line-height:1.15;font-weight:700;letter-spacing:0;cursor:pointer;text-transform:uppercase}
+.area-choice::after{content:'ABRIR';font-size:10px;font-weight:800;color:#fff;background:#1e88e5;border-radius:4px;padding:5px 9px;min-width:54px;text-align:center}
 .area-choice:last-child{border-bottom:0}
-.area-choice:hover{background:#eefbea}
-.area-choice.disabled{cursor:default;opacity:.72}
-.area-choice.disabled:hover{background:#fff}
+.area-choice:hover{background:#eef7ff;color:#08213a}
+.area-choice:focus-visible{outline:2px solid #ffd700;outline-offset:-4px}
+.area-choice.disabled{cursor:default;color:#607080;background:#f4f7fa;font-weight:600}
+.area-choice.disabled::after{content:'EM BREVE';background:#d9e3ec;color:#607080;min-width:68px}
+.area-choice.disabled:hover{background:#f4f7fa;color:#607080}
 body.recebarm-view #kpiBar1,
 body.recebarm-view #flowBar,
 body.recebarm-view #prevEncPanel{display:none!important}
