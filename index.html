@@ -1549,8 +1549,8 @@ const MEDIA_HORA_AUTO=[
 
 const SK='cdgam_v6';
 const SK_BACKUPS='cdgam_v6_backups';
-const LOCAL_CACHE_DAYS=21;
-const LOCAL_CACHE_FALLBACK_DAYS=7;
+const LOCAL_CACHE_DAYS=180;
+const LOCAL_CACHE_FALLBACK_DAYS=90;
 const LOCAL_BACKUP_DAYS=10;
 const PWD='gam2025';
 const NEW_RULES_FROM='2026-06-02';
@@ -1804,6 +1804,7 @@ let fbRestLoadRunning=false;
 let fbRestSaveRunning=false;
 let fbRestSaveQueued=false;
 let fbRestReplaceQueued=false;
+let pendingCloudSave=false;
 
 function load(){
   try{
@@ -2452,7 +2453,10 @@ async function saveToFirebaseRest(replaceDays=false){
       const ts=Date.now();
       lastSaveTs=ts;
       let remote={};
-      try{remote=await fbRestReadPayload()||{};}catch(e){remote={};}
+      try{remote=await fbRestReadPayload()||{};}catch(e){
+        if(!replaceDaysNow)throw e;
+        remote={};
+      }
       const daysToSave=replaceDaysNow
         ?[...db.days].sort((a,b)=>a.date.localeCompare(b.date))
         :mergeDays(remote.days,db.days);
@@ -2467,6 +2471,7 @@ async function saveToFirebaseRest(replaceDays=false){
       db.days=Array.isArray(confirmed.days)?confirmed.days:daysToSave;
       saveLocalDb(db);
       fbConnected=true;
+      pendingCloudSave=false;
       fbRestLastHash=cloudPayloadHash(confirmed);
       showSyncStatus('Nuvem ativa',false);
       const lb=document.getElementById('liveBadge');if(lb)lb.style.display='inline';
@@ -2501,6 +2506,9 @@ async function syncFromFirebaseRest(showOk){
     if(!isSaving){
       updated=!!applyRemoteData(remote);
       fbRestLastHash=remoteHash;
+    }
+    if(pendingCloudSave&&db.days&&db.days.length&&!fbRestSaveRunning){
+      setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),50);
     }
     if(showOk)showSyncStatus(updated?'Sincronizado':'Nuvem ativa',false);
     return updated;
@@ -2634,6 +2642,7 @@ function save(replaceDays=false){
     db.days=mergeDays(stored.days,db.days);
   }
   saveLocalDb(db);
+  pendingCloudSave=true;
   // Supabase tem prioridade
   if(typeof sbUrl!=='undefined'&&sbUrl&&sbKey&&sbConnected){
     sbSave(replaceDays);
@@ -7265,6 +7274,7 @@ function readHoraData(){
     if(isRouteMetric(m)){
       const route=routeFromMetric(m);
       const totals=byMetric[routeTotalMetricKey(route)]||new Array(HOURS.length).fill('');
+      hd[routeTotalMetricKey(route)]=totals;
       hd[m]=routePendingToDone(vals,totals,routeInitialTotal(getDay(dt),m));
     } else if(isDeltaMetric(m,dt)){
       hd[m]=acumToDeltas(vals);
@@ -7963,6 +7973,7 @@ async function sbSave(replaceDays=false){
           saveLocalDb(db);
           lastSyncHash=simpleHash(JSON.stringify({days:db.days,users:(confirmed.users||payload.users||{})}));
           sbConnected=true;
+          pendingCloudSave=false;
           showSyncStatus('☁ Salvo na nuvem ✓',false);
           setTimeout(()=>{if(sbConnected)showSyncStatus('☁ Nuvem ativa ✓',false);},2000);
         } else {
@@ -8016,6 +8027,9 @@ async function sbLoad(){
     }
     if(remoteTs>sbLastTs)sbLastTs=remoteTs;
     if(changed||remoteHash!==lastSyncHash)lastSyncHash=remoteHash;
+    if(pendingCloudSave&&db.days&&db.days.length&&!sbSaveRunning){
+      setTimeout(()=>sbSave(false).catch(()=>{}),50);
+    }
     return changed;
   }catch(e){
     startFirebaseFallback(e.message,true);
@@ -8619,6 +8633,7 @@ function startCloudSyncAfterLogin(){
   if(cloudSyncStarted)return;
   cloudSyncStarted=true;
   startFirebaseRestPolling(false);
+  [800,2500,6000].forEach(ms=>setTimeout(()=>syncFromFirebaseRest(true).catch(()=>{}),ms));
   setTimeout(async()=>{
     await sbConnect();
     if(!sbConnected)setTimeout(initFirebase,500);
