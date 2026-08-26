@@ -21,6 +21,8 @@ body.privacy-lock::after{content:attr(data-watermark);position:fixed;right:16px;
 @media print{body>*{display:none!important}body::before{content:"Documento interno - impressao bloqueada";display:block;color:#000;font:700 18px Arial;margin:40px}}
 .hdr{background:#0a2340;padding:5px 10px;display:flex;align-items:center;gap:8px;border-bottom:3px solid #e94560;position:sticky;top:0;z-index:100}
 .hdr-logo{background:#e94560;color:#fff;padding:4px 10px;border-radius:4px;font-weight:900;font-size:13px;letter-spacing:1px;white-space:nowrap}
+.area-switch-btn{display:none;background:#122033;color:#89d4ff;border:1px solid #1e4a72;border-radius:4px;padding:4px 10px;font-size:11px;font-weight:bold;cursor:pointer;white-space:nowrap}
+.area-switch-btn:hover{background:#17314d;color:#fff;border-color:#6a9fc0}
 .hdr-title{flex:1;text-align:center;font-size:15px;font-weight:bold;color:#ffd700;letter-spacing:.8px}
 .hdr-date{font-size:11px;color:#aaa;min-width:80px;text-align:right}
 /* KPI BARS */
@@ -690,7 +692,8 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 <!-- HEADER -->
 <div class="hdr">
   <div class="hdr-logo">GAM</div>
-  <div class="hdr-title">ACOMPANHAMENTO DE PRODUTIVIDADE — CD GAM (GENESIO A. MENDES)</div>
+  <button type="button" class="area-switch-btn" id="areaSwitchBtn" onclick="showAreaHub()">Trocar de área</button>
+  <div class="hdr-title">ACOMPANHAMENTO DE PRODUTIVIDADE - CD GAM (GENESIO A. MENDES)</div>
   <span class="live-badge" id="liveBadge" style="display:none">⬤ AO VIVO</span>
   <span id="syncStatus" style="font-size:10px;color:#89b4d4;padding:2px 8px;background:#122033;border-radius:3px;">☁ Conectando...</span>
   <span id="userBadge" class="user-badge" onclick="doLogout()" title="Clique para sair" style="display:none">—</span>
@@ -3181,6 +3184,7 @@ function updateRecebArmViewMode(id){
   }
 }
 
+const AREA_STATE_KEY='gam_area_state_v1';
 let currentAreaMode='home';
 const AREA_TAB_IDS={
   noturno:['tabDash','tabHist','tabComp','tabRotas','tabPreench','tabAdm','tabProdDash','tabProdSetores'],
@@ -3217,6 +3221,25 @@ function applyAreaTabs(area){
     tab.style.display=(allowed&&activeSet.has(tab.id))?'':'none';
   });
 }
+function saveAreaState(tabId){
+  try{localStorage.setItem(AREA_STATE_KEY,JSON.stringify({area:currentAreaMode||'home',tab:tabId||'areas'}));}catch(_){}
+}
+function canOpenStoredTab(tabId){
+  const tab=document.getElementById(TAB_ID_BY_BODY[tabId]||'');
+  return !!(tab&&tab.style.display!=='none');
+}
+function restoreAreaState(){
+  let saved=null;
+  try{saved=JSON.parse(localStorage.getItem(AREA_STATE_KEY)||'null');}catch(_){saved=null;}
+  const area=saved&&AREA_TAB_IDS[saved.area]?saved.area:'home';
+  if(area==='home'){
+    showAreaHub();
+    return;
+  }
+  applyAreaTabs(area);
+  const fallback=area==='recebimento'?'recebarm':'dash';
+  switchTab(canOpenStoredTab(saved&&saved.tab)?saved.tab:fallback);
+}
 function showAreaHub(){
   applyAreaTabs('home');
   switchTab('areas');
@@ -3232,6 +3255,7 @@ function switchTab(id){
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('act',t.id===TAB_ID_BY_BODY[id]));
   document.querySelectorAll('.tab-body').forEach(t=>t.classList.remove('act'));
   const el=document.getElementById('tb-'+id);if(el)el.classList.add('act');
+  saveAreaState(id);
   if(id==='hist')renderHist();
   if(id==='comp')renderComp();
   if(id==='rotas')renderRotasTab();
@@ -8579,7 +8603,9 @@ function afterLogin(){
   updateUserBadge();
   applyRoleUI();
   captureRoleTabs();
-  showAreaHub();
+  const areaBtn=document.getElementById('areaSwitchBtn');
+  if(areaBtn)areaBtn.style.display='';
+  restoreAreaState();
   const day=getDay(curDate)||emptyDay(curDate||today());
   loadFormFrom(day);
   startCloudSyncAfterLogin();
