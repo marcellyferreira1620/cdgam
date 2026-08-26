@@ -3276,7 +3276,7 @@ function selectDay(dt){
   if(!dt)return;
   curDate=dt;buildDayNav();
   const day=getDay(dt);
-  if(day){renderKPIs(day);renderFlowBar(day);renderDashCharts(day);renderDashTables(day);renderRotasTbl(day,'rotasTblFull');updateRotasKPIs(day);refreshOpenPrevisaoEncerramento(day);renderProdSetoresDash(day);renderProdDiurnoDash(day);}
+  if(day){renderKPIs(day);renderFlowBar(day);renderDashCharts(day);renderDashTables(day);renderRotasTblFull(day);refreshOpenPrevisaoEncerramento(day);renderProdSetoresDash(day);renderProdDiurnoDash(day);}
   const tab=activeTab();
   if(tab==='prodsetores')renderProdSetores();
   if(tab==='proddash'){renderProdSetoresChart();renderProdSetoresDash(day||emptyDay(dt));}
@@ -7810,11 +7810,16 @@ function renderRotasTbl(day,tblId){
   el.innerHTML=html;
 }
 
+function updateRotasDateLabel(dayOrDate){
+  const lbl=document.getElementById('rotasDateLbl');
+  const dt=typeof dayOrDate==='string'?dayOrDate:(dayOrDate&&dayOrDate.date)||curDate||today();
+  if(lbl&&dt)lbl.textContent=fmtDate(dt);
+}
+
 function renderRotasTblFull(day){
   renderRotasTbl(day,'rotasTblFull');
   if(day)updateRotasKPIs(day);
-  const lbl=document.getElementById('rotasDateLbl');
-  if(lbl&&day)lbl.textContent=fmtDate(day.date);
+  updateRotasDateLabel(day);
 }
 
 function updateRotasKPIs(day){
