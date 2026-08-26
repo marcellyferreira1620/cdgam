@@ -8606,20 +8606,21 @@ async function doLogin(){
   if(await hashPwd(p)!==usr.passwordHash){err.textContent='❌ Senha incorreta.';err.style.color='#ff4c4c';return;}
   setSession({username:u,role:usr.role,displayName:usr.displayName||u});
   document.getElementById('loginOv').style.display='none';
-  afterLogin();
+  afterLogin({restoreArea:false});
 }
 function doLogout(){
   if(!confirm('Sair do sistema?'))return;
   clearSession();location.reload();
 }
-function afterLogin(){
+function afterLogin(opts={}){
   enablePrivacyLock();
   updateUserBadge();
   applyRoleUI();
   captureRoleTabs();
   const areaBtn=document.getElementById('areaSwitchBtn');
   if(areaBtn)areaBtn.style.display='';
-  restoreAreaState();
+  if(opts.restoreArea)restoreAreaState();
+  else showAreaHub();
   const day=getDay(curDate)||emptyDay(curDate||today());
   loadFormFrom(day);
   startCloudSyncAfterLogin();
@@ -8841,7 +8842,9 @@ function init(){
   // 5. Verificar sessão ativa
   if(checkSession()){
     document.getElementById('loginOv').style.display='none';
-    afterLogin();
+    const navEntry=performance.getEntriesByType&&performance.getEntriesByType('navigation')[0];
+    const isReload=navEntry?navEntry.type==='reload':performance.navigation&&performance.navigation.type===1;
+    afterLogin({restoreArea:isReload});
   }
   // loginOv já está visível por CSS (display:flex) quando não há sessão
   startRouteLiveDelayClock();
