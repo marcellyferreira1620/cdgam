@@ -4552,7 +4552,24 @@ function recebArm997SummaryFromItems(items){
       skuSets[k].add(item.sku);
     });
   });
-  Object.keys(base).forEach(k=>{base[k].skus=skuSets[k].size;});
+  Object.keys(base).forEach(k=>{base[k].skus=base[k].linhas;});
+  return base;
+}
+
+function recebArm997SummaryFromRows(rows,dayDate){
+  const base={today:{...recebArm997BlankBucket()},previous:{...recebArm997BlankBucket()},total:{...recebArm997BlankBucket()}};
+  (Array.isArray(rows)?rows:[]).forEach(r=>{
+    const sku=String(r.codigo||'').trim();
+    if(!sku)return;
+    const date=recebArmIsoFromDate(r.entrada,dayDate);
+    const cat=recebArm997ItemCategory(date,dayDate);
+    [cat,'total'].forEach(k=>{
+      base[k].linhas++;
+      base[k].skus++;
+      base[k].qtd+=+r.qtdArmazenada||0;
+      base[k].vol+=recebArm997VolumeFromRow(r);
+    });
+  });
   return base;
 }
 
@@ -4574,7 +4591,7 @@ function recebArm997StoredSincePrevious(prevItems,currentItems){
       skuSets[k].add(prev.sku);
     });
   });
-  Object.keys(stored).forEach(k=>{stored[k].skus=skuSets[k].size;});
+  Object.keys(stored).forEach(k=>{stored[k].skus=stored[k].linhas;});
   return stored;
 }
 
@@ -4597,12 +4614,13 @@ function recebArm997EnteredSincePrevious(prevItems,currentItems){
       skuSets[k].add(cur.sku);
     });
   });
-  Object.keys(entered).forEach(k=>{entered[k].skus=skuSets[k].size;});
+  Object.keys(entered).forEach(k=>{entered[k].skus=entered[k].linhas;});
   return entered;
 }
 
 function recebArm997BuildImportRecord(rows,dayDate,fileName,endereco,prevItems){
   const items=recebArm997SnapshotItems(rows,dayDate);
+  const pending=recebArm997SummaryFromRows(rows,dayDate);
   return{
     id:recebArmId('qrpimp'),
     version:'997-hora-v2',
@@ -4611,8 +4629,8 @@ function recebArm997BuildImportRecord(rows,dayDate,fileName,endereco,prevItems){
     endereco:endereco||'997',
     dayDate,
     rows:(Array.isArray(rows)?rows.length:0),
-    pending:recebArm997SummaryFromItems(items),
-    entered:recebArm997EnteredSincePrevious(prevItems,items),
+    pending,
+    entered:(!Array.isArray(prevItems)||!prevItems.length)?pending:recebArm997EnteredSincePrevious(prevItems,items),
     stored:recebArm997StoredSincePrevious(prevItems,items),
     _updatedAt:Date.now(),
     items
@@ -5117,7 +5135,7 @@ function recebArm997CurrentSummaryRows(data){
       item.vol+=vol;
     });
   });
-  const finish=arr=>arr.map(item=>({key:item.key,linhas:item.linhas,skus:item.skus.size,vol:item.vol})).sort((a,b)=>a.key.localeCompare(b.key));
+  const finish=arr=>arr.map(item=>({key:item.key,linhas:item.linhas,skus:item.linhas,vol:item.vol})).sort((a,b)=>a.key.localeCompare(b.key));
   return{days:finish(Object.values(mapDay)),months:finish(Object.values(mapMonth))};
 }
 
