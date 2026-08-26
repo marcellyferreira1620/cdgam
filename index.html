@@ -4377,8 +4377,17 @@ function parseRecebArmQrpText(text,endereco){
     const beforeDate=chunk.slice(codeRel+1,dateRel);
     const nome=beforeDate[0]||'';
     const apresentacao=beforeDate[1]||'';
+    const parseQrpQty=t=>{
+      const raw=String(t||'').trim();
+      const m=raw.match(/^\d+(?:[.,]\d+)?/);
+      if(!m)return{raw,q:0};
+      const v=m[0];
+      if(v.includes('.')&&v.split('.').pop().length>=3)return{raw,q:+v.replace(/\./g,'')||0};
+      if(/^\d{1,3}(\.\d{3})+$/.test(v))return{raw,q:+v.replace(/\./g,'')||0};
+      return{raw,q:+v.replace(',','.')||0};
+    };
     const qtyCandidates=beforeDate
-      .map((t,idx)=>({t,idx,q:parseQty(t)}))
+      .map((t,idx)=>({t,idx,...parseQrpQty(t)}))
       .filter(x=>isNumeric(x.t)&&!(/^\d{8}$/.test(x.t)&&isDate(chunk[dateRel]||'')));
     const qtdLocal=qtyCandidates.length>=2?qtyCandidates[qtyCandidates.length-2]:qtyCandidates[qtyCandidates.length-1];
     const qtEmb=qtyCandidates.length>=2?qtyCandidates[qtyCandidates.length-1]:null;
@@ -4394,6 +4403,8 @@ function parseRecebArmQrpText(text,endereco){
       lote:loteText,
       qtdArmazenada:qtdLocal?qtdLocal.q:0,
       qtEmb:qtEmb?qtEmb.q:0,
+      qtdArmazenadaRaw:qtdLocal?qtdLocal.raw:'',
+      qtEmbRaw:qtEmb?qtEmb.raw:'',
       validade:chunk[dateRel]||'',
       entrada:isDate(chunk[dateRel+1]||'')?chunk[dateRel+1]:'',
       tipo:isNumeric(chunk[dateRel+2])?chunk[dateRel+2]:'',
@@ -4430,15 +4441,17 @@ function parseRecebArmExcel997(workbook,endereco){
 }
 
 function parseRecebArmExcel997(workbook,endereco){
-  const rows=recebArmSheetRows(workbook);
-  const headerIndex=recebArmFindHeader(rows,['codigo']);
-  if(headerIndex<0)return [];
-  const headers=rows[headerIndex];
-  return rows.slice(headerIndex+1).map((row,i)=>{
+  const parsed=[];
+  const sheetNames=(workbook&&Array.isArray(workbook.SheetNames)?workbook.SheetNames:[]).filter(name=>recebArmKey(name)!=='estoque');
+  const readRows=(rows,sheetName)=>{
+    const headerIndex=recebArmFindHeader(rows,['codigo']);
+    if(headerIndex<0)return;
+    const headers=rows[headerIndex];
+    rows.slice(headerIndex+1).forEach((row,i)=>{
     const codigo=recebArmCell(row,headers,['codigo','código','cod']);
-    if(!String(codigo||'').trim())return null;
+    if(!String(codigo||'').trim())return;
     const nome=String(recebArmCell(row,headers,['nome do produto','nome','produto'])||'').trim();
-    return{
+    parsed.push({
       id:recebArmId('qrp'),
       endereco:endereco||recebArmCell(row,headers,['local','endereco','endereço'])||'997',
       codigo:String(codigo).trim(),
@@ -4451,17 +4464,51 @@ function parseRecebArmExcel997(workbook,endereco){
       fornecedor:String(recebArmCell(row,headers,['nome fornec','nome.fornec','fornecedor','fornec'])||'').trim(),
       validade:String(recebArmCell(row,headers,['validade'])||'').trim(),
       entrada:String(recebArmCell(row,headers,['data de entrada','entrada'])||'').trim(),
+      origemPlanilha:sheetName||'',
       _updatedAt:Date.now()+i
-    };
-  }).filter(Boolean);
+    });
+  });
+  };
+  sheetNames.forEach(name=>{
+    const ws=workbook.Sheets[name];
+    if(!ws)return;
+    readRows(XLSX.utils.sheet_to_json(ws,{header:1,defval:''}),name);
+  });
+  return parsed;
 }
 
 function recebArm997VolumeFromRow(r){
   if(r.qtdVolume!==undefined&&r.qtdVolume!==null&&r.qtdVolume!=='')return +r.qtdVolume||0;
-  const qtLocal=+r.qtdArmazenada||0;
-  const qtEmb=+r.qtEmb||0;
+  let qtLocal=+r.qtdArmazenada||0;
+  let qtEmb=+r.qtEmb||0;
   if(qtLocal<=0)return 0;
+  const rawLocal=String(r.qtdArmazenadaRaw||'').trim();
+  const localNum=(rawLocal.match(/^\d+(?:[.,]\d+)?/)||[''])[0];
+  const localDigits=localNum.replace(/\D/g,'');
+  if(localNum.includes('.')&&localNum.split('.').pop().length>3&&localDigits.length>1){
+    qtLocal=+localDigits.slice(0,-1)||qtLocal;
+  }else if(!localNum.includes('.')&&localDigits.length>=4&&qtEmb>0){
+    const dropped=+localDigits.slice(0,-1);
+    const direct=Math.floor(qtLocal/qtEmb);
+    const droppedVol=Math.floor(dropped/qtEmb);
+    if(dropped>0&&droppedVol>0&&direct>=Math.max(30,droppedVol*8))qtLocal=dropped;
+  }
   if(qtEmb<=0)return Math.floor(qtLocal);
+  const rawEmb=String(r.qtEmbRaw||'').trim();
+  const embDigits=(rawEmb.match(/^\d+(?:[.,]\d+)?/)||[''])[0].replace(/\D/g,'');
+  if(embDigits.length>1&&qtEmb<100&&qtEmb%10===0&&qtLocal>=qtEmb&&qtLocal%qtEmb!==0){
+    const droppedEmb=qtEmb/10;
+    if(droppedEmb>0&&qtLocal%droppedEmb===0)qtEmb=droppedEmb;
+  }
+  if(qtLocal<qtEmb){
+    if(qtEmb%10===0&&qtEmb/10<=10&&qtLocal%(qtEmb/10)===0){
+      const droppedVol=Math.floor(qtLocal/(qtEmb/10));
+      if(droppedVol<=3)return droppedVol;
+    }
+    if(qtEmb<=12)return Math.floor(qtLocal);
+    if(qtEmb>=1000&&qtLocal>=100)return 1;
+    return 0;
+  }
   return Math.floor(qtLocal/qtEmb);
 }
 
