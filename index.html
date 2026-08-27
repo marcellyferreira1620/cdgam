@@ -2066,6 +2066,15 @@ function dayFieldHasValue(value){
   return false;
 }
 
+function mergeNumericNoLoss(a,b,fallback){
+  const hasA=dayFieldHasValue(a);
+  const hasB=dayFieldHasValue(b);
+  if(hasA&&hasB&&Number.isFinite(+a)&&Number.isFinite(+b))return Math.max(+a,+b);
+  if(hasB)return b;
+  if(hasA)return a;
+  return fallback;
+}
+
 function mergeHourData(current,next,chosen){
   const out=JSON.parse(JSON.stringify((chosen&&chosen.hd)||{}));
   const keys=new Set([
@@ -2082,6 +2091,7 @@ function mergeHourData(current,next,chosen){
       const av=a[i],bv=b[i],cv=c[i];
       const hasA=dayFieldHasValue(av);
       const hasB=dayFieldHasValue(bv);
+      if(hasA&&hasB&&Number.isFinite(+av)&&Number.isFinite(+bv))return Math.max(+av,+bv);
       if(hasA&&hasB)return cv!==undefined?cv:bv;
       if(hasB)return bv;
       if(hasA)return av;
@@ -2102,7 +2112,8 @@ function mergeDayRootFields(current,next,chosen){
     const cv=chosen&&chosen[key];
     const hasA=dayFieldHasValue(av);
     const hasB=dayFieldHasValue(bv);
-    if(hasA&&hasB)out[key]=cv!==undefined?cv:bv;
+    if(hasA&&hasB&&typeof av==='number'&&typeof bv==='number')out[key]=mergeNumericNoLoss(av,bv,cv);
+    else if(hasA&&hasB)out[key]=cv!==undefined?cv:bv;
     else if(hasB)out[key]=bv;
     else if(hasA)out[key]=av;
     else if(cv!==undefined)out[key]=cv;
@@ -2462,9 +2473,7 @@ async function saveToFirebaseRest(replaceDays=false){
         if(!replaceDaysNow)throw e;
         remote={};
       }
-      const daysToSave=replaceDaysNow
-        ?[...db.days].sort((a,b)=>a.date.localeCompare(b.date))
-        :mergeDays(remote.days,db.days);
+      const daysToSave=mergeDays(remote.days,db.days);
       const payload={
         ...remote,
         days:daysToSave,
@@ -2472,7 +2481,7 @@ async function saveToFirebaseRest(replaceDays=false){
         savedAt:ts
       };
       await fbRestWritePayload(payload);
-      const confirmed=replaceDaysNow?payload:await confirmFirebaseRestSave(payload);
+      const confirmed=await confirmFirebaseRestSave(payload);
       db.days=Array.isArray(confirmed.days)?confirmed.days:daysToSave;
       saveLocalDb(db);
       fbConnected=true;
@@ -2547,18 +2556,15 @@ async function saveToFirebase(replaceDays=false){
   isSaving=true;
   const ts=Date.now();
   lastSaveTs=ts;
-  let daysToSave=[...db.days].sort((a,b)=>a.date.localeCompare(b.date));
-  if(!replaceDays){
-    const snap=await fbDb.ref(FB_PATH).once('value').catch(()=>null);
-    const remote=decodeFirebasePayload(snap?snap.val():null);
-    daysToSave=mergeDays(remote&&remote.days,db.days);
-    db.days=daysToSave;
-    saveLocalDb(db);
-  }
+  const snap=await fbDb.ref(FB_PATH).once('value').catch(()=>null);
+  const remote=decodeFirebasePayload(snap?snap.val():null);
+  let daysToSave=mergeDays(remote&&remote.days,db.days);
+  db.days=daysToSave;
+  saveLocalDb(db);
   const payload={days:daysToSave,users:getLocalUsersCache(),savedAt:ts};
   return fbDb.ref(FB_PATH).set(encodeFirebasePayload(payload))
     .then(async()=>{
-      const confirmed=replaceDays?payload:await confirmFirebaseRestSave(payload).catch(()=>payload);
+      const confirmed=await confirmFirebaseRestSave(payload).catch(()=>payload);
       db.days=Array.isArray(confirmed.days)?confirmed.days:daysToSave;
       saveLocalDb(db);
       fbConnected=true;
@@ -2647,7 +2653,8 @@ function applyRemoteData(remote){
 function save(replaceDays=false){
   const stored=storedDbSnapshot();
   saveLocalBackup(stored,replaceDays?'before-replace':'before-save');
-  if(!replaceDays&&stored&&Array.isArray(stored.days)){
+  restoreBestLocalBackupIfNeeded(replaceDays?'save-replace':'save');
+  if(stored&&Array.isArray(stored.days)){
     db.days=mergeDays(stored.days,db.days);
   }
   saveLocalDb(db);
@@ -4594,7 +4601,125 @@ function parseRecebArmExcel997(workbook,endereco){
   return parsed;
 }
 
+function recebArm997ParseQty(value){
+  const digits=String(value||'').replace(/\D/g,'');
+  return digits?+digits||0:0;
+}
+
+function recebArm997CleanText(value){
+  return String(value||'').replace(/[\x00-\x1f]+/g,' ').trim();
+}
+
+function recebArm997ReadU32(view,offset){
+  return offset+4<=view.byteLength?view.getUint32(offset,true):0;
+}
+
+function recebArm997ReadI32(view,offset){
+  return offset+4<=view.byteLength?view.getInt32(offset,true):0;
+}
+
+function recebArm997DecodeUtf16(bytes){
+  try{return recebArm997CleanText(new TextDecoder('utf-16le').decode(bytes));}
+  catch(_){
+    let out='';
+    for(let i=0;i+1<bytes.length;i+=2)out+=String.fromCharCode(bytes[i]|(bytes[i+1]<<8));
+    return recebArm997CleanText(out);
+  }
+}
+
+function recebArm997FindEmfPages(bytes,view){
+  const pages=[];
+  for(let i=0;i<bytes.length-120;i+=4){
+    if(recebArm997ReadU32(view,i)!==1)continue;
+    if(bytes[i+40]!==32||bytes[i+41]!==69||bytes[i+42]!==77||bytes[i+43]!==70)continue;
+    const recordSize=recebArm997ReadU32(view,i+4);
+    const pageBytes=recebArm997ReadU32(view,i+48);
+    if(recordSize===108&&pageBytes>1000&&pageBytes<1000000&&i+pageBytes<=bytes.length){
+      pages.push({start:i,bytes:pageBytes});
+    }
+  }
+  return pages;
+}
+
+function recebArm997NearestText(items,minX,maxX){
+  const found=items.find(item=>item.x>=minX&&item.x<=maxX);
+  return found?found.text:'';
+}
+
+function parseRecebArmQrpBuffer(buffer,endereco){
+  const bytes=new Uint8Array(buffer);
+  const view=new DataView(buffer);
+  const pages=recebArm997FindEmfPages(bytes,view);
+  const rows=[];
+  pages.forEach((page,pageIdx)=>{
+    const groups={};
+    let pos=page.start;
+    const end=page.start+page.bytes;
+    while(pos+8<=end){
+      const type=recebArm997ReadU32(view,pos);
+      const size=recebArm997ReadU32(view,pos+4);
+      if(size<8||pos+size>end)break;
+      if(type===84&&size>=76){
+        const x=recebArm997ReadI32(view,pos+36);
+        const y=recebArm997ReadI32(view,pos+40);
+        const chars=recebArm997ReadU32(view,pos+44);
+        const offset=recebArm997ReadU32(view,pos+48);
+        if(chars>0&&chars<240&&offset>0&&offset+chars*2<=size){
+          const text=recebArm997DecodeUtf16(bytes.slice(pos+offset,pos+offset+chars*2));
+          if(text&&/[0-9A-Za-zÀ-ÿ]/.test(text)){
+            if(!groups[y])groups[y]=[];
+            groups[y].push({x,text});
+          }
+        }
+      }
+      pos+=size;
+    }
+    Object.values(groups).forEach(items=>{
+      items.sort((a,b)=>a.x-b.x);
+      if(!items.some(item=>item.text==='09 09 999 07'))return;
+      const qtEmb=recebArm997ParseQty(recebArm997NearestText(items,595,635));
+      const qtdLocal=recebArm997ParseQty(recebArm997NearestText(items,745,790));
+      const volCalc=qtEmb>0?qtdLocal/qtEmb:0;
+      const codigo=recebArm997NearestText(items,120,155);
+      if(!codigo)return;
+      rows.push({
+        id:recebArmId('qrp'),
+        endereco:endereco||'997',
+        pagina:pageIdx+1,
+        local:recebArm997NearestText(items,10,90),
+        codigo,
+        nome:recebArm997NearestText(items,185,315),
+        descricao:[recebArm997NearestText(items,185,315),recebArm997NearestText(items,320,475)].filter(Boolean).join(' - '),
+        apresentacao:recebArm997NearestText(items,320,475),
+        lote:recebArm997NearestText(items,475,560),
+        qtEmb,
+        prob:recebArm997ParseQty(recebArm997NearestText(items,650,690)),
+        venc:recebArm997ParseQty(recebArm997NearestText(items,695,730)),
+        qtdArmazenada:qtdLocal,
+        qtdVolume:Math.round(volCalc),
+        volumeCalc:volCalc,
+        validade:recebArm997NearestText(items,825,865),
+        entrada:recebArm997NearestText(items,875,920),
+        tipo:recebArm997NearestText(items,965,995),
+        caixaLab:recebArm997NearestText(items,995,1070),
+        _updatedAt:Date.now()+rows.length
+      });
+    });
+  });
+  return rows.sort((a,b)=>(a.pagina||0)-(b.pagina||0)||(a._updatedAt||0)-(b._updatedAt||0));
+}
+
+function recebArm997VolumeCalcFromRow(r){
+  if(r&&r.volumeCalc!==undefined&&r.volumeCalc!==null&&r.volumeCalc!=='')return +r.volumeCalc||0;
+  const qtLocal=+((r&&r.qtdArmazenada)||0);
+  const qtEmb=+((r&&r.qtEmb)||0);
+  if(qtEmb>0)return qtLocal/qtEmb;
+  if(r&&r.qtdVolume!==undefined&&r.qtdVolume!==null&&r.qtdVolume!=='')return +r.qtdVolume||0;
+  return qtLocal||0;
+}
+
 function recebArm997VolumeFromRow(r){
+  if(r&&r.volumeCalc!==undefined&&r.volumeCalc!==null&&r.volumeCalc!=='')return Math.round(+r.volumeCalc||0);
   if(r.qtdVolume!==undefined&&r.qtdVolume!==null&&r.qtdVolume!=='')return +r.qtdVolume||0;
   let qtLocal=+r.qtdArmazenada||0;
   let qtEmb=+r.qtEmb||0;
@@ -4643,14 +4768,69 @@ function recebArm997SnapshotItems(rows,dayDate){
     if(!byKey[key]){
       byKey[key]={
         key,date,sku,
-        qtd:0,vol:0,
+        descricao:r.descricao||r.nome||'',
+        lote:r.lote||'',
+        validade:r.validade||'',
+        linhas:0,qtd:0,vol:0,
         category:recebArm997ItemCategory(date,dayDate)
       };
     }
+    byKey[key].linhas++;
     byKey[key].qtd+=+r.qtdArmazenada||0;
     byKey[key].vol+=recebArm997VolumeFromRow(r);
   });
   return Object.values(byKey);
+}
+
+function recebArm997PartialStoredItems(prevItems,currentItems,dayDate){
+  const currentByKey={};
+  (Array.isArray(currentItems)?currentItems:[]).forEach(item=>{currentByKey[item.key]=item;});
+  return (Array.isArray(prevItems)?prevItems:[]).map(prev=>{
+    const cur=currentByKey[prev.key];
+    if(!cur)return null;
+    if(prev.category!=='today'||prev.date!==dayDate)return null;
+    const qtdAntes=+prev.qtd||0;
+    const qtdAtual=+cur.qtd||0;
+    const volAntes=+prev.vol||0;
+    const volAtual=+cur.vol||0;
+    if(qtdAntes<=0||qtdAtual<=0||qtdAtual>=qtdAntes)return null;
+    return{
+      sku:prev.sku||cur.sku||'',
+      descricao:cur.descricao||prev.descricao||'',
+      entrada:prev.date||cur.date||dayDate,
+      lote:cur.lote||prev.lote||'',
+      validade:cur.validade||prev.validade||'',
+      qtdAntes,
+      qtdAtual,
+      qtdSaida:qtdAntes-qtdAtual,
+      volAntes,
+      volAtual,
+      volSaida:Math.max(volAntes-volAtual,0)
+    };
+  }).filter(Boolean);
+}
+
+function recebArm997MergeDayReceivedItems(existingItems,currentItems,dayDate){
+  const map={};
+  (Array.isArray(existingItems)?existingItems:[]).forEach(item=>{
+    if(!item||!item.key)return;
+    map[item.key]={...item};
+  });
+  (Array.isArray(currentItems)?currentItems:[]).forEach(item=>{
+    if(!item||!item.key||item.date!==dayDate)return;
+    const current={...item,category:'today'};
+    const saved=map[item.key];
+    if(!saved){
+      map[item.key]=current;
+      return;
+    }
+    const savedQty=+saved.qtd||0;
+    const currentQty=+current.qtd||0;
+    if(currentQty>savedQty){
+      map[item.key]={...saved,...current,qtd:currentQty,vol:Math.max(+saved.vol||0,+current.vol||0)};
+    }
+  });
+  return Object.values(map).filter(item=>item&&item.date===dayDate);
 }
 
 function recebArm997BlankBucket(){
@@ -4675,6 +4855,7 @@ function recebArm997SummaryFromItems(items){
 
 function recebArm997SummaryFromRows(rows,dayDate){
   const base={today:{...recebArm997BlankBucket()},previous:{...recebArm997BlankBucket()},total:{...recebArm997BlankBucket()}};
+  const skuSets={today:new Set(),previous:new Set(),total:new Set()};
   (Array.isArray(rows)?rows:[]).forEach(r=>{
     const sku=String(r.codigo||'').trim();
     if(!sku)return;
@@ -4682,11 +4863,12 @@ function recebArm997SummaryFromRows(rows,dayDate){
     const cat=recebArm997ItemCategory(date,dayDate);
     [cat,'total'].forEach(k=>{
       base[k].linhas++;
-      base[k].skus++;
       base[k].qtd+=+r.qtdArmazenada||0;
       base[k].vol+=recebArm997VolumeFromRow(r);
+      skuSets[k].add(sku);
     });
   });
+  Object.keys(base).forEach(k=>{base[k].skus=base[k].linhas;});
   return base;
 }
 
@@ -4747,6 +4929,8 @@ function recebArm997BuildImportRecord(rows,dayDate,fileName,endereco,prevItems){
     dayDate,
     rows:(Array.isArray(rows)?rows.length:0),
     pending,
+    exact:recebArm997ExactSummary({qrpRows:rows},dayDate),
+    partials:recebArm997PartialStoredItems(prevItems,items,dayDate),
     entered:(!Array.isArray(prevItems)||!prevItems.length)?pending:recebArm997EnteredSincePrevious(prevItems,items),
     stored:recebArm997StoredSincePrevious(prevItems,items),
     _updatedAt:Date.now(),
@@ -4765,15 +4949,22 @@ async function importRecebArm997(ev){
       const wb=XLSX.read(await readFileBuffer(file),{type:'array'});
       rows=parseRecebArmExcel997(wb,endereco);
     }else{
-      let text=await readFileText(file,'UTF-16LE');
-      rows=parseRecebArmQrpText(text,endereco);
+      const buffer=await readFileBuffer(file);
+      rows=parseRecebArmQrpBuffer(buffer,endereco);
+      if(!rows.length){
+        const text=await readFileText(file,'UTF-16LE');
+        rows=parseRecebArmQrpText(text,endereco);
+      }
     }
     if(!rows.length)throw new Error('Nenhuma linha encontrada');
     const day=recebArmDay();
     const data=ensureRecebArm(day);
-    const importRecord=recebArm997BuildImportRecord(rows,day.date,file.name,endereco,data.qrpLastItems||[]);
+    const sameParser=data.qrpParserVersion==='emf-997-v1';
+    const importRecord=recebArm997BuildImportRecord(rows,day.date,file.name,endereco,sameParser?(data.qrpLastItems||[]):[]);
     data.qrpRows=rows;
+    data.qrpDayReceivedItems=recebArm997MergeDayReceivedItems(sameParser?(data.qrpDayReceivedItems||[]):[],importRecord.items,day.date);
     data.qrpLastItems=importRecord.items;
+    data.qrpParserVersion='emf-997-v1';
     data.qrpImports=[...(data.qrpImports||[]),{...importRecord,items:undefined}].slice(-36);
     recebArmTouch(day);
     compareRecebArmStorage(false);
@@ -5244,32 +5435,227 @@ function recebArm997CurrentSummaryRows(data){
     const date=recebArmIsoFromDate(r.entrada,curDate||today());
     const month=date.slice(0,7);
     const vol=recebArm997VolumeFromRow(r);
-    if(!mapDay[date])mapDay[date]={key:date,linhas:0,skus:new Set(),vol:0};
-    if(!mapMonth[month])mapMonth[month]={key:month,linhas:0,skus:new Set(),vol:0};
+    const volCalc=recebArm997VolumeCalcFromRow(r);
+    const qtd=+r.qtdArmazenada||0;
+    if(!mapDay[date])mapDay[date]={key:date,linhas:0,skus:new Set(),qtd:0,volCalc:0,vol:0};
+    if(!mapMonth[month])mapMonth[month]={key:month,linhas:0,skus:new Set(),qtd:0,volCalc:0,vol:0};
     [mapDay[date],mapMonth[month]].forEach(item=>{
       item.linhas++;
       item.skus.add(sku);
+      item.qtd+=qtd;
+      item.volCalc+=volCalc;
       item.vol+=vol;
     });
   });
-  const finish=arr=>arr.map(item=>({key:item.key,linhas:item.linhas,skus:item.linhas,vol:item.vol})).sort((a,b)=>a.key.localeCompare(b.key));
+  const finish=arr=>arr.map(item=>({key:item.key,linhas:item.linhas,skus:item.linhas,qtd:item.qtd,volCalc:item.volCalc,vol:item.vol})).sort((a,b)=>a.key.localeCompare(b.key));
   return{days:finish(Object.values(mapDay)),months:finish(Object.values(mapMonth))};
 }
 
 function recebArm997DetailSummaryTable(title,items,mode){
-  const total=items.reduce((acc,i)=>({skus:acc.skus+(+i.skus||0),vol:acc.vol+(+i.vol||0)}),{skus:0,vol:0});
-  const rows=items.length?items.map(i=>`<tr><td>${excelText(recebArm997KeyLabel(i.key,mode))}</td><td>${prodFmt(i.skus,0)}</td><td style="font-weight:bold;color:#ffd700">${prodFmt(i.vol,0)}</td></tr>`).join(''):'<tr><td colspan="3">Sem dados da 997.</td></tr>';
-  const totalRow=items.length?`<tr><th>Total</th><th>${prodFmt(total.skus,0)}</th><th style="color:#ffd700">${prodFmt(total.vol,0)}</th></tr>`:'';
-  return `<div style="overflow-x:auto"><table class="receb-arm-tbl"><thead><tr><th colspan="3">${title}</th></tr><tr><th>${mode==='month'?'Mês':'Dia'}</th><th>SKUs/Códigos</th><th>Volumes</th></tr></thead><tbody>${rows}${totalRow}</tbody></table></div>`;
+  const total=items.reduce((acc,i)=>({
+    linhas:acc.linhas+(+i.linhas||0),
+    skus:acc.skus+(+i.skus||0),
+    qtd:acc.qtd+(+i.qtd||0),
+    volCalc:acc.volCalc+(+i.volCalc||0),
+    vol:acc.vol+(+i.vol||0)
+  }),{linhas:0,skus:0,qtd:0,volCalc:0,vol:0});
+  const rows=items.length?items.map(i=>`<tr><td>${excelText(recebArm997KeyLabel(i.key,mode))}</td><td>${prodFmt(i.linhas,0)}</td><td>${prodFmt(i.skus,0)}</td><td>${prodFmt(i.qtd,0)}</td><td>${prodFmt(i.volCalc,1)}</td><td style="font-weight:bold;color:#ffd700">${prodFmt(i.vol,0)}</td></tr>`).join(''):'<tr><td colspan="6">Sem dados da 997.</td></tr>';
+  const totalRow=items.length?`<tr><th>Total</th><th>${prodFmt(total.linhas,0)}</th><th>${prodFmt(total.skus,0)}</th><th>${prodFmt(total.qtd,0)}</th><th>${prodFmt(total.volCalc,1)}</th><th style="color:#ffd700">${prodFmt(total.vol,0)}</th></tr>`:'';
+  return `<div style="overflow-x:auto"><table class="receb-arm-tbl"><thead><tr><th colspan="6">${title}</th></tr><tr><th>${mode==='month'?'Mês':'Dia'}</th><th>Linhas</th><th>SKUs</th><th>QT. Local</th><th>Volumes Calc.</th><th>Volumes Arred.</th></tr></thead><tbody>${rows}${totalRow}</tbody></table></div>`;
 }
 
-function recebArm997MovementSummaryTable(entered,stored,pending){
+function recebArm997ExactSummary(data,dayDate){
+  const rows=Array.isArray(data&&data.qrpRows)?data.qrpRows:[];
+  const empty=()=>({linhas:0,skus:new Set(),qtd:0,volCalc:0,vol:0});
+  const summary={today:empty(),previous:empty(),total:empty()};
+  rows.forEach(r=>{
+    const sku=String(r.codigo||'').trim();
+    if(!sku)return;
+    const date=recebArmIsoFromDate(r.entrada,dayDate);
+    const cat=date===dayDate?'today':'previous';
+    const qtd=+r.qtdArmazenada||0;
+    const volCalc=recebArm997VolumeCalcFromRow(r);
+    const vol=recebArm997VolumeFromRow(r);
+    [cat,'total'].forEach(k=>{
+      summary[k].linhas++;
+      summary[k].skus.add(sku);
+      summary[k].qtd+=qtd;
+      summary[k].volCalc+=volCalc;
+      summary[k].vol+=vol;
+    });
+  });
+  ['today','previous','total'].forEach(k=>{summary[k].skus=summary[k].linhas;});
+  return summary;
+}
+
+function recebArm997MovementSummaryTable(exact){
   const rows=[
-    {label:'Entraram',data:entered,color:'#1e90ff'},
-    {label:'Armazenados',data:stored,color:'#00e676'},
-    {label:'Pendentes',data:pending,color:'#ffd700'}
+    {label:'Total da 997',data:exact.total,color:'#ffd700'},
+    {label:'Entrada na data da tela',data:exact.today,color:'#1e90ff'},
+    {label:'Dias anteriores',data:exact.previous,color:'#9cc2e5'}
   ];
-  return `<div style="overflow-x:auto;margin:8px 0"><table class="receb-arm-tbl"><thead><tr><th colspan="3">Resumo do dia - 997</th></tr><tr><th>Indicador</th><th>SKUs/Códigos</th><th>Volumes</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r.label}</td><td>${prodFmt(+(r.data.total&&r.data.total.skus)||0,0)}</td><td style="font-weight:bold;color:${r.color}">${prodFmt(+(r.data.total&&r.data.total.vol)||0,0)}</td></tr>`).join('')}</tbody></table></div>`;
+  return `<div style="overflow-x:auto;margin:8px 0"><table class="receb-arm-tbl"><thead><tr><th colspan="6">Resumo da 997 atual</th></tr><tr><th>Indicador</th><th>Linhas</th><th>SKUs</th><th>QT. Local</th><th>Volumes Calc.</th><th>Volumes Arred.</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r.label}</td><td>${prodFmt(+(r.data&&r.data.linhas)||0,0)}</td><td>${prodFmt(+(r.data&&r.data.skus)||0,0)}</td><td>${prodFmt(+(r.data&&r.data.qtd)||0,0)}</td><td>${prodFmt(+(r.data&&r.data.volCalc)||0,1)}</td><td style="font-weight:bold;color:${r.color}">${prodFmt(+(r.data&&r.data.vol)||0,0)}</td></tr>`).join('')}</tbody></table></div>`;
+}
+
+function recebArm997HourlyStoredTable(imports){
+  const list=(Array.isArray(imports)?imports:[]).slice().sort((a,b)=>(+a.importedAt||0)-(+b.importedAt||0));
+  const hours=[7,8,9,10,11,12,14,15,16,17];
+  const labels=['Início do dia',...hours.map(h=>`${String(h).padStart(2,'0')}h`),'Final do dia'];
+  const buckets={};
+  labels.forEach(label=>{buckets[label]={entradaCod:0,entradaVol:0,saidaCod:0,saidaVol:0,saldoCod:null,saldoVol:null,arquivo:''};});
+  const bucketFor=r=>{
+    if(!r||!r.importedAt)return '';
+    const h=new Date(r.importedAt).getHours();
+    if(h<7)return '07h';
+    if(h===13)return '12h';
+    if(h>17)return '17h';
+    return `${String(h).padStart(2,'0')}h`;
+  };
+  list.forEach((r,idx)=>{
+    const exact=(r.exact&&r.exact.total)?r.exact.total:((r.pending&&r.pending.total)||{});
+    const entered=(r.entered&&r.entered.total)?r.entered.total:{};
+    const stored=(r.stored&&r.stored.total)?r.stored.total:{};
+    const label=idx===0?'Início do dia':bucketFor(r);
+    const bucket=buckets[label]||buckets['17h'];
+    if(idx>0){
+      bucket.entradaCod+=+(entered.skus)||0;
+      bucket.entradaVol+=+(entered.vol)||0;
+      bucket.saidaCod+=+(stored.skus)||0;
+      bucket.saidaVol+=+(stored.vol)||0;
+    }
+    bucket.saldoCod=+(exact.skus)||0;
+    bucket.saldoVol=+(exact.vol)||0;
+    bucket.arquivo=r.fileName||bucket.arquivo||'997';
+  });
+  if(list.length){
+    const last=list[list.length-1];
+    const exact=(last.exact&&last.exact.total)?last.exact.total:((last.pending&&last.pending.total)||{});
+    buckets['Final do dia'].saldoCod=+(exact.skus)||0;
+    buckets['Final do dia'].saldoVol=+(exact.vol)||0;
+    buckets['Final do dia'].arquivo=last.fileName||'997';
+  }
+  const row=(label,field,color)=>`<tr><td style="text-align:left;font-weight:bold">${label}</td>${labels.map(h=>`<td style="font-weight:bold;color:${color}">${buckets[h][field]===null?'':prodFmt(+(buckets[h][field])||0,0)}</td>`).join('')}</tr>`;
+  const files=`<tr><td style="text-align:left">Arquivo</td>${labels.map(h=>`<td>${excelText(buckets[h].arquivo||'')}</td>`).join('')}</tr>`;
+  const empty='<tr><td colspan="13">Anexe a 997 a cada hora para calcular entrada, saída e saldo.</td></tr>';
+  return `<div style="overflow-x:auto;margin-top:8px">
+    <table class="receb-arm-tbl">
+      <thead><tr><th colspan="13">Hora a hora da 997</th></tr><tr><th>Indicador</th>${labels.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+      <tbody>${list.length?`${files}${row('Entrada - códigos','entradaCod','#1e90ff')}${row('Entrada - volumes','entradaVol','#1e90ff')}${row('Saída - códigos','saidaCod','#00e676')}${row('Saída - volumes','saidaVol','#00e676')}${row('Saldo - códigos','saldoCod','#ffd700')}${row('Saldo - volumes','saldoVol','#ffd700')}`:empty}</tbody>
+    </table>
+  </div>`;
+}
+
+function recebArm997PartialAlertsTable(imports){
+  const rows=[];
+  (Array.isArray(imports)?imports:[]).forEach(r=>{
+    const hour=r.importedAt?new Date(r.importedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'-';
+    (Array.isArray(r.partials)?r.partials:[]).forEach(item=>{
+      rows.push({...item,hour,fileName:r.fileName||'997'});
+    });
+  });
+  if(!rows.length)return '';
+  return `<div style="overflow-x:auto;margin-top:8px">
+    <table class="receb-arm-tbl">
+      <thead><tr><th colspan="9">Alerta - armazenagem parcial</th></tr><tr><th>Hora</th><th>Arquivo</th><th>Data entrada</th><th>Código</th><th>Descrição</th><th>QT. anterior</th><th>QT. atual</th><th>QT. saída</th><th>Volumes saída</th></tr></thead>
+      <tbody>${rows.map(r=>`<tr><td>${excelText(r.hour)}</td><td>${excelText(r.fileName)}</td><td>${excelText(fmtDateShort(r.entrada))}</td><td>${excelText(r.sku)}</td><td style="text-align:left">${excelText(r.descricao||'')}</td><td>${prodFmt(+r.qtdAntes||0,0)}</td><td>${prodFmt(+r.qtdAtual||0,0)}</td><td style="font-weight:bold;color:#00e676">${prodFmt(+r.qtdSaida||0,0)}</td><td style="font-weight:bold;color:#00e676">${prodFmt(+r.volSaida||0,0)}</td></tr>`).join('')}</tbody>
+    </table>
+  </div>`;
+}
+
+function recebArm997FinalDaySummary(data,dayDate){
+  const received=recebArm997MergeDayReceivedItems(data&&data.qrpDayReceivedItems,data&&data.qrpLastItems,dayDate);
+  const currentByKey={};
+  (Array.isArray(data&&data.qrpLastItems)?data.qrpLastItems:[]).forEach(item=>{
+    if(item&&item.key)currentByKey[item.key]=item;
+  });
+  const bucket=()=>({linhas:0,skus:new Set(),qtd:0,vol:0});
+  const result={
+    received:bucket(),
+    full:bucket(),
+    partial:bucket(),
+    none:bucket(),
+    pending:bucket()
+  };
+  const add=(target,item,qtd,vol)=>{
+    target.linhas++;
+    if(item&&item.sku)target.skus.add(item.sku);
+    target.qtd+=+qtd||0;
+    target.vol+=+vol||0;
+  };
+  received.forEach(base=>{
+    const cur=currentByKey[base.key]||null;
+    const baseQtd=+base.qtd||0;
+    const baseVol=+base.vol||0;
+    const curQtd=cur?(+cur.qtd||0):0;
+    const curVol=cur?(+cur.vol||0):0;
+    add(result.received,base,baseQtd,baseVol);
+    if(curQtd<=0){
+      add(result.full,base,baseQtd,baseVol);
+    }else if(curQtd<baseQtd){
+      add(result.partial,base,baseQtd-curQtd,Math.max(baseVol-curVol,0));
+      add(result.pending,base,curQtd,curVol);
+    }else{
+      add(result.none,base,baseQtd,baseVol);
+      add(result.pending,base,curQtd,curVol);
+    }
+  });
+  Object.values(result).forEach(item=>{item.skus=item.skus.size;});
+  return result;
+}
+
+function recebArm997FinalDayTable(data,dayDate){
+  const s=recebArm997FinalDaySummary(data,dayDate);
+  const rows=[
+    {label:'Itens/SKUs recebidos hoje',data:s.received,color:'#1e90ff'},
+    {label:'Armazenados 100%',data:s.full,color:'#00e676'},
+    {label:'Armazenados parcial',data:s.partial,color:'#ffd700'},
+    {label:'Não armazenado',data:s.none,color:'#ff4d5a'},
+    {label:'Saldo final na 997',data:s.pending,color:'#ffd700'}
+  ];
+  return `<div style="overflow-x:auto;margin-top:8px">
+    <table class="receb-arm-tbl">
+      <thead><tr><th colspan="4">Final do dia - itens com entrada na data da tela</th></tr><tr><th>Status</th><th>Itens/SKUs (linhas)</th><th>QT. Local</th><th>Volumes</th></tr></thead>
+      <tbody>${rows.map(r=>`<tr><td style="text-align:left;font-weight:bold">${r.label}</td><td>${prodFmt(+(r.data&&r.data.skus)||0,0)}</td><td>${prodFmt(+(r.data&&r.data.qtd)||0,0)}</td><td style="font-weight:bold;color:${r.color}">${prodFmt(+(r.data&&r.data.vol)||0,0)}</td></tr>`).join('')}</tbody>
+    </table>
+  </div>`;
+}
+
+function recebArm997PendingSplitTable(data,dayDate){
+  const rows=Array.isArray(data&&data.qrpRows)?data.qrpRows:[];
+  if(!rows.length)return '';
+  const month=String(dayDate||today()).slice(0,7);
+  const empty=()=>({linhas:0,qtd:0,vol:0});
+  const buckets={
+    prevMonth:empty(),
+    today:empty(),
+    other:empty(),
+    total:empty()
+  };
+  rows.forEach(r=>{
+    const date=recebArmIsoFromDate(r.entrada,dayDate);
+    let key='other';
+    if(date===dayDate)key='today';
+    else if(date&&date.slice(0,7)===month&&date<dayDate)key='prevMonth';
+    const qtd=+r.qtdArmazenada||0;
+    const vol=recebArm997VolumeFromRow(r);
+    [key,'total'].forEach(k=>{
+      buckets[k].linhas++;
+      buckets[k].qtd+=qtd;
+      buckets[k].vol+=vol;
+    });
+  });
+  const labels=[
+    ['Pendência de agosto até o dia anterior',buckets.prevMonth,'#ffd700'],
+    ['Pendente de hoje',buckets.today,'#1e90ff'],
+    ['Outros meses',buckets.other,'#9cc2e5'],
+    ['Total pendente na 997',buckets.total,'#00e676']
+  ];
+  return `<div style="overflow-x:auto;margin-top:8px">
+    <table class="receb-arm-tbl">
+      <thead><tr><th colspan="4">Pendência final por data de entrada</th></tr><tr><th>Grupo</th><th>Itens/SKUs (linhas)</th><th>QT. Local</th><th>Volumes</th></tr></thead>
+      <tbody>${labels.map(([label,row,color])=>`<tr><td style="text-align:left;font-weight:bold">${label}</td><td>${prodFmt(row.linhas,0)}</td><td>${prodFmt(row.qtd,0)}</td><td style="font-weight:bold;color:${color}">${prodFmt(row.vol,0)}</td></tr>`).join('')}</tbody>
+    </table>
+  </div>`;
 }
 
 function recebArm997DayMovementSummary(imports,pending){
@@ -5294,44 +5680,19 @@ function renderRecebArm997Report(){
   const data=ensureRecebArm(day);
   const imports=(data.qrpImports||[]).filter(r=>r&&r.version==='997-hora-v2').slice().sort((a,b)=>(+a.importedAt||0)-(+b.importedAt||0));
   const last=imports[imports.length-1]||null;
-  const pending=last&&last.pending?last.pending:{today:{},previous:{},total:{}};
-  const stored=last&&last.stored?last.stored:{today:{},previous:{},total:{}};
-  const entered=last&&last.entered?last.entered:{today:{},previous:{},total:{}};
-  const daySummary=recebArm997DayMovementSummary(imports,pending);
+  const exact=(last&&last.exact)?last.exact:recebArm997ExactSummary(data,day.date);
   const detail=recebArm997CurrentSummaryRows(data);
-  const histRows=imports.map(r=>{
-    const hour=r.importedAt?new Date(r.importedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'-';
-    const pending=r.pending||{};
-    const stored=r.stored||{};
-    const entered=r.entered||{};
-    return `<tr>
-      <td>${excelText(hour)}</td>
-      <td>${excelText(r.fileName||'997')}</td>
-      <td>${prodFmt(+r.rows||0,0)}</td>
-      <td style="font-weight:bold;color:#1e90ff">${prodFmt(+(entered.today&&entered.today.vol)||0,0)}</td>
-      <td style="font-weight:bold;color:#1e90ff">${prodFmt(+(entered.previous&&entered.previous.vol)||0,0)}</td>
-      <td style="font-weight:bold;color:#1e90ff">${prodFmt(+(entered.total&&entered.total.vol)||0,0)}</td>
-      <td style="font-weight:bold;color:#00e676">${prodFmt(+(stored.today&&stored.today.vol)||0,0)}</td>
-      <td style="font-weight:bold;color:#00e676">${prodFmt(+(stored.previous&&stored.previous.vol)||0,0)}</td>
-      <td style="font-weight:bold;color:#00e676">${prodFmt(+(stored.total&&stored.total.vol)||0,0)}</td>
-      <td>${prodFmt(+(pending.today&&pending.today.vol)||0,0)}</td>
-      <td>${prodFmt(+(pending.previous&&pending.previous.vol)||0,0)}</td>
-      <td>${prodFmt(+(pending.total&&pending.total.vol)||0,0)}</td>
-    </tr>`;
-  }).join('');
   el.innerHTML=`
-    <div class="receb-arm-head" style="border-top:1px solid #1a3550"><strong>Hora a hora da 997</strong></div>
-    ${recebArm997MovementSummaryTable(daySummary.entered,daySummary.stored,daySummary.pending)}
-    <div style="overflow-x:auto;margin-top:8px">
-      <table class="receb-arm-tbl">
-        <thead><tr><th colspan="12">Hora a hora da 997</th></tr><tr><th>Hora importada</th><th>Arquivo</th><th>Linhas</th><th>Entrou novo vol. entrada do dia</th><th>Entrou novo vol. dias anteriores</th><th>Entrou novo vol. total</th><th>Armazenado vol. entrada do dia</th><th>Armazenado vol. dias anteriores</th><th>Armazenado vol. total</th><th>Saldo 997 vol. entrada do dia</th><th>Saldo 997 vol. dias anteriores</th><th>Saldo 997 vol. total</th></tr></thead>
-        <tbody>${histRows||'<tr><td colspan="12">Anexe a 997 a cada hora para montar o histórico.</td></tr>'}</tbody>
-      </table>
-    </div>
+    <div class="receb-arm-head" style="border-top:1px solid #1a3550"><strong>997 - Entrada e armazenagem</strong></div>
+    ${recebArm997MovementSummaryTable(exact)}
     <div class="receb-arm-grid" style="margin-top:10px">
-      ${recebArm997DetailSummaryTable('Detalhamento por dia - 997 pendente',detail.days,'day')}
-      ${recebArm997DetailSummaryTable('Detalhamento por mês - 997 pendente',detail.months,'month')}
-    </div>`;
+      ${recebArm997DetailSummaryTable('Entrou por dia - 997 atual',detail.days,'day')}
+      ${recebArm997DetailSummaryTable('Resumo por mês de entrada - 997',detail.months,'month')}
+    </div>
+    ${recebArm997HourlyStoredTable(imports)}
+    ${recebArm997PartialAlertsTable(imports)}
+    ${recebArm997FinalDayTable(data,day.date)}
+    ${recebArm997PendingSplitTable(data,day.date)}`;
 }
 
 function renderRecebArm(){
@@ -5357,13 +5718,23 @@ function recebArm997ConvertedRows(data){
     const code=String(r.codigo||'').trim();
     const base=baseByCode[code.replace(/^0+/,'')]||{};
     const qtLocal=+r.qtdArmazenada||0;
-    const qtEmb=+r.qtEmb||0;
     return{
+      pagina:r.pagina||'',
+      local:r.local||r.endereco||'997',
       codigo:code,
       nome:r.nome||String(r.descricao||'').split(' - ')[0]||base.descricao||'',
+      apresentacao:r.apresentacao||'',
+      lote:r.lote||'',
+      qtEmb:+r.qtEmb||0,
+      prob:+r.prob||0,
+      venc:+r.venc||0,
       entrada:recebArmIsoFromDate(r.entrada,'').replace(/^(\d{4})-(\d{2})-(\d{2})$/,'$3/$2/$1')||r.entrada||'',
+      validade:r.validade||'',
       qtLocal,
+      qtVolumeCalc:recebArm997VolumeCalcFromRow(r),
       qtVolume:recebArm997VolumeFromRow(r),
+      tipo:r.tipo||'',
+      caixaLab:r.caixaLab||'',
       fornecedor:r.fornecedor||base.fornecedor||''
     };
   });
@@ -5374,17 +5745,49 @@ function exportRecebArm997Convertida(){
   const data=ensureRecebArm(day);
   const rows=recebArm997ConvertedRows(data);
   if(!rows.length){alert('Importe a 997 antes de exportar.');return;}
+  const imports=(data.qrpImports||[]).filter(r=>r&&r.version==='997-hora-v2').slice().sort((a,b)=>(+a.importedAt||0)-(+b.importedAt||0));
+  const last=imports[imports.length-1]||null;
+  const stamp=last&&last.importedAt?new Date(last.importedAt):new Date();
+  const hh=String(stamp.getHours()).padStart(2,'0');
+  const mm=String(stamp.getMinutes()).padStart(2,'0');
+  const fileName=`997-convertida-${(day.date||curDate||today()).replaceAll('-','')}-${hh}${mm}.xlsx`;
+  const outRows=rows.map(r=>({
+    Pagina:r.pagina,
+    Local:r.local,
+    Codigo:r.codigo,
+    Nome:r.nome,
+    Apresentacao:r.apresentacao,
+    Lote:r.lote,
+    'QT. EMB':r.qtEmb,
+    Prob:r.prob,
+    Venc:r.venc,
+    'QT. LOCAL':r.qtLocal,
+    'Volumes Calc.':r.qtVolumeCalc,
+    'Volumes Arred.':r.qtVolume,
+    Validade:r.validade,
+    Entrada:r.entrada,
+    Tipo:r.tipo,
+    'C. Cx. Lab.':r.caixaLab,
+    'NOME.FORNEC':r.fornecedor
+  }));
+  if(window.XLSX&&XLSX.utils&&XLSX.writeFile){
+    const ws=XLSX.utils.json_to_sheet(outRows);
+    const wb=XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb,ws,'997 Convertida');
+    XLSX.writeFile(wb,fileName);
+    return;
+  }
   let html='<!doctype html><html><head><meta charset="utf-8"></head><body>';
-  html+='<table border="1"><tr><th>Código</th><th>Nome do Produto</th><th>Data de Entrada</th><th>Quantidade Local</th><th>Quantidade de Volume</th><th>NOME.FORNEC</th></tr>';
+  html+='<table border="1"><tr><th>Página</th><th>Local</th><th>Código</th><th>Nome</th><th>Apresentação</th><th>Lote</th><th>QT. EMB</th><th>Prob</th><th>Venc</th><th>QT. LOCAL</th><th>Volumes Calc.</th><th>Volumes Arred.</th><th>Validade</th><th>Entrada</th><th>Tipo</th><th>C. Cx. Lab.</th><th>NOME.FORNEC</th></tr>';
   rows.forEach(r=>{
-    html+=`<tr><td>${excelText(r.codigo)}</td><td>${excelText(r.nome)}</td><td>${excelText(r.entrada)}</td><td>${+r.qtLocal||0}</td><td>${+r.qtVolume||0}</td><td>${excelText(r.fornecedor||'')}</td></tr>`;
+    html+=`<tr><td>${excelText(r.pagina)}</td><td>${excelText(r.local)}</td><td>${excelText(r.codigo)}</td><td>${excelText(r.nome)}</td><td>${excelText(r.apresentacao)}</td><td>${excelText(r.lote)}</td><td>${+r.qtEmb||0}</td><td>${+r.prob||0}</td><td>${+r.venc||0}</td><td>${+r.qtLocal||0}</td><td>${+r.qtVolumeCalc||0}</td><td>${+r.qtVolume||0}</td><td>${excelText(r.validade)}</td><td>${excelText(r.entrada)}</td><td>${excelText(r.tipo)}</td><td>${excelText(r.caixaLab)}</td><td>${excelText(r.fornecedor||'')}</td></tr>`;
   });
   html+='</table></body></html>';
   const blob=new Blob([html],{type:'application/vnd.ms-excel;charset=utf-8'});
   const url=URL.createObjectURL(blob);
   const a=document.createElement('a');
   a.href=url;
-  a.download=`997-convertida-${(day.date||curDate||today()).replaceAll('-','')}.xls`;
+  a.download=fileName.replace(/\.xlsx$/,'.xls');
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -7971,13 +8374,13 @@ async function sbSave(replaceDays=false){
         const remote=await sbReadPayload()||{};
         const payload={
           ...remote,
-          days:replaceDaysNow?[...db.days].sort((a,b)=>a.date.localeCompare(b.date)):mergeDays(remote.days,db.days),
+          days:mergeDays(remote.days,db.days),
           users:remote.users||getLocalUsersCache(),
           savedAt:ts
         };
         const r=await sbWritePayload(payload,ts);
         if(r.ok){
-          const confirmed=replaceDaysNow?payload:await confirmSupabaseSave(payload);
+          const confirmed=await confirmSupabaseSave(payload);
           db.days=Array.isArray(confirmed.days)?confirmed.days:payload.days;
           saveLocalDb(db);
           lastSyncHash=simpleHash(JSON.stringify({days:db.days,users:(confirmed.users||payload.users||{})}));
