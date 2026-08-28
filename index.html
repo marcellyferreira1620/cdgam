@@ -2066,15 +2066,6 @@ function dayFieldHasValue(value){
   return false;
 }
 
-function mergeNumericNoLoss(a,b,fallback){
-  const hasA=dayFieldHasValue(a);
-  const hasB=dayFieldHasValue(b);
-  if(hasA&&hasB&&Number.isFinite(+a)&&Number.isFinite(+b))return Math.max(+a,+b);
-  if(hasB)return b;
-  if(hasA)return a;
-  return fallback;
-}
-
 function mergeHourData(current,next,chosen){
   const out=JSON.parse(JSON.stringify((chosen&&chosen.hd)||{}));
   const keys=new Set([
@@ -2091,7 +2082,6 @@ function mergeHourData(current,next,chosen){
       const av=a[i],bv=b[i],cv=c[i];
       const hasA=dayFieldHasValue(av);
       const hasB=dayFieldHasValue(bv);
-      if(hasA&&hasB&&Number.isFinite(+av)&&Number.isFinite(+bv))return Math.max(+av,+bv);
       if(hasA&&hasB)return cv!==undefined?cv:bv;
       if(hasB)return bv;
       if(hasA)return av;
@@ -2112,8 +2102,7 @@ function mergeDayRootFields(current,next,chosen){
     const cv=chosen&&chosen[key];
     const hasA=dayFieldHasValue(av);
     const hasB=dayFieldHasValue(bv);
-    if(hasA&&hasB&&typeof av==='number'&&typeof bv==='number')out[key]=mergeNumericNoLoss(av,bv,cv);
-    else if(hasA&&hasB)out[key]=cv!==undefined?cv:bv;
+    if(hasA&&hasB)out[key]=cv!==undefined?cv:bv;
     else if(hasB)out[key]=bv;
     else if(hasA)out[key]=av;
     else if(cv!==undefined)out[key]=cv;
