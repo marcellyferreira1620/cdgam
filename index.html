@@ -4463,6 +4463,7 @@ function addRecebArmNota(){
     chave:chave||nota.chave||'',
     fornecedor,
     protocolo:protocolo||nota.protocolo||'',
+    entradaData:nota.entradaData||day.date||curDate||today(),
     confStatus:existing?(nota.confStatus||'andamento'):'andamento',
     armStatus:nota.armStatus||'pendente',
     volumes:parsed.volumes!==undefined?+parsed.volumes||0:(nota.volumes||0),
@@ -5372,13 +5373,16 @@ function recebArmNormalizeSku(value){
   return String(value||'').trim().toUpperCase().replace(/\s+/g,'').replace(/^0+/,'');
 }
 
-function recebArm997PendingIndex(data){
+function recebArm997PendingIndex(data,dayDate){
   const bySku={},byDescription=[];
+  const targetDate=recebArmIsoFromDate(dayDate||curDate||today(),curDate||today());
   recebArmQrpCurrentSnapshot(data&&data.qrpRows).forEach(r=>{
+    const rowDate=recebArmIsoFromDate(r.entrada,targetDate);
+    if(targetDate&&rowDate!==targetDate)return;
     const sku=recebArmNormalizeSku(r.codigo||'');
     if(!sku)return;
     if(!bySku[sku]){
-      bySku[sku]={sku,codigo:r.codigo||'',descricao:r.descricao||r.nome||'',qtd:0,vol:0,linhas:0};
+      bySku[sku]={sku,codigo:r.codigo||'',descricao:r.descricao||r.nome||'',entrada:rowDate,qtd:0,vol:0,linhas:0};
       byDescription.push(bySku[sku]);
     }
     bySku[sku].qtd+=+r.qtdArmazenada||0;
@@ -5390,17 +5394,17 @@ function recebArm997PendingIndex(data){
 }
 
 function recebArmFindNotaSku(item,data,index){
-  const direct=recebArmNormalizeSku(item&&item.codGam);
-  if(direct)return{sku:direct,codigo:item.codGam,match:'Base COD GAM'};
-  const base=recebArmFindProductBase(item,data);
-  const baseSku=recebArmNormalizeSku(base&&base.codigo);
-  if(baseSku)return{sku:baseSku,codigo:base.codigo,match:'Base COD GAM'};
   let best=null,bestScore=0;
   (index&&index.byDescription?index.byDescription:[]).forEach(row=>{
     const score=recebArmDescriptionScore(item&&item.descricao,row.descricao||'');
     if(score>bestScore){bestScore=score;best=row;}
   });
-  if(best&&bestScore>=0.62)return{sku:best.sku,codigo:best.codigo,match:'Descrição 997'};
+  if(best&&bestScore>=0.50)return{sku:best.sku,codigo:best.codigo,match:'Descrição + data 997'};
+  const direct=recebArmNormalizeSku(item&&item.codGam);
+  if(direct&&index&&index.bySku&&index.bySku[direct])return{sku:direct,codigo:item.codGam,match:'Base COD GAM + data 997'};
+  const base=recebArmFindProductBase(item,data);
+  const baseSku=recebArmNormalizeSku(base&&base.codigo);
+  if(baseSku)return{sku:baseSku,codigo:base.codigo,match:'Base COD GAM'};
   return{sku:'',codigo:'',match:'Sem vínculo'};
 }
 
@@ -5516,7 +5520,7 @@ function renderRecebArmFluxo(data){
     const confOk=notas.filter(n=>recebArmNormalizeStatus(n.confStatus)==='finalizado');
     const armRun=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)==='andamento');
     const armOk=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)==='finalizado');
-    const qrpIndex=recebArm997PendingIndex(data);
+    const qrpIndex=recebArm997PendingIndex(data,curDate||today());
     const armProgressNotes=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)!=='finalizado');
     const notaCards=notas.map(n=>`<details class="receb-arm-item-mini"><summary>NF ${excelText(n.nfNumero||'sem número')} - ${prodFmt(+n.volumes||0,0)} cx / ${prodFmt(+n.unidades||0,0)} un</summary>
       <div class="receb-arm-status-grid">
@@ -6028,7 +6032,7 @@ function exportRecebArmExcel(){
   html+='</table><h3>Notas</h3><table border="1"><tr><th>NF</th><th>Chave</th><th>Fornecedor</th><th>Protocolo</th><th>Status conferência</th><th>Status armazenagem</th><th>Itens lidos</th></tr>';
   (data.notas||[]).forEach(n=>{html+=`<tr><td>${excelText(n.nfNumero||'')}</td><td>${excelText(n.chave||'')}</td><td>${excelText(n.fornecedor||'')}</td><td>${excelText(n.protocolo||'')}</td><td>${excelText(RECEB_ARM_STATUS[recebArmNormalizeStatus(n.confStatus)])}</td><td>${excelText(RECEB_ARM_STATUS[recebArmNormalizeStatus(n.armStatus)])}</td><td>${(n.itens||[]).length}</td></tr>`;});
   html+='</table><h3>Itens da NF x 997</h3><table border="1"><tr><th>NF</th><th>Item</th><th>COD GAM</th><th>Código NF</th><th>Descrição</th><th>Caixas NF</th><th>Unidades NF</th><th>Pendente 997 un.</th><th>Pendente 997 vol.</th><th>% armazenado</th><th>% pendente</th><th>Status</th><th>Vínculo</th></tr>';
-  const qrpIndex=recebArm997PendingIndex(data);
+  const qrpIndex=recebArm997PendingIndex(data,date);
   (data.notas||[]).forEach(n=>recebArmNota997Rows(n,data,qrpIndex).forEach(r=>{
     html+=`<tr><td>${excelText(r.nf||'')}</td><td>${excelText(r.item||'')}</td><td>${excelText(r.codGam||'')}</td><td>${excelText(r.codigoNf||'')}</td><td>${excelText(r.descricao||'')}</td><td>${+r.caixas||0}</td><td>${+r.unidades||0}</td><td>${+r.pendenteUn||0}</td><td>${+r.pendenteVol||0}</td><td>${r.armazenadoPct===null?'':r.armazenadoPct}</td><td>${r.pendentePct===null?'':r.pendentePct}</td><td>${excelText(r.status||'')}</td><td>${excelText(r.match||'')}</td></tr>`;
   }));
