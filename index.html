@@ -2066,6 +2066,16 @@ function dayFieldHasValue(value){
   return false;
 }
 
+function hourFieldHasValue(value){
+  if(value===null||value===undefined)return false;
+  if(typeof value==='number')return Number.isFinite(value);
+  if(typeof value==='string')return value.trim()!=='';
+  if(Array.isArray(value))return value.some(hourFieldHasValue);
+  if(typeof value==='object')return Object.keys(value).some(k=>hourFieldHasValue(value[k]));
+  if(typeof value==='boolean')return value;
+  return false;
+}
+
 function mergeHourData(current,next,chosen){
   const out=JSON.parse(JSON.stringify((chosen&&chosen.hd)||{}));
   const keys=new Set([
@@ -2080,8 +2090,8 @@ function mergeHourData(current,next,chosen){
     const len=Math.max(HOURS.length,a.length,b.length,c.length);
     out[metric]=new Array(len).fill('').map((_,i)=>{
       const av=a[i],bv=b[i],cv=c[i];
-      const hasA=dayFieldHasValue(av);
-      const hasB=dayFieldHasValue(bv);
+      const hasA=hourFieldHasValue(av);
+      const hasB=hourFieldHasValue(bv);
       if(hasA&&hasB)return cv!==undefined?cv:bv;
       if(hasB)return bv;
       if(hasA)return av;
