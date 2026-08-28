@@ -2116,6 +2116,67 @@ function mergeDayRootFields(current,next,chosen){
   return out;
 }
 
+const NIGHT_OPERATION_GUARD_VERSION='2026-08-28-prod-noturna';
+let nightOperationGuardLastError='';
+
+function runNightOperationFormulaGuard(){
+  const errors=[];
+  try{
+    const checkoutMetric='Vol. Checkout';
+    const mergedCheckout=mergeHourData(
+      {hd:{[checkoutMetric]:[700]},_updatedAt:1},
+      {hd:{[checkoutMetric]:[291]},_updatedAt:2},
+      {hd:{[checkoutMetric]:[291]},_updatedAt:2}
+    );
+    if(+mergedCheckout[checkoutMetric][0]!==291){
+      errors.push('hora a hora nao pode forcar o maior valor');
+    }
+
+    const root=mergeDayRootFields(
+      {date:'2099-08-27',pnDoca:1000,hd:{},_updatedAt:1},
+      {date:'2099-08-27',pnDoca:500,hd:{},_updatedAt:2},
+      {date:'2099-08-27',pnDoca:500,hd:{},_updatedAt:2}
+    );
+    if(+root.pnDoca!==500){
+      errors.push('campos do dia precisam aceitar correcao para baixo');
+    }
+
+    const deltas=acumToDeltas([630,2394,3398,'',4524]);
+    const expectedDeltas=[630,1764,1004,'',1126];
+    expectedDeltas.forEach((expected,i)=>{
+      if(deltas[i]!==expected)errors.push('delta acumulado divergente na hora '+i);
+    });
+
+    if(Array.isArray(ROTAS_FIXAS)&&ROTAS_FIXAS.length){
+      const route=ROTAS_FIXAS[0];
+      const routeKey=routeMetricKey(route);
+      const routeTotalKey=routeTotalMetricKey(route);
+      const mergedRoute=mergeHourData(
+        {hd:{[routeKey]:[952],[routeTotalKey]:[952]},_updatedAt:1},
+        {hd:{[routeKey]:[0],[routeTotalKey]:[942]},_updatedAt:2},
+        {hd:{[routeKey]:[0],[routeTotalKey]:[942]},_updatedAt:2}
+      );
+      if(+mergedRoute[routeKey][0]!==0||+mergedRoute[routeTotalKey][0]!==942){
+        errors.push('rotas precisam preservar pendente menor e total atualizado');
+      }
+    }
+  }catch(err){
+    errors.push(err&&err.message?err.message:String(err));
+  }
+  nightOperationGuardLastError=errors.join(' | ');
+  return errors.length===0;
+}
+
+function ensureNightOperationFormulaGuard(context){
+  const ok=runNightOperationFormulaGuard();
+  if(ok)return true;
+  console.error('Trava da producao noturna bloqueou a operacao',context,nightOperationGuardLastError,NIGHT_OPERATION_GUARD_VERSION);
+  if(typeof showSyncStatus==='function'){
+    showSyncStatus('Trava prod. noturna: revisar formulas',true);
+  }
+  return false;
+}
+
 function maxDayUpdatedAt(days){
   return (Array.isArray(days)?days:[]).reduce((max,day)=>Math.max(max,+day?._updatedAt||0),0);
 }
@@ -2640,6 +2701,7 @@ function applyRemoteData(remote){
 }
 
 function save(replaceDays=false){
+  if(!ensureNightOperationFormulaGuard('save'))return false;
   const stored=storedDbSnapshot();
   saveLocalBackup(stored,replaceDays?'before-replace':'before-save');
   restoreBestLocalBackupIfNeeded(replaceDays?'save-replace':'save');
