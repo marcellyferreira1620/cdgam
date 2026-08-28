@@ -5482,6 +5482,21 @@ function recebArmNota997MiniReport(nota,data,index){
   </div>`;
 }
 
+function recebArmNota997FlowSummary(notas,data,index){
+  const list=(Array.isArray(notas)?notas:[]).filter(n=>n&&Array.isArray(n.itens)&&n.itens.length);
+  if(!list.length)return '-';
+  return list.map(n=>{
+    const total=recebArmNota997Summary(recebArmNota997Rows(n,data,index));
+    const color=total.armazenadoPct>=100?'#00e676':(total.armazenadoPct>0?'#ffd700':'#ff4c4c');
+    return `<div style="margin-bottom:6px">
+      <b style="color:#1e90ff">NF ${excelText(n.nfNumero||'sem número')}</b><br>
+      <span style="color:${color};font-weight:bold">${prodFmt(total.armazenadoPct,1)}% armazenado</span><br>
+      <span style="color:#ff9500">${prodFmt(total.pendentePct,1)}% pendente</span><br>
+      <span style="font-size:10px;color:#9cc2e5">100%: ${prodFmt(total.totalmente,0)} | Parcial: ${prodFmt(total.parcial,0)} | Nada: ${prodFmt(total.nada,0)}</span>
+    </div>`;
+  }).join('');
+}
+
 function renderRecebArmFluxo(data){
   const el=document.getElementById('recebArmFluxo');
   if(!el)return;
@@ -5502,6 +5517,7 @@ function renderRecebArmFluxo(data){
     const armRun=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)==='andamento');
     const armOk=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)==='finalizado');
     const qrpIndex=recebArm997PendingIndex(data);
+    const armProgressNotes=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)!=='finalizado');
     const notaCards=notas.map(n=>`<details class="receb-arm-item-mini"><summary>NF ${excelText(n.nfNumero||'sem número')} - ${prodFmt(+n.volumes||0,0)} cx / ${prodFmt(+n.unidades||0,0)} un</summary>
       <div class="receb-arm-status-grid">
         <div class="receb-arm-status"><label>Conferência</label>${recebArmStatusSelect(n.id,'confStatus',n.confStatus)}</div>
@@ -5528,7 +5544,7 @@ function renderRecebArmFluxo(data){
       <div class="receb-arm-flow-arrow">→</div>
       ${recebArmFlowStep('Conferência finalizada',confOk.length?confOk.map(n=>'NF '+excelText(n.nfNumero||'')).join('<br>'):'-',confOk.length?'ok':'off')}
       <div class="receb-arm-flow-arrow">→</div>
-      ${recebArmFlowStep('Em armazenagem',armRun.length?armRun.map(n=>'NF '+excelText(n.nfNumero||'')).join('<br>'):'-',armRun.length?'run':'off')}
+      ${recebArmFlowStep('Em armazenagem',recebArmNota997FlowSummary(armProgressNotes,data,qrpIndex),armProgressNotes.length?'run':(armRun.length?'run':'off'))}
       <div class="receb-arm-flow-arrow">→</div>
       ${recebArmFlowStep('Armazenagem finalizada',armOk.length?armOk.map(n=>'NF '+excelText(n.nfNumero||'')).join('<br>'):'-',armOk.length?'ok':'off')}
     </div>`;
