@@ -2387,6 +2387,39 @@ function mergeByIdOrIndex(current,next,preferredKey){
   return Object.values(byKey);
 }
 
+function recebArmQrpRowsUpdatedAt(rows){
+  return (Array.isArray(rows)?rows:[]).reduce((max,row)=>Math.max(max,+row?._updatedAt||0),0);
+}
+
+function recebArmQrpCurrentSnapshot(rows){
+  const list=Array.isArray(rows)?rows.filter(Boolean):[];
+  if(!list.length)return [];
+  const maxTs=recebArmQrpRowsUpdatedAt(list);
+  const current=maxTs?list.filter(row=>Math.abs((+row._updatedAt||0)-maxTs)<=10000):list;
+  const source=current.length?current:list;
+  const seen=new Set();
+  return source.filter(row=>{
+    const key=[
+      row.pagina||'',row.local||row.endereco||'',row.codigo||'',row.nome||'',
+      row.apresentacao||'',row.lote||'',row.qtEmb||'',row.qtdArmazenada||'',
+      row.validade||'',row.entrada||'',row.caixaLab||''
+    ].join('|');
+    if(seen.has(key))return false;
+    seen.add(key);
+    return true;
+  });
+}
+
+function mergeRecebArmQrpRows(a,b){
+  const aRows=recebArmQrpCurrentSnapshot(a);
+  const bRows=recebArmQrpCurrentSnapshot(b);
+  const aTs=recebArmQrpRowsUpdatedAt(aRows);
+  const bTs=recebArmQrpRowsUpdatedAt(bRows);
+  if(!aRows.length)return bRows;
+  if(!bRows.length)return aRows;
+  return bTs>=aTs?bRows:aRows;
+}
+
 function mergeRecebArm(current,next){
   if(!current&&!next)return null;
   const a=current||{};
@@ -2398,12 +2431,10 @@ function mergeRecebArm(current,next){
     notas:mergeByIdOrIndex(a.notas,b.notas,'id'),
     pendConf:mergeByIdOrIndex(a.pendConf,b.pendConf,'id'),
     pendArm:mergeByIdOrIndex(a.pendArm,b.pendArm,'id'),
-    qrpRows:mergeByIdOrIndex(a.qrpRows,b.qrpRows,'id'),
+    qrpRows:mergeRecebArmQrpRows(a.qrpRows,b.qrpRows),
     qrpImports:mergeByIdOrIndex(a.qrpImports,b.qrpImports,'id'),
     qrpLastItems:(+b._updatedAt||0)>=(+a._updatedAt||0)?(b.qrpLastItems||a.qrpLastItems||[]):(a.qrpLastItems||b.qrpLastItems||[]),
     productBase:mergeByIdOrIndex(a.productBase,b.productBase,'codigo'),
-    qrpDayClosed:!!(a.qrpDayClosed||b.qrpDayClosed),
-    qrpDayClosedAt:Math.max(+a.qrpDayClosedAt||0,+b.qrpDayClosedAt||0),
     _updatedAt:Math.max(+a._updatedAt||0,+b._updatedAt||0)
   };
 }
@@ -3988,15 +4019,13 @@ function exportProdDiurnoExcel(){
 
 // Recebimento / Armazenagem
 function emptyRecebArm(){
-  return{agendaRows:[],notas:[],pendConf:[],pendArm:[],qrpRows:[],qrpImports:[],qrpLastItems:[],productBase:[],qrpDayClosed:false,qrpDayClosedAt:0,_updatedAt:0};
+  return{agendaRows:[],notas:[],pendConf:[],pendArm:[],qrpRows:[],qrpImports:[],qrpLastItems:[],productBase:[],_updatedAt:0};
 }
 
 function ensureRecebArm(day){
   if(!day.recebArm||typeof day.recebArm!=='object')day.recebArm=emptyRecebArm();
   const data=day.recebArm;
   ['agendaRows','notas','pendConf','pendArm','qrpRows','qrpImports','qrpLastItems','productBase'].forEach(k=>{if(!Array.isArray(data[k]))data[k]=[];});
-  data.qrpDayClosed=!!data.qrpDayClosed;
-  data.qrpDayClosedAt=+data.qrpDayClosedAt||0;
   return data;
 }
 
@@ -5011,6 +5040,7 @@ async function importRecebArm997(ev){
         rows=parseRecebArmQrpText(text,endereco);
       }
     }
+    rows=recebArmQrpCurrentSnapshot(rows);
     if(!rows.length)throw new Error('Nenhuma linha encontrada');
     const day=recebArmDay();
     const data=ensureRecebArm(day);
@@ -5048,6 +5078,7 @@ function compareRecebArmStorage(showMsg=true){
   const day=recebArmDay();
   const data=ensureRecebArm(day);
   const byCode={};
+  data.qrpRows=recebArmQrpCurrentSnapshot(data.qrpRows);
   data.qrpRows.forEach(r=>{
     const key=String(r.codigo||'').trim();
     if(!key)return;
@@ -5337,6 +5368,120 @@ function recebArmFlowStep(label,value,cls,sub){
   return `<div class="receb-arm-flow-step ${cls||'off'}"><div class="step-lbl">${excelText(label)}</div><div class="step-val">${value}</div>${sub?`<div class="receb-arm-flow-meta">${sub}</div>`:''}</div>`;
 }
 
+function recebArmNormalizeSku(value){
+  return String(value||'').trim().toUpperCase().replace(/\s+/g,'').replace(/^0+/,'');
+}
+
+function recebArm997PendingIndex(data){
+  const bySku={},byDescription=[];
+  recebArmQrpCurrentSnapshot(data&&data.qrpRows).forEach(r=>{
+    const sku=recebArmNormalizeSku(r.codigo||'');
+    if(!sku)return;
+    if(!bySku[sku]){
+      bySku[sku]={sku,codigo:r.codigo||'',descricao:r.descricao||r.nome||'',qtd:0,vol:0,linhas:0};
+      byDescription.push(bySku[sku]);
+    }
+    bySku[sku].qtd+=+r.qtdArmazenada||0;
+    bySku[sku].vol+=recebArm997VolumeFromRow(r);
+    bySku[sku].linhas++;
+    if(!bySku[sku].descricao)bySku[sku].descricao=r.descricao||r.nome||'';
+  });
+  return{bySku,byDescription};
+}
+
+function recebArmFindNotaSku(item,data,index){
+  const direct=recebArmNormalizeSku(item&&item.codGam);
+  if(direct)return{sku:direct,codigo:item.codGam,match:'Base COD GAM'};
+  const base=recebArmFindProductBase(item,data);
+  const baseSku=recebArmNormalizeSku(base&&base.codigo);
+  if(baseSku)return{sku:baseSku,codigo:base.codigo,match:'Base COD GAM'};
+  let best=null,bestScore=0;
+  (index&&index.byDescription?index.byDescription:[]).forEach(row=>{
+    const score=recebArmDescriptionScore(item&&item.descricao,row.descricao||'');
+    if(score>bestScore){bestScore=score;best=row;}
+  });
+  if(best&&bestScore>=0.62)return{sku:best.sku,codigo:best.codigo,match:'Descrição 997'};
+  return{sku:'',codigo:'',match:'Sem vínculo'};
+}
+
+function recebArmNota997Rows(nota,data,index){
+  const has997=!!recebArmQrpCurrentSnapshot(data&&data.qrpRows).length;
+  const remaining={};
+  Object.keys((index&&index.bySku)||{}).forEach(sku=>{remaining[sku]={...index.bySku[sku]};});
+  return (Array.isArray(nota&&nota.itens)?nota.itens:[]).map((item,idx)=>{
+    const found=recebArmFindNotaSku(item,data,index);
+    const pending=found.sku?(remaining[found.sku]||null):null;
+    const entradaVol=item.caixas!==undefined?+item.caixas:+item.qtdEntrada||0;
+    const entradaUn=+item.unidades||0;
+    const entradaBase=entradaUn>0?entradaUn:entradaVol;
+    const pendUn=pending?+pending.qtd||0:0;
+    const pendVol=pending?+pending.vol||0:0;
+    const pendBase=found.sku&&has997?Math.min(Math.max(entradaUn>0?pendUn:pendVol,0),entradaBase):0;
+    const pendVolAlocado=found.sku&&has997?Math.min(Math.max(pendVol,0),entradaVol>0?entradaVol:pendVol):0;
+    const armazenadoBase=found.sku&&has997?Math.max(entradaBase-pendBase,0):0;
+    const armazenadoPct=found.sku&&has997&&entradaBase>0?Math.round((armazenadoBase/entradaBase)*1000)/10:null;
+    const pendentePct=armazenadoPct===null?null:Math.round((100-armazenadoPct)*10)/10;
+    let status='Sem vínculo';
+    if(!has997)status='Sem 997 importada';
+    else if(found.sku&&entradaBase>0&&pendBase<=0)status='Armazenado 100%';
+    else if(found.sku&&entradaBase>0&&pendBase>=entradaBase)status='Nada armazenado';
+    else if(found.sku&&entradaBase>0)status='Armazenado parcial';
+    if(pending){
+      pending.qtd=Math.max((+pending.qtd||0)-(entradaUn>0?pendBase:0),0);
+      pending.vol=Math.max((+pending.vol||0)-(entradaUn>0?pendVolAlocado:pendBase),0);
+    }
+    return{
+      nf:nota&&nota.nfNumero||'',
+      item:item.nItem||idx+1,
+      codGam:found.codigo||'',
+      codigoNf:item.codigo||'',
+      descricao:item.descricaoBase||item.descricao||'',
+      caixas:entradaVol,
+      unidades:entradaUn,
+      pendenteUn:found.sku&&has997?Math.min(pendUn,entradaUn||pendUn):0,
+      pendenteVol:pendVolAlocado,
+      armazenadoBase,
+      pendenteBase:pendBase,
+      armazenadoPct,
+      pendentePct,
+      status,
+      match:found.match
+    };
+  });
+}
+
+function recebArmNota997Summary(rows){
+  const total={codigos:0,totalmente:0,parcial:0,nada:0,semVinculo:0,base:0,armazenado:0,pendente:0};
+  (Array.isArray(rows)?rows:[]).forEach(r=>{
+    total.codigos++;
+    total.base+=(+r.armazenadoBase||0)+(+r.pendenteBase||0);
+    total.armazenado+=+r.armazenadoBase||0;
+    total.pendente+=+r.pendenteBase||0;
+    if(r.status==='Armazenado 100%')total.totalmente++;
+    else if(r.status==='Armazenado parcial')total.parcial++;
+    else if(r.status==='Nada armazenado')total.nada++;
+    else total.semVinculo++;
+  });
+  total.armazenadoPct=total.base>0?Math.round((total.armazenado/total.base)*1000)/10:0;
+  total.pendentePct=total.base>0?Math.round((total.pendente/total.base)*1000)/10:0;
+  return total;
+}
+
+function recebArmNota997MiniReport(nota,data,index){
+  const rows=recebArmNota997Rows(nota,data,index);
+  if(!rows.length)return '';
+  const total=recebArmNota997Summary(rows);
+  const statusColor=status=>status==='Armazenado 100%'?'#00e676':(status==='Armazenado parcial'?'#ffd700':(status==='Nada armazenado'?'#ff4c4c':'#9cc2e5'));
+  return `<div style="margin-top:8px">
+    <table class="receb-arm-tbl"><thead><tr><th colspan="7">NF x 997 - armazenagem</th></tr><tr><th>Códigos</th><th>100%</th><th>Parcial</th><th>Nada</th><th>Sem vínculo</th><th>% armazenado</th><th>% pendente</th></tr></thead><tbody>
+      <tr><td>${prodFmt(total.codigos,0)}</td><td style="color:#00e676;font-weight:bold">${prodFmt(total.totalmente,0)}</td><td style="color:#ffd700;font-weight:bold">${prodFmt(total.parcial,0)}</td><td style="color:#ff4c4c;font-weight:bold">${prodFmt(total.nada,0)}</td><td>${prodFmt(total.semVinculo,0)}</td><td style="color:#00e676;font-weight:bold">${prodFmt(total.armazenadoPct,1)}%</td><td style="color:#ff9500;font-weight:bold">${prodFmt(total.pendentePct,1)}%</td></tr>
+    </tbody></table>
+    <div style="overflow-x:auto"><table class="receb-arm-tbl"><thead><tr><th>Item</th><th>COD GAM</th><th>Código NF</th><th>Descrição</th><th>Caixas NF</th><th>Unidades NF</th><th>Pendente 997 un.</th><th>Pendente 997 vol.</th><th>% armazenado</th><th>% pendente</th><th>Status</th></tr></thead><tbody>
+      ${rows.map(r=>`<tr><td>${excelText(r.item)}</td><td style="color:#00e5ff;font-weight:bold">${excelText(r.codGam||'')}</td><td>${excelText(r.codigoNf||'')}</td><td style="text-align:left;color:#fff;font-weight:bold">${excelText(r.descricao||'')}</td><td style="color:#ffd700;font-weight:bold">${prodFmt(+r.caixas||0,3)}</td><td style="color:#ffd700;font-weight:bold">${prodFmt(+r.unidades||0,0)}</td><td>${prodFmt(+r.pendenteUn||0,0)}</td><td>${prodFmt(+r.pendenteVol||0,0)}</td><td style="font-weight:bold;color:#00e676">${r.armazenadoPct===null?'-':prodFmt(r.armazenadoPct,1)+'%'}</td><td style="font-weight:bold;color:#ff9500">${r.pendentePct===null?'-':prodFmt(r.pendentePct,1)+'%'}</td><td style="font-weight:bold;color:${statusColor(r.status)}">${excelText(r.status)}</td></tr>`).join('')}
+    </tbody></table></div>
+  </div>`;
+}
+
 function renderRecebArmFluxo(data){
   const el=document.getElementById('recebArmFluxo');
   if(!el)return;
@@ -5356,6 +5501,7 @@ function renderRecebArmFluxo(data){
     const confOk=notas.filter(n=>recebArmNormalizeStatus(n.confStatus)==='finalizado');
     const armRun=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)==='andamento');
     const armOk=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)==='finalizado');
+    const qrpIndex=recebArm997PendingIndex(data);
     const notaCards=notas.map(n=>`<details class="receb-arm-item-mini"><summary>NF ${excelText(n.nfNumero||'sem número')} - ${prodFmt(+n.volumes||0,0)} cx / ${prodFmt(+n.unidades||0,0)} un</summary>
       <div class="receb-arm-status-grid">
         <div class="receb-arm-status"><label>Conferência</label>${recebArmStatusSelect(n.id,'confStatus',n.confStatus)}</div>
@@ -5368,6 +5514,7 @@ function renderRecebArmFluxo(data){
         <button class="receb-arm-btn red" type="button" onclick="removeRecebArmNota('${n.id}')">Remover</button>
       </div>
       ${(n.itens||[]).length?recebArmRenderItensTable(n.itens,'',false):''}
+      ${recebArmNota997MiniReport(n,data,qrpIndex)}
     </details>`).join('');
     return `<div class="receb-arm-flow-row">
       <div class="receb-arm-flow-main">
@@ -5417,7 +5564,7 @@ function recebArm997ReportRows(){
   (Array.isArray(db.days)?db.days:[]).forEach(day=>{
     if(!day||!day.date||!day.recebArm)return;
     const data=day.recebArm;
-    (Array.isArray(data.qrpRows)?data.qrpRows:[]).forEach(r=>{
+    recebArmQrpCurrentSnapshot(data.qrpRows).forEach(r=>{
       const sku=String(r.codigo||'').trim();
       if(!sku)return;
       const date=recebArmIsoFromDate(r.entrada,day.date);
@@ -5482,7 +5629,7 @@ function recebArm997SummaryTable(title,items,mode){
 }
 
 function recebArm997CurrentSummaryRows(data){
-  const source=(Array.isArray(data&&data.qrpRows)&&data.qrpRows.length)?data.qrpRows:[];
+  const source=recebArmQrpCurrentSnapshot(data&&data.qrpRows);
   const mapDay={},mapMonth={};
   source.forEach(r=>{
     const sku=String(r.codigo||'').trim();
@@ -5520,7 +5667,7 @@ function recebArm997DetailSummaryTable(title,items,mode){
 }
 
 function recebArm997ExactSummary(data,dayDate){
-  const rows=Array.isArray(data&&data.qrpRows)?data.qrpRows:[];
+  const rows=recebArmQrpCurrentSnapshot(data&&data.qrpRows);
   const empty=()=>({linhas:0,skus:new Set(),qtd:0,volCalc:0,vol:0});
   const summary={today:empty(),previous:empty(),total:empty()};
   rows.forEach(r=>{
@@ -5552,28 +5699,10 @@ function recebArm997MovementSummaryTable(exact){
   return `<div style="overflow-x:auto;margin:8px 0"><table class="receb-arm-tbl"><thead><tr><th colspan="6">Resumo da 997 atual</th></tr><tr><th>Indicador</th><th>Linhas</th><th>SKUs</th><th>QT. Local</th><th>Volumes Calc.</th><th>Volumes Arred.</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r.label}</td><td>${prodFmt(+(r.data&&r.data.linhas)||0,0)}</td><td>${prodFmt(+(r.data&&r.data.skus)||0,0)}</td><td>${prodFmt(+(r.data&&r.data.qtd)||0,0)}</td><td>${prodFmt(+(r.data&&r.data.volCalc)||0,1)}</td><td style="font-weight:bold;color:${r.color}">${prodFmt(+(r.data&&r.data.vol)||0,0)}</td></tr>`).join('')}</tbody></table></div>`;
 }
 
-function recebArm997ShouldShowFinalDay(data){
-  return !!(data&&data.qrpDayClosed);
-}
-
-function closeRecebArm997Day(){
-  if(!confirm('Encerrar a 997 deste dia? Depois disso o Final do Dia aparece no relatório.'))return;
-  const day=recebArmDay();
-  const data=ensureRecebArm(day);
-  const ts=Date.now();
-  data.qrpDayClosed=true;
-  data.qrpDayClosedAt=ts;
-  data._updatedAt=ts;
-  day._updatedAt=ts;
-  persistRecebArmOnly(day);
-  renderRecebArm();
-}
-
-function recebArm997HourlyStoredTable(imports,data){
+function recebArm997HourlyStoredTable(imports){
   const list=(Array.isArray(imports)?imports:[]).slice().sort((a,b)=>(+a.importedAt||0)-(+b.importedAt||0));
   const hours=[7,8,9,10,11,12,14,15,16,17];
-  const showFinal=recebArm997ShouldShowFinalDay(data);
-  const labels=['Início do dia',...hours.map(h=>`${String(h).padStart(2,'0')}h`),...(showFinal?['Final do dia']:[])];
+  const labels=['Início do dia',...hours.map(h=>`${String(h).padStart(2,'0')}h`),'Final do dia'];
   const buckets={};
   labels.forEach(label=>{buckets[label]={entradaCod:0,entradaVol:0,saidaCod:0,saidaVol:0,saldoCod:null,saldoVol:null,arquivo:''};});
   const bucketFor=r=>{
@@ -5600,7 +5729,7 @@ function recebArm997HourlyStoredTable(imports,data){
     bucket.saldoVol=+(exact.vol)||0;
     bucket.arquivo=r.fileName||bucket.arquivo||'997';
   });
-  if(showFinal&&list.length){
+  if(list.length){
     const last=list[list.length-1];
     const exact=(last.exact&&last.exact.total)?last.exact.total:((last.pending&&last.pending.total)||{});
     buckets['Final do dia'].saldoCod=+(exact.skus)||0;
@@ -5609,11 +5738,10 @@ function recebArm997HourlyStoredTable(imports,data){
   }
   const row=(label,field,color)=>`<tr><td style="text-align:left;font-weight:bold">${label}</td>${labels.map(h=>`<td style="font-weight:bold;color:${color}">${buckets[h][field]===null?'':prodFmt(+(buckets[h][field])||0,0)}</td>`).join('')}</tr>`;
   const files=`<tr><td style="text-align:left">Arquivo</td>${labels.map(h=>`<td>${excelText(buckets[h].arquivo||'')}</td>`).join('')}</tr>`;
-  const colCount=labels.length+1;
-  const empty=`<tr><td colspan="${colCount}">Anexe a 997 a cada hora para calcular entrada, saída e saldo.</td></tr>`;
+  const empty='<tr><td colspan="13">Anexe a 997 a cada hora para calcular entrada, saída e saldo.</td></tr>';
   return `<div style="overflow-x:auto;margin-top:8px">
     <table class="receb-arm-tbl">
-      <thead><tr><th colspan="${colCount}">Hora a hora da 997</th></tr><tr><th>Indicador</th>${labels.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+      <thead><tr><th colspan="13">Hora a hora da 997</th></tr><tr><th>Indicador</th>${labels.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
       <tbody>${list.length?`${files}${row('Entrada - códigos','entradaCod','#1e90ff')}${row('Entrada - volumes','entradaVol','#1e90ff')}${row('Saída - códigos','saidaCod','#00e676')}${row('Saída - volumes','saidaVol','#00e676')}${row('Saldo - códigos','saldoCod','#ffd700')}${row('Saldo - volumes','saldoVol','#ffd700')}`:empty}</tbody>
     </table>
   </div>`;
@@ -5695,7 +5823,7 @@ function recebArm997FinalDayTable(data,dayDate){
 }
 
 function recebArm997PendingSplitTable(data,dayDate){
-  const rows=Array.isArray(data&&data.qrpRows)?data.qrpRows:[];
+  const rows=recebArmQrpCurrentSnapshot(data&&data.qrpRows);
   if(!rows.length)return '';
   const month=String(dayDate||today()).slice(0,7);
   const empty=()=>({linhas:0,qtd:0,vol:0});
@@ -5756,20 +5884,16 @@ function renderRecebArm997Report(){
   const last=imports[imports.length-1]||null;
   const exact=(last&&last.exact)?last.exact:recebArm997ExactSummary(data,day.date);
   const detail=recebArm997CurrentSummaryRows(data);
-  const closed=recebArm997ShouldShowFinalDay(data);
   el.innerHTML=`
-    <div class="receb-arm-head" style="border-top:1px solid #1a3550">
-      <strong>997 - Entrada e armazenagem</strong>
-      ${closed?'<span style="color:#00e676;font-weight:bold">Dia encerrado</span>':'<button class="receb-arm-btn green" type="button" onclick="closeRecebArm997Day()">Encerrar dia</button>'}
-    </div>
+    <div class="receb-arm-head" style="border-top:1px solid #1a3550"><strong>997 - Entrada e armazenagem</strong></div>
     ${recebArm997MovementSummaryTable(exact)}
     <div class="receb-arm-grid" style="margin-top:10px">
       ${recebArm997DetailSummaryTable('Entrou por dia - 997 atual',detail.days,'day')}
       ${recebArm997DetailSummaryTable('Resumo por mês de entrada - 997',detail.months,'month')}
     </div>
-    ${recebArm997HourlyStoredTable(imports,data)}
+    ${recebArm997HourlyStoredTable(imports)}
     ${recebArm997PartialAlertsTable(imports)}
-    ${closed?recebArm997FinalDayTable(data,day.date):''}
+    ${recebArm997FinalDayTable(data,day.date)}
     ${recebArm997PendingSplitTable(data,day.date)}`;
 }
 
@@ -5792,7 +5916,7 @@ function recebArm997ConvertedRows(data){
     const code=String(p&&p.codigo||'').trim().replace(/^0+/,'');
     if(code&&!baseByCode[code])baseByCode[code]=p;
   });
-  return (Array.isArray(data&&data.qrpRows)?data.qrpRows:[]).map(r=>{
+  return recebArmQrpCurrentSnapshot(data&&data.qrpRows).map(r=>{
     const code=String(r.codigo||'').trim();
     const base=baseByCode[code.replace(/^0+/,'')]||{};
     const qtLocal=+r.qtdArmazenada||0;
@@ -5887,8 +6011,11 @@ function exportRecebArmExcel(){
   (data.agendaRows||[]).filter(r=>!recebArmAgendaIsTotalRow(r)).forEach(r=>{html+=`<tr><td>${excelText(r.protocolo||'')}</td><td>${excelText(r.fornecedor||'')}</td><td>${excelText(r.transportador||'')}</td><td>${excelText(r.tipo||'')}</td><td>${r.skus||0}</td><td>${r.volumes||0}</td></tr>`;});
   html+='</table><h3>Notas</h3><table border="1"><tr><th>NF</th><th>Chave</th><th>Fornecedor</th><th>Protocolo</th><th>Status conferência</th><th>Status armazenagem</th><th>Itens lidos</th></tr>';
   (data.notas||[]).forEach(n=>{html+=`<tr><td>${excelText(n.nfNumero||'')}</td><td>${excelText(n.chave||'')}</td><td>${excelText(n.fornecedor||'')}</td><td>${excelText(n.protocolo||'')}</td><td>${excelText(RECEB_ARM_STATUS[recebArmNormalizeStatus(n.confStatus)])}</td><td>${excelText(RECEB_ARM_STATUS[recebArmNormalizeStatus(n.armStatus)])}</td><td>${(n.itens||[]).length}</td></tr>`;});
-  html+='</table><h3>Itens da NF x 997</h3><table border="1"><tr><th>NF</th><th>Item</th><th>COD GAM</th><th>Código NF</th><th>EAN</th><th>Descrição</th><th>Caixas</th><th>Unidades</th><th>Lote</th><th>Validade</th><th>Armazenado</th><th>Pendente</th></tr>';
-  (data.notas||[]).forEach(n=>(n.itens||[]).forEach(i=>{const entrou=i.caixas!==undefined?+i.caixas:+i.qtdEntrada||0,arm=+i.qtdArmazenada||0;html+=`<tr><td>${excelText(n.nfNumero||'')}</td><td>${excelText(i.nItem||'')}</td><td>${excelText(i.codGam||'')}</td><td>${excelText(i.codigo||'')}</td><td>${excelText(i.ean||'')}</td><td>${excelText(i.descricaoBase||i.descricao||'')}</td><td>${entrou}</td><td>${+i.unidades||0}</td><td>${excelText(i.lote||'')}</td><td>${excelText(i.validade||'')}</td><td>${arm}</td><td>${Math.max(entrou-arm,0)}</td></tr>`;}));
+  html+='</table><h3>Itens da NF x 997</h3><table border="1"><tr><th>NF</th><th>Item</th><th>COD GAM</th><th>Código NF</th><th>Descrição</th><th>Caixas NF</th><th>Unidades NF</th><th>Pendente 997 un.</th><th>Pendente 997 vol.</th><th>% armazenado</th><th>% pendente</th><th>Status</th><th>Vínculo</th></tr>';
+  const qrpIndex=recebArm997PendingIndex(data);
+  (data.notas||[]).forEach(n=>recebArmNota997Rows(n,data,qrpIndex).forEach(r=>{
+    html+=`<tr><td>${excelText(r.nf||'')}</td><td>${excelText(r.item||'')}</td><td>${excelText(r.codGam||'')}</td><td>${excelText(r.codigoNf||'')}</td><td>${excelText(r.descricao||'')}</td><td>${+r.caixas||0}</td><td>${+r.unidades||0}</td><td>${+r.pendenteUn||0}</td><td>${+r.pendenteVol||0}</td><td>${r.armazenadoPct===null?'':r.armazenadoPct}</td><td>${r.pendentePct===null?'':r.pendentePct}</td><td>${excelText(r.status||'')}</td><td>${excelText(r.match||'')}</td></tr>`;
+  }));
   html+='</table><h3>Pendências Conferência</h3><table border="1"><tr><th>NF</th><th>Item</th><th>Descrição</th><th>Volumes/Caixas</th><th>Unidades</th><th>NFD fornecedor</th><th>Obs.</th></tr>';
   (data.pendConf||[]).forEach(r=>{html+=`<tr><td>${excelText(r.nf||'')}</td><td>${excelText(r.item||'')}</td><td>${excelText(r.descricao||'')}</td><td>${r.qtdVolumes!==undefined?+r.qtdVolumes:+r.qtd||0}</td><td>${+r.qtdUnidades||0}</td><td>${r.nfdFornecedor?'Sim':'Não'}</td><td>${excelText(r.obs||'')}</td></tr>`;});
   html+='</table><h3>Pendências Armazenagem</h3><table border="1"><tr><th>NF</th><th>Item</th><th>Qtd</th><th>Endereço</th><th>Origem</th></tr>';
