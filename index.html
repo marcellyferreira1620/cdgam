@@ -2402,6 +2402,8 @@ function mergeRecebArm(current,next){
     qrpImports:mergeByIdOrIndex(a.qrpImports,b.qrpImports,'id'),
     qrpLastItems:(+b._updatedAt||0)>=(+a._updatedAt||0)?(b.qrpLastItems||a.qrpLastItems||[]):(a.qrpLastItems||b.qrpLastItems||[]),
     productBase:mergeByIdOrIndex(a.productBase,b.productBase,'codigo'),
+    qrpDayClosed:!!(a.qrpDayClosed||b.qrpDayClosed),
+    qrpDayClosedAt:Math.max(+a.qrpDayClosedAt||0,+b.qrpDayClosedAt||0),
     _updatedAt:Math.max(+a._updatedAt||0,+b._updatedAt||0)
   };
 }
@@ -3986,13 +3988,15 @@ function exportProdDiurnoExcel(){
 
 // Recebimento / Armazenagem
 function emptyRecebArm(){
-  return{agendaRows:[],notas:[],pendConf:[],pendArm:[],qrpRows:[],qrpImports:[],qrpLastItems:[],productBase:[],_updatedAt:0};
+  return{agendaRows:[],notas:[],pendConf:[],pendArm:[],qrpRows:[],qrpImports:[],qrpLastItems:[],productBase:[],qrpDayClosed:false,qrpDayClosedAt:0,_updatedAt:0};
 }
 
 function ensureRecebArm(day){
   if(!day.recebArm||typeof day.recebArm!=='object')day.recebArm=emptyRecebArm();
   const data=day.recebArm;
   ['agendaRows','notas','pendConf','pendArm','qrpRows','qrpImports','qrpLastItems','productBase'].forEach(k=>{if(!Array.isArray(data[k]))data[k]=[];});
+  data.qrpDayClosed=!!data.qrpDayClosed;
+  data.qrpDayClosedAt=+data.qrpDayClosedAt||0;
   return data;
 }
 
@@ -5548,10 +5552,28 @@ function recebArm997MovementSummaryTable(exact){
   return `<div style="overflow-x:auto;margin:8px 0"><table class="receb-arm-tbl"><thead><tr><th colspan="6">Resumo da 997 atual</th></tr><tr><th>Indicador</th><th>Linhas</th><th>SKUs</th><th>QT. Local</th><th>Volumes Calc.</th><th>Volumes Arred.</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r.label}</td><td>${prodFmt(+(r.data&&r.data.linhas)||0,0)}</td><td>${prodFmt(+(r.data&&r.data.skus)||0,0)}</td><td>${prodFmt(+(r.data&&r.data.qtd)||0,0)}</td><td>${prodFmt(+(r.data&&r.data.volCalc)||0,1)}</td><td style="font-weight:bold;color:${r.color}">${prodFmt(+(r.data&&r.data.vol)||0,0)}</td></tr>`).join('')}</tbody></table></div>`;
 }
 
-function recebArm997HourlyStoredTable(imports){
+function recebArm997ShouldShowFinalDay(data){
+  return !!(data&&data.qrpDayClosed);
+}
+
+function closeRecebArm997Day(){
+  if(!confirm('Encerrar a 997 deste dia? Depois disso o Final do Dia aparece no relatório.'))return;
+  const day=recebArmDay();
+  const data=ensureRecebArm(day);
+  const ts=Date.now();
+  data.qrpDayClosed=true;
+  data.qrpDayClosedAt=ts;
+  data._updatedAt=ts;
+  day._updatedAt=ts;
+  persistRecebArmOnly(day);
+  renderRecebArm();
+}
+
+function recebArm997HourlyStoredTable(imports,data){
   const list=(Array.isArray(imports)?imports:[]).slice().sort((a,b)=>(+a.importedAt||0)-(+b.importedAt||0));
   const hours=[7,8,9,10,11,12,14,15,16,17];
-  const labels=['Início do dia',...hours.map(h=>`${String(h).padStart(2,'0')}h`),'Final do dia'];
+  const showFinal=recebArm997ShouldShowFinalDay(data);
+  const labels=['Início do dia',...hours.map(h=>`${String(h).padStart(2,'0')}h`),...(showFinal?['Final do dia']:[])];
   const buckets={};
   labels.forEach(label=>{buckets[label]={entradaCod:0,entradaVol:0,saidaCod:0,saidaVol:0,saldoCod:null,saldoVol:null,arquivo:''};});
   const bucketFor=r=>{
@@ -5578,7 +5600,7 @@ function recebArm997HourlyStoredTable(imports){
     bucket.saldoVol=+(exact.vol)||0;
     bucket.arquivo=r.fileName||bucket.arquivo||'997';
   });
-  if(list.length){
+  if(showFinal&&list.length){
     const last=list[list.length-1];
     const exact=(last.exact&&last.exact.total)?last.exact.total:((last.pending&&last.pending.total)||{});
     buckets['Final do dia'].saldoCod=+(exact.skus)||0;
@@ -5587,10 +5609,11 @@ function recebArm997HourlyStoredTable(imports){
   }
   const row=(label,field,color)=>`<tr><td style="text-align:left;font-weight:bold">${label}</td>${labels.map(h=>`<td style="font-weight:bold;color:${color}">${buckets[h][field]===null?'':prodFmt(+(buckets[h][field])||0,0)}</td>`).join('')}</tr>`;
   const files=`<tr><td style="text-align:left">Arquivo</td>${labels.map(h=>`<td>${excelText(buckets[h].arquivo||'')}</td>`).join('')}</tr>`;
-  const empty='<tr><td colspan="13">Anexe a 997 a cada hora para calcular entrada, saída e saldo.</td></tr>';
+  const colCount=labels.length+1;
+  const empty=`<tr><td colspan="${colCount}">Anexe a 997 a cada hora para calcular entrada, saída e saldo.</td></tr>`;
   return `<div style="overflow-x:auto;margin-top:8px">
     <table class="receb-arm-tbl">
-      <thead><tr><th colspan="13">Hora a hora da 997</th></tr><tr><th>Indicador</th>${labels.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
+      <thead><tr><th colspan="${colCount}">Hora a hora da 997</th></tr><tr><th>Indicador</th>${labels.map(h=>`<th>${h}</th>`).join('')}</tr></thead>
       <tbody>${list.length?`${files}${row('Entrada - códigos','entradaCod','#1e90ff')}${row('Entrada - volumes','entradaVol','#1e90ff')}${row('Saída - códigos','saidaCod','#00e676')}${row('Saída - volumes','saidaVol','#00e676')}${row('Saldo - códigos','saldoCod','#ffd700')}${row('Saldo - volumes','saldoVol','#ffd700')}`:empty}</tbody>
     </table>
   </div>`;
@@ -5733,16 +5756,20 @@ function renderRecebArm997Report(){
   const last=imports[imports.length-1]||null;
   const exact=(last&&last.exact)?last.exact:recebArm997ExactSummary(data,day.date);
   const detail=recebArm997CurrentSummaryRows(data);
+  const closed=recebArm997ShouldShowFinalDay(data);
   el.innerHTML=`
-    <div class="receb-arm-head" style="border-top:1px solid #1a3550"><strong>997 - Entrada e armazenagem</strong></div>
+    <div class="receb-arm-head" style="border-top:1px solid #1a3550">
+      <strong>997 - Entrada e armazenagem</strong>
+      ${closed?'<span style="color:#00e676;font-weight:bold">Dia encerrado</span>':'<button class="receb-arm-btn green" type="button" onclick="closeRecebArm997Day()">Encerrar dia</button>'}
+    </div>
     ${recebArm997MovementSummaryTable(exact)}
     <div class="receb-arm-grid" style="margin-top:10px">
       ${recebArm997DetailSummaryTable('Entrou por dia - 997 atual',detail.days,'day')}
       ${recebArm997DetailSummaryTable('Resumo por mês de entrada - 997',detail.months,'month')}
     </div>
-    ${recebArm997HourlyStoredTable(imports)}
+    ${recebArm997HourlyStoredTable(imports,data)}
     ${recebArm997PartialAlertsTable(imports)}
-    ${recebArm997FinalDayTable(data,day.date)}
+    ${closed?recebArm997FinalDayTable(data,day.date):''}
     ${recebArm997PendingSplitTable(data,day.date)}`;
 }
 
