@@ -206,18 +206,9 @@ body.devolucao-view .day-nav{justify-content:flex-start;padding:8px 14px}
 .inventario-field{display:flex;flex-direction:column;gap:4px;color:#0b3b63;font-size:11px;font-weight:800}
 .inventario-field input,.inventario-field textarea{border:1px solid #9fc7e6;border-radius:5px;padding:8px;background:#fff;color:#0a2340;font-weight:700;font-size:12px;min-width:0}
 .inventario-field textarea{min-height:72px;resize:vertical;font-weight:600}
-.inventario-map-scroll{overflow:auto;background:#eaf0f4;border:1px solid #aeb8c2;border-radius:4px;padding:8px}
-.inventario-farol{position:relative;width:1488px;height:454px;background:#fff;box-shadow:0 0 0 1px #000 inset;background-image:linear-gradient(#dfe5ea 1px,transparent 1px),linear-gradient(90deg,#dfe5ea 1px,transparent 1px);background-size:22px 18px}
-.inventario-map-top{position:absolute;left:0;top:0;right:0;height:12px;background:#000}
-.inventario-map-label{position:absolute;color:#000;font-size:12px;line-height:1;font-weight:900;text-align:center;text-transform:uppercase;letter-spacing:0}
-.inventario-map-label.doca{font-size:16px}
-.inventario-map-area{position:absolute;border:2px solid #000;background:#fff}
-.inventario-map-conf{position:absolute;right:0;top:162px;width:86px;height:240px;background:#11aee3;border:2px solid #000;color:#001f33;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;letter-spacing:3px;writing-mode:vertical-rl;text-orientation:upright}
-.inventario-map-block{position:absolute;display:grid;gap:0}
-.inventario-local{width:100%;height:100%;border:1px solid #000;background:#fff;color:#003b6f;font-weight:900;font-size:9px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
-.inventario-local.baixo{background:#00a86b;color:#fff}
-.inventario-local.alto{background:#00a86b;color:#fff;box-shadow:inset 0 0 0 2px #ffd700}
-.inventario-local.alto::after{content:'OK';background:#ffd700;color:#0a2340;border-radius:2px;padding:1px 3px;font-size:9px;font-weight:900}
+.inventario-map-scroll{overflow:hidden;background:#fff;border:1px solid #aeb8c2;border-radius:4px;padding:0}
+.inventario-farol{display:block;width:100%;height:auto;background:#fff}
+.inventario-farol text{font-family:Arial,Helvetica,sans-serif;letter-spacing:0}
 .inventario-resumo{width:100%;min-height:165px;border:1px solid #9fc7e6;border-radius:6px;padding:12px;font-size:12px;line-height:1.45;color:#0a2340;background:#fff;resize:vertical}
 body.inventario-view #kpiBar1,
 body.inventario-view #flowBar,
@@ -6678,32 +6669,88 @@ function inventarioErroSetor(setor,label,d){
     </div>
   </div>`;
 }
-function inventarioMapCell(local,farol){
-    const st=+farol[local]||0;
-    const cls=st>=2?'alto':(st>=1?'baixo':'');
-    const status=st>=2?'baixo + alto OK':(st>=1?'baixo inventariado':'pendente');
-    const arg=JSON.stringify(String(local||'')).replace(/"/g,'&quot;');
-    return `<button type="button" class="inventario-local ${cls}" title="${excelText(local)} - ${status}" aria-label="${excelText(local)} - ${status}" onclick="toggleInventarioLocal(${arg})"></button>`;
+function inventarioSvgCells(x,y,cols,rows,w=22,h=18){
+  let out='';
+  for(let r=0;r<rows;r++){
+    for(let c=0;c<cols;c++){
+      out+=`<rect x="${x+c*w}" y="${y+r*h}" width="${w}" height="${h}" fill="#fff" stroke="#000" stroke-width="1"/>`;
+    }
+  }
+  return out;
+}
+function inventarioSvgNumberRow(nums,x,y,w=77,h=18){
+  return nums.map((n,i)=>`<g><rect x="${x+i*w}" y="${y}" width="${w}" height="${h}" fill="#fff" stroke="#000" stroke-width="2"/><text x="${x+i*w+w/2}" y="${y+14}" text-anchor="middle" font-size="14" font-weight="800" fill="#000">${n}</text></g>`).join('');
+}
+function inventarioSvgLabel(text,x,y,size=12,weight=800,anchor='middle'){
+  return `<text x="${x}" y="${y}" text-anchor="${anchor}" font-size="${size}" font-weight="${weight}" fill="#000">${text}</text>`;
 }
 function renderInventarioFarol(d){
-  const farol=d.farol||{};
-  const blocks=INVENTARIO_FAROL_LAYOUT.map(block=>{
-    let cells='';
-    for(let i=1;i<=block.cols*block.rows;i++){
-      const local=`${block.p}${String(i).padStart(3,'0')}`;
-      cells+=inventarioMapCell(local,farol);
-    }
-    return `<div class="inventario-map-block" style="left:${block.x}px;top:${block.y}px;grid-template-columns:repeat(${block.cols},22px);grid-template-rows:repeat(${block.rows},18px)">${cells}</div>`;
-  }).join('');
-  const areas=INVENTARIO_FAROL_AREAS.map(a=>`<div class="inventario-map-area" style="left:${a.x}px;top:${a.y}px;width:${a.w}px;height:${a.h}px"></div>`).join('');
-  return `<div class="inventario-map-top"></div>
-    <div class="inventario-map-label" style="left:510px;top:18px;width:90px">RUA 07</div>
-    <div class="inventario-map-label" style="left:500px;top:406px;width:95px">RUA 01</div>
-    <div class="inventario-map-label" style="left:994px;top:406px;width:95px">RUA 01</div>
-    <div class="inventario-map-label doca" style="left:712px;top:428px;width:80px">DOCA</div>
-    <div class="inventario-map-label" style="left:1235px;top:406px;width:85px">PSICO</div>
-    ${areas}${blocks}
-    <div class="inventario-map-conf">Conferencia</div>`;
+  return `<svg class="inventario-farol" viewBox="0 0 1774 470" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Farol visual da area de inventario">
+    <rect x="0" y="0" width="1774" height="470" fill="#fff"/>
+    <rect x="0" y="0" width="1774" height="12" fill="#000"/>
+    ${inventarioSvgCells(0,26,7,2,25,18)}
+    ${inventarioSvgCells(205,26,7,2,24,18)}
+    ${inventarioSvgCells(406,26,14,2,31,18)}
+    ${inventarioSvgCells(867,0,26,2,28,18)}
+    ${inventarioSvgCells(868,45,14,2,26,18)}
+    ${inventarioSvgCells(1268,45,13,2,25,18)}
+    ${inventarioSvgCells(1624,45,6,2,25,18)}
+    ${inventarioSvgCells(0,80,33,1,25.55,18)}
+    ${inventarioSvgNumberRow([20,19,18,17,16,15,14,13,12,11],0,98,84.4,18)}
+    <rect x="177" y="134" width="639" height="57" fill="#fff" stroke="#000" stroke-width="2"/>
+    ${inventarioSvgLabel('miniload e flow rack perfumaria',497,173,18,800)}
+    ${inventarioSvgNumberRow([21,22,23,24,25,26,27,28,29,30],0,210,84.4,18)}
+    ${inventarioSvgCells(0,228,33,1,25.55,18)}
+    ${inventarioSvgCells(0,264,7,2,25,18)}
+    ${inventarioSvgCells(205,264,7,2,24,18)}
+    ${inventarioSvgCells(406,264,16,2,24,18)}
+    ${inventarioSvgCells(0,317,7,2,25,20)}
+    ${inventarioSvgCells(205,317,7,2,24,20)}
+    ${inventarioSvgCells(406,317,17,2,24,20)}
+    ${inventarioSvgCells(0,376,7,2,25,18)}
+    ${inventarioSvgCells(205,376,7,2,24,18)}
+    ${inventarioSvgCells(406,376,17,2,24,18)}
+    ${inventarioSvgLabel('RUA 07',698,22,12,900)}
+    ${inventarioSvgLabel('RUA 07',1120,41,12,900)}
+    ${inventarioSvgLabel('RUA 06',700,78,12,900)}
+    ${inventarioSvgLabel('RUA 06',1120,96,12,900)}
+    ${inventarioSvgLabel('RUA 05',1120,148,12,900)}
+    ${inventarioSvgLabel('RUA 04',700,262,12,900)}
+    ${inventarioSvgLabel('RUA 03',700,315,12,900)}
+    ${inventarioSvgLabel('RUA 02',700,374,12,900)}
+    ${inventarioSvgLabel('RUA 01',700,426,12,900)}
+    ${inventarioSvgCells(868,100,14,2,24,18)}
+    ${inventarioSvgCells(1268,100,14,2,24,18)}
+    ${inventarioSvgCells(1624,100,6,2,25,18)}
+    ${inventarioSvgCells(868,154,30,1,24.3,18)}
+    ${inventarioSvgNumberRow([31,32,33,34,35,36,37,38,39,40,41],868,172,66.3,18)}
+    <rect x="868" y="190" width="728" height="36" fill="#fff" stroke="#000" stroke-width="2"/>
+    ${inventarioSvgLabel('flow rack medicamento',1230,210,18,800)}
+    ${inventarioSvgCells(868,228,30,1,24.3,18)}
+    ${inventarioSvgCells(868,264,8,2,23,18)}
+    ${inventarioSvgCells(1084,264,8,2,23,18)}
+    ${inventarioSvgCells(1320,264,11,1,25,18)}
+    ${inventarioSvgCells(868,318,8,2,23,18)}
+    ${inventarioSvgCells(1084,318,8,2,23,18)}
+    ${inventarioSvgCells(1320,300,6,2,24,20)}
+    ${inventarioSvgCells(1524,300,2,6,18,18)}
+    ${inventarioSvgCells(868,376,8,2,23,18)}
+    ${inventarioSvgCells(1084,376,8,2,23,18)}
+    ${inventarioSvgCells(1320,358,6,2,24,18)}
+    ${inventarioSvgCells(1320,426,10,1,25,18)}
+    <rect x="1268" y="264" width="52" height="148" fill="#fff" stroke="#000" stroke-width="2"/>
+    <text x="1294" y="283" text-anchor="middle" font-size="12" font-weight="800" fill="#000">
+      <tspan x="1294" dy="0">g</tspan><tspan x="1294" dy="17">e</tspan><tspan x="1294" dy="17">l</tspan><tspan x="1294" dy="17">a</tspan><tspan x="1294" dy="17">d</tspan><tspan x="1294" dy="17">e</tspan><tspan x="1294" dy="17">i</tspan><tspan x="1294" dy="17">r</tspan><tspan x="1294" dy="17">a</tspan>
+    </text>
+    <rect x="1686" y="173" width="88" height="239" fill="#5b9bd5" stroke="#000" stroke-width="2"/>
+    <text x="1730" y="225" text-anchor="middle" font-size="12" font-weight="800" fill="#000">
+      <tspan x="1730" dy="0">C</tspan><tspan x="1730" dy="18">o</tspan><tspan x="1730" dy="18">n</tspan><tspan x="1730" dy="18">f</tspan><tspan x="1730" dy="18">e</tspan><tspan x="1730" dy="18">r</tspan><tspan x="1730" dy="18">e</tspan><tspan x="1730" dy="18">n</tspan><tspan x="1730" dy="18">c</tspan><tspan x="1730" dy="18">i</tspan><tspan x="1730" dy="18">a</tspan>
+    </text>
+    ${inventarioSvgLabel('65',1578,318,14,800)}
+    ${inventarioSvgLabel('64',1578,377,14,800)}
+    ${inventarioSvgLabel('PSICO',1408,426,12,900)}
+    ${inventarioSvgLabel('DOCA',870,458,18,900)}
+  </svg>`;
 }
 function renderInventario(){
   const wrap=document.getElementById('inventarioPage');
@@ -6724,9 +6771,9 @@ function renderInventario(){
       </div>
     </div>
     <div class="inventario-grid">
-      ${inventarioCard('Locais do farol',prodFmt(t.farol.total,0),'base visual')}
-      ${inventarioCard('Baixo inventariado',prodFmt(t.farol.baixo,0),`${inventarioPct(t.farol.baixo,t.farol.total)}% dos locais`,'#00e676')}
-      ${inventarioCard('Baixo + alto OK',prodFmt(t.farol.alto,0),`${inventarioPct(t.farol.alto,t.farol.total)}% dos locais`,'#00e676')}
+      ${inventarioCard('Endere&ccedil;os do mapa',prodFmt(t.farol.total,0),'farol visual')}
+      ${inventarioCard('Ruas sinalizadas','07','Rua 01 at&eacute; Rua 07')}
+      ${inventarioCard('&Aacute;reas destacadas','04','Doca, psico, geladeira e confer&ecirc;ncia')}
       ${inventarioCard('Valor localizado',prodFmt(t.localizado,2),`${t.pctReserva}% da reserva`)}
       ${inventarioCard('Menu 24 devolvidos',prodFmt(t.palletMenu24,0),'pallets')}
       ${inventarioCard('Erros de corre&ccedil;&atilde;o',prodFmt(t.totalErros,0),'todos os setores','#ff9800')}
@@ -6751,7 +6798,7 @@ function renderInventario(){
       </div>
     </section>
     <section class="inventario-section">
-      <div class="inventario-section-h">Farol de posi&ccedil;&otilde;es inventariadas <small>clique para alternar: pendente, baixo, baixo + alto OK</small></div>
+      <div class="inventario-section-h">Farol de posi&ccedil;&otilde;es inventariadas <small>modelo visual do setor</small></div>
       <div class="inventario-section-b">
         <div class="inventario-map-scroll">
           <div class="inventario-farol">${renderInventarioFarol(d)}</div>
