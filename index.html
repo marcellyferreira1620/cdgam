@@ -6151,6 +6151,7 @@ function boletimBuildWhatsapp(day){
     ``,
     `*OPERAÇÃO DIURNA*`,
     `Recebimento: ${prodFmt(r.notas,0)} NF(s) no dia | Conferência 100%: ${prodFmt(r.confFinal,0)} | Pendência conferência: ${prodFmt(r.pendConf,0)}`,
+    `Lead time ponderado: ${String(b.leadTimePonderado||'-').trim()||'-'}`,
     `Armazenagem: recebidos ${prodFmt(r.recVol,0)} vol. / ${prodFmt(r.recSkus,0)} SKUs | armazenados ${prodFmt(r.storedVol,0)} vol. (${r.storedVolPct}%) / ${prodFmt(r.storedSku,0)} SKUs (${r.storedSkuPct}%) | pendentes ${prodFmt(r.pendVol,0)} vol. (${r.pendVolPct}%) / ${prodFmt(r.pendSku,0)} SKUs (${r.pendSkuPct}%)`,
     `Abastecimento 1° turno: abastecidas ${prodFmt(b.abastecidas,0)} | pendentes ${prodFmt(b.pendentes,0)} | canceladas ${prodFmt(b.canceladas,0)}`,
     `Inventário: posições ${prodFmt(b.posicoesInventariadas,0)} | reserva liberada R$ ${prodFmt(b.valorReserva,2)}`,
@@ -6215,7 +6216,11 @@ function renderBoletim(){
         <div class="boletim-section-b">
           <div class="boletim-list">
             <div class="boletim-subhead">Setor Recebimento</div>
-            ${boletimLine('Lead time ponderado','Em implantação','será puxado dos gráficos')}
+          </div>
+          <div class="boletim-fields" style="margin-top:12px">
+            ${boletimField('Lead time ponderado','leadTimePonderado',b.leadTimePonderado,'text')}
+          </div>
+          <div class="boletim-list">
             <div class="boletim-subhead">Setor Armazenagem</div>
             ${boletimLine('Volumes recebidos',prodFmt(r.recVol,0),'volumes')}
             ${boletimLine('SKUs recebidos',prodFmt(r.recSkus,0),'SKUs')}
