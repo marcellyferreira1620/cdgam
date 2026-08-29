@@ -125,6 +125,8 @@ body.recebarm-view .receb-arm-form{grid-template-columns:repeat(auto-fit,minmax(
 .boletim-section-b{padding:12px}
 .boletim-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}
 .boletim-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.boletim-subhead{margin:12px 0 8px;padding:7px 10px;background:#eaf4ff;border-left:4px solid #1e88e5;color:#003b6f;font-size:12px;font-weight:900;text-transform:uppercase}
+.boletim-subhead:first-child{margin-top:0}
 .boletim-field{display:flex;flex-direction:column;gap:4px;color:#0b3b63;font-size:11px;font-weight:800}
 .boletim-field input,.boletim-field textarea{border:1px solid #9fc7e6;border-radius:5px;padding:8px;background:#fff;color:#0a2340;font-weight:700;font-size:12px;min-width:0}
 .boletim-field textarea{min-height:82px;resize:vertical;font-weight:600}
@@ -6055,6 +6057,8 @@ function boletimRecebStats(day){
   const recSkus=nfSkus||boletimNum(agenda.totalSkus)||boletimNum(exact.today&&exact.today.skus);
   const pendVol=boletimNum(exact.today&&exact.today.vol);
   const pendSku=boletimNum(exact.today&&exact.today.skus);
+  const storedVol=Math.max(recVol-pendVol,0);
+  const storedSku=Math.max(recSkus-pendSku,0);
   return{
     notas:notas.length,
     confFinal,
@@ -6064,6 +6068,10 @@ function boletimRecebStats(day){
     pendConf:pendConf.length,
     recVol,
     recSkus,
+    storedVol,
+    storedSku,
+    storedVolPct:boletimPct(storedVol,recVol),
+    storedSkuPct:boletimPct(storedSku,recSkus),
     pendVol,
     pendSku,
     pendVolPct:boletimPct(pendVol,recVol),
@@ -6142,7 +6150,7 @@ function boletimBuildWhatsapp(day){
     ``,
     `*OPERAÇÃO DIURNA*`,
     `Recebimento: ${prodFmt(r.notas,0)} NF(s) no dia | Conferência 100%: ${prodFmt(r.confFinal,0)} | Pendência conferência: ${prodFmt(r.pendConf,0)}`,
-    `Armazenagem: recebidos ${prodFmt(r.recVol,0)} vol. / ${prodFmt(r.recSkus,0)} SKUs | pendentes ${prodFmt(r.pendVol,0)} vol. (${r.pendVolPct}%) / ${prodFmt(r.pendSku,0)} SKUs (${r.pendSkuPct}%)`,
+    `Armazenagem: recebidos ${prodFmt(r.recVol,0)} vol. / ${prodFmt(r.recSkus,0)} SKUs | armazenados ${prodFmt(r.storedVol,0)} vol. (${r.storedVolPct}%) / ${prodFmt(r.storedSku,0)} SKUs (${r.storedSkuPct}%) | pendentes ${prodFmt(r.pendVol,0)} vol. (${r.pendVolPct}%) / ${prodFmt(r.pendSku,0)} SKUs (${r.pendSkuPct}%)`,
     `Abastecimento: abastecidas ${prodFmt(b.abastecidas,0)} | pendentes ${prodFmt(b.pendentes,0)} | canceladas ${prodFmt(b.canceladas,0)}`,
     `Inventário: posições ${prodFmt(b.posicoesInventariadas,0)} | reserva liberada R$ ${prodFmt(b.valorReserva,2)}`,
     b.manutencaoDiurna?`Manutenção diurna: ${String(b.manutencaoDiurna).trim()}`:`Manutenção diurna: sem apontamento.`,
@@ -6203,15 +6211,23 @@ function renderBoletim(){
         <div class="boletim-section-h">Operação diurna <small>Recebimento, armazenagem, abastecimento e inventário</small></div>
         <div class="boletim-section-b">
           <div class="boletim-list">
+            <div class="boletim-subhead">Setor Recebimento</div>
             ${boletimLine('Lead time ponderado','Em implantação','será puxado dos gráficos')}
+            <div class="boletim-subhead">Setor Armazenagem</div>
             ${boletimLine('Volumes recebidos',prodFmt(r.recVol,0),`${prodFmt(r.recSkus,0)} SKUs`)}
+            ${boletimLine('Volumes armazenados',prodFmt(r.storedVol,0),`${r.storedVolPct}%`)}
             ${boletimLine('Volumes pendentes de armazenagem',prodFmt(r.pendVol,0),`${r.pendVolPct}%`)}
+            ${boletimLine('SKUs armazenados',prodFmt(r.storedSku,0),`${r.storedSkuPct}%`)}
             ${boletimLine('SKUs pendentes de armazenagem',prodFmt(r.pendSku,0),`${r.pendSkuPct}%`)}
           </div>
+          <div class="boletim-subhead">Setor de Abastecimento</div>
           <div class="boletim-fields" style="margin-top:12px">
             ${boletimField('Linhas abastecidas','abastecidas',b.abastecidas)}
             ${boletimField('Linhas pendentes','pendentes',b.pendentes)}
             ${boletimField('Linhas canceladas','canceladas',b.canceladas)}
+          </div>
+          <div class="boletim-subhead">Setor de Inventário</div>
+          <div class="boletim-fields" style="margin-top:12px">
             ${boletimField('Posições inventariadas','posicoesInventariadas',b.posicoesInventariadas)}
             ${boletimField('Valor liberado da reserva','valorReserva',b.valorReserva,'text')}
             ${boletimTextarea('Manutenção / observações do dia','manutencaoDiurna',b.manutencaoDiurna)}
