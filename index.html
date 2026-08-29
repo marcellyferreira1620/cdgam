@@ -209,6 +209,8 @@ body.devolucao-view .day-nav{justify-content:flex-start;padding:8px 14px}
 .inventario-map-scroll{overflow:hidden;background:#fff;border:1px solid #aeb8c2;border-radius:4px;padding:0}
 .inventario-farol{display:block;width:100%;height:auto;background:#fff}
 .inventario-farol text{font-family:Arial,Helvetica,sans-serif;letter-spacing:0}
+.inventario-farol .inv-cell{cursor:pointer}
+.inventario-farol .inv-ok{pointer-events:none;font-size:10px;font-weight:900;fill:#f00}
 .inventario-resumo{width:100%;min-height:165px;border:1px solid #9fc7e6;border-radius:6px;padding:12px;font-size:12px;line-height:1.45;color:#0a2340;background:#fff;resize:vertical}
 body.inventario-view #kpiBar1,
 body.inventario-view #flowBar,
@@ -6496,6 +6498,7 @@ const INVENTARIO_FAROL_LAYOUT=[
 const INVENTARIO_FAROL_AREAS=[
   {x:128,y:128,w:568,h:55},{x:747,y:164,w:664,h:55},{x:1132,y:254,w:278,h:148}
 ];
+const INVENTARIO_FAROL_TOTAL=705;
 function inventarioLayoutLocais(){
   const locais=[];
   INVENTARIO_FAROL_LAYOUT.forEach(block=>{
@@ -6503,7 +6506,7 @@ function inventarioLayoutLocais(){
   });
   return locais;
 }
-function inventarioDefaultLocais(){return inventarioLayoutLocais();}
+function inventarioDefaultLocais(){return Array.from({length:INVENTARIO_FAROL_TOTAL},(_,i)=>`MAP-${String(i+1).padStart(4,'0')}`);}
 function inventarioLocais(d){
   const base=inventarioDefaultLocais();
   const extra=Object.keys((d&&d.farol)||{}).filter(k=>!base.includes(k));
@@ -6669,11 +6672,19 @@ function inventarioErroSetor(setor,label,d){
     </div>
   </div>`;
 }
+let inventarioSvgCellSeq=0;
+let inventarioSvgFarolData={};
 function inventarioSvgCells(x,y,cols,rows,w=22,h=18){
   let out='';
   for(let r=0;r<rows;r++){
     for(let c=0;c<cols;c++){
-      out+=`<rect x="${x+c*w}" y="${y+r*h}" width="${w}" height="${h}" fill="#fff" stroke="#000" stroke-width="1"/>`;
+      const local=`MAP-${String(++inventarioSvgCellSeq).padStart(4,'0')}`;
+      const st=+inventarioSvgFarolData[local]||0;
+      const fill=st>=1?'#6aa84f':'#fff';
+      const arg=JSON.stringify(local).replace(/"/g,'&quot;');
+      const cx=x+c*w;
+      const cy=y+r*h;
+      out+=`<g onclick="toggleInventarioLocal(${arg})"><title>${local}</title><rect class="inv-cell" x="${cx}" y="${cy}" width="${w}" height="${h}" fill="${fill}" stroke="#000" stroke-width="1"/>${st>=2?`<text class="inv-ok" x="${cx+w/2}" y="${cy+h-4}" text-anchor="middle">OK</text>`:''}</g>`;
     }
   }
   return out;
@@ -6685,6 +6696,8 @@ function inventarioSvgLabel(text,x,y,size=12,weight=800,anchor='middle'){
   return `<text x="${x}" y="${y}" text-anchor="${anchor}" font-size="${size}" font-weight="${weight}" fill="#000">${text}</text>`;
 }
 function renderInventarioFarol(d){
+  inventarioSvgCellSeq=0;
+  inventarioSvgFarolData=(d&&d.farol)||{};
   return `<svg class="inventario-farol" viewBox="0 0 1774 470" preserveAspectRatio="xMidYMid meet" role="img" aria-label="Farol visual da area de inventario">
     <rect x="0" y="0" width="1774" height="470" fill="#fff"/>
     <rect x="0" y="0" width="1774" height="12" fill="#000"/>
