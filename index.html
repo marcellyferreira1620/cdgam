@@ -6160,6 +6160,8 @@ function saveDevolucaoField(key,value){
   day.devolucao._updatedAt=ts;
   day._updatedAt=ts;
   devolucaoSaveCurrent(day);
+  const savedDay=getDay(dt)||day;
+  renderDevolucaoCharts(devolucaoTotals(savedDay.devolucao||day.devolucao||{}));
   devolucaoRefreshResumo();
 }
 function devolucaoBuildResumo(day){
