@@ -106,6 +106,40 @@ body.recebarm-view .receb-arm-panel{margin-bottom:10px}
 body.recebarm-view .receb-arm-body{padding:12px}
 body.recebarm-view .receb-arm-form{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
 @media(max-width:1100px){body.recebarm-view .receb-arm-kpis{grid-template-columns:repeat(auto-fit,minmax(145px,1fr))}}
+.boletim-page{padding:12px 14px;background:#f4f8fb;color:#0a2340;min-height:calc(100vh - 132px)}
+.boletim-head{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#0a2340;border:1px solid #1e4a72;border-radius:6px;padding:12px 16px;margin-bottom:12px}
+.boletim-title{display:flex;flex-direction:column;gap:4px}
+.boletim-title strong{color:#00e676;font-size:14px;text-transform:uppercase;letter-spacing:0}
+.boletim-title span{color:#6ab7ff;font-size:11px}
+.boletim-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.boletim-btn{border:0;border-radius:5px;padding:9px 14px;font-size:12px;font-weight:800;cursor:pointer;color:#fff;background:#1e88e5}
+.boletim-btn.green{background:#00a86b}.boletim-btn.gray{background:#526676}
+.boletim-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:8px;margin-bottom:12px}
+.boletim-card{background:#122033;border:1px solid #1a3550;border-radius:6px;padding:12px;min-height:86px}
+.boletim-card span{display:block;color:#6ab7ff;font-size:10px;text-transform:uppercase;margin-bottom:8px}
+.boletim-card strong{display:block;color:#ffd700;font-size:24px;line-height:1.1}
+.boletim-card small{display:block;color:#9fc7e6;font-size:11px;margin-top:6px}
+.boletim-section{background:#fff;border:1px solid #c8d9e8;border-radius:6px;margin-bottom:12px;overflow:hidden}
+.boletim-section-h{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#0a2340;color:#ffd700;padding:10px 14px;font-size:12px;font-weight:800;text-transform:uppercase}
+.boletim-section-h small{color:#6ab7ff;font-weight:600;text-transform:none}
+.boletim-section-b{padding:12px}
+.boletim-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:10px}
+.boletim-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.boletim-field{display:flex;flex-direction:column;gap:4px;color:#0b3b63;font-size:11px;font-weight:800}
+.boletim-field input,.boletim-field textarea{border:1px solid #9fc7e6;border-radius:5px;padding:8px;background:#fff;color:#0a2340;font-weight:700;font-size:12px;min-width:0}
+.boletim-field textarea{min-height:82px;resize:vertical;font-weight:600}
+.boletim-list{display:grid;gap:6px}
+.boletim-line{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #dbe8f3;padding:6px 0;font-size:12px}
+.boletim-line:last-child{border-bottom:0}
+.boletim-line b{color:#003b6f}.boletim-line strong{color:#004b8d}
+.boletim-whatsapp{width:100%;min-height:230px;border:1px solid #9fc7e6;border-radius:6px;padding:12px;font-size:12px;line-height:1.45;color:#0a2340;background:#fff;resize:vertical}
+body.boletim-view #kpiBar1,
+body.boletim-view #flowBar,
+body.boletim-view #prevEncPanel{display:none!important}
+body.boletim-view .tabs{padding-top:8px;background:#071525}
+body.boletim-view .tabs .tab:not(#tabAreas):not(#tabBoletim){display:none!important}
+body.boletim-view #tabBoletim{font-size:13px;padding:10px 18px}
+body.boletim-view .day-nav{justify-content:flex-start;padding:8px 14px}
 /* CHARTS */
 .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px}
 .chart-box{background:#122033;border-radius:6px;padding:8px;border:1px solid #1a3550}
@@ -795,6 +829,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
   <div class="tab"     id="tabProdDashDia" onclick="switchTab('proddashdia')" style="display:none">Dashboard Prod. Individual (Diurno)</div>
   <div class="tab"     id="tabProdDia" onclick="switchTab('proddia')" style="display:none">Produtividade Individual (Diurno)</div>
   <div class="tab"     id="tabRecebArm" onclick="switchTab('recebarm')" style="display:none">Recebimento/Armazenagem</div>
+  <div class="tab"     id="tabBoletim" onclick="switchTab('boletim')" style="display:none">Boletim Interno CD Diário</div>
 </div>
 
 <!-- TAB AREAS -->
@@ -808,9 +843,14 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
       <button type="button" class="area-choice disabled" aria-disabled="true">DEVOLUÇÃO</button>
       <button type="button" class="area-choice disabled" aria-disabled="true">FLUXOGRAMAS</button>
       <button type="button" class="area-choice disabled" aria-disabled="true">PRODUTIVIDADE INDIVIDUAL</button>
-      <button type="button" class="area-choice disabled" aria-disabled="true">BOLETIM INTERNO CD DIÁRIO</button>
+      <button type="button" class="area-choice" onclick="selectArea('boletim','boletim')">BOLETIM INTERNO CD DIÁRIO</button>
     </div>
   </div>
+</div>
+
+<!-- TAB BOLETIM -->
+<div class="tab-body" id="tb-boletim">
+  <div class="boletim-page" id="boletimPage"></div>
 </div>
 
 <!-- TAB DASHBOARD -->
@@ -2103,7 +2143,7 @@ function mergeHourData(current,next,chosen){
 
 function mergeDayRootFields(current,next,chosen){
   const out={...chosen};
-  const skip=new Set(['date','_updatedAt','_fieldUpdatedAt','rotas','prodSetores','prodDiurno','recebArm','hd']);
+  const skip=new Set(['date','_updatedAt','_fieldUpdatedAt','rotas','prodSetores','prodDiurno','recebArm','boletim','hd']);
   const keys=new Set([...Object.keys(current||{}),...Object.keys(next||{}),...Object.keys(chosen||{})]);
   keys.forEach(key=>{
     if(skip.has(key))return;
@@ -2449,6 +2489,39 @@ function mergeRecebArm(current,next){
   };
 }
 
+function mergeBoletim(current,next){
+  if(!current&&!next)return null;
+  const a=current||{};
+  const b=next||{};
+  const out={};
+  const aft=a._fieldUpdatedAt||{};
+  const bft=b._fieldUpdatedAt||{};
+  const keys=new Set([...Object.keys(a),...Object.keys(b)]);
+  keys.forEach(key=>{
+    if(key==='_fieldUpdatedAt'||key==='_updatedAt')return;
+    const av=a[key],bv=b[key];
+    const ats=+aft[key]||0;
+    const bts=+bft[key]||0;
+    const hasA=av!==undefined&&av!==null;
+    const hasB=bv!==undefined&&bv!==null;
+    if(ats||bts){
+      out[key]=bts>=ats&&hasB?bv:av;
+      return;
+    }
+    if(hasB&&dayFieldHasValue(bv))out[key]=bv;
+    else if(hasA&&dayFieldHasValue(av))out[key]=av;
+    else if(hasB)out[key]=bv;
+    else if(hasA)out[key]=av;
+  });
+  out._fieldUpdatedAt={...aft,...bft};
+  Object.keys(aft).forEach(key=>{
+    if((+aft[key]||0)>(+bft[key]||0))out._fieldUpdatedAt[key]=aft[key];
+  });
+  const ts=Math.max(+a._updatedAt||0,+b._updatedAt||0);
+  if(ts)out._updatedAt=ts;
+  return out;
+}
+
 function mergeDayRecords(current,next){
   if(!current)return next;
   if(!next)return current;
@@ -2466,8 +2539,9 @@ function mergeDayRecords(current,next){
   const prodSetores=mergeProdSetores(current.prodSetores,next.prodSetores);
   const prodDiurno=mergeProdDiurno(current.prodDiurno,next.prodDiurno);
   const recebArm=mergeRecebArm(current.recebArm,next.recebArm);
+  const boletim=mergeBoletim(current.boletim,next.boletim);
   const root=mergeDayRootFields(current,next,chosen);
-  return {...root,...(rotas.length?{rotas}:{}),...(prodSetores?{prodSetores}:{}),...(prodDiurno?{prodDiurno}:{}),...(recebArm?{recebArm}:{})};
+  return {...root,...(rotas.length?{rotas}:{}),...(prodSetores?{prodSetores}:{}),...(prodDiurno?{prodDiurno}:{}),...(recebArm?{recebArm}:{}),...(boletim?{boletim}:{})};
 }
 
 function mergeDays(remoteDays,localDays){
@@ -3297,7 +3371,8 @@ function updateMediaHoraAuto(){
 function updateRecebArmViewMode(id){
   document.body.classList.toggle('area-home-view',id==='areas');
   document.body.classList.toggle('recebarm-view',id==='recebarm');
-  if(id==='recebarm'){
+  document.body.classList.toggle('boletim-view',id==='boletim');
+  if(id==='recebarm'||id==='boletim'){
     const panel=document.getElementById('prevEncPanel');
     if(panel)panel.style.display='none';
   }
@@ -3307,7 +3382,8 @@ const AREA_STATE_KEY='gam_area_state_v1';
 let currentAreaMode='home';
 const AREA_TAB_IDS={
   noturno:['tabDash','tabHist','tabComp','tabRotas','tabPreench','tabAdm','tabProdDash','tabProdSetores'],
-  recebimento:['tabRecebArm','tabProdDashDia','tabProdDia']
+  recebimento:['tabRecebArm','tabProdDashDia','tabProdDia'],
+  boletim:['tabBoletim']
 };
 const TAB_ID_BY_BODY={
   areas:'tabAreas',
@@ -3321,7 +3397,8 @@ const TAB_ID_BY_BODY={
   prodsetores:'tabProdSetores',
   proddashdia:'tabProdDashDia',
   proddia:'tabProdDia',
-  recebarm:'tabRecebArm'
+  recebarm:'tabRecebArm',
+  boletim:'tabBoletim'
 };
 function captureRoleTabs(){
   document.querySelectorAll('.tab').forEach(tab=>{
@@ -3356,7 +3433,7 @@ function restoreAreaState(){
     return;
   }
   applyAreaTabs(area);
-  const fallback=area==='recebimento'?'recebarm':'dash';
+  const fallback=area==='recebimento'?'recebarm':(area==='boletim'?'boletim':'dash');
   switchTab(canOpenStoredTab(saved&&saved.tab)?saved.tab:fallback);
 }
 function showAreaHub(){
@@ -3366,7 +3443,7 @@ function showAreaHub(){
 function selectArea(area,initialTab){
   if(!AREA_TAB_IDS[area])return;
   applyAreaTabs(area);
-  switchTab(initialTab||(area==='recebimento'?'recebarm':'dash'));
+  switchTab(initialTab||(area==='recebimento'?'recebarm':(area==='boletim'?'boletim':'dash')));
 }
 
 function switchTab(id){
@@ -3384,6 +3461,7 @@ function switchTab(id){
   if(id==='proddashdia')renderProdDiurnoDash(getDay(curDate)||emptyDay(curDate||today()));
   if(id==='proddia')renderProdDiurno();
   if(id==='recebarm')renderRecebArm();
+  if(id==='boletim')renderBoletim();
 }
 
 // ── DAY NAV ───────────────────────────────────────────────
@@ -5939,6 +6017,234 @@ function renderRecebArm(){
   renderRecebArm997Report();
 }
 
+function boletimNum(v){return parseSumNumber(v);}
+function boletimPct(part,total){total=boletimNum(total);return total?Math.round((boletimNum(part)/total)*100):0;}
+function boletimTimeToMinutes(value){
+  const txt=String(value||'').trim();
+  const m=txt.match(/^(\d{1,2}):(\d{2})$/);
+  if(!m)return null;
+  return (+m[1])*60+(+m[2]);
+}
+function boletimHoursBetween(start,end){
+  const a=boletimTimeToMinutes(start),b=boletimTimeToMinutes(end);
+  if(a===null||b===null)return 0;
+  let diff=b-a;
+  if(diff<0)diff+=24*60;
+  return diff>0?diff/60:0;
+}
+function boletimMedia(total,start,end){
+  const hours=boletimHoursBetween(start,end);
+  return hours?boletimNum(total)/hours:0;
+}
+function boletimManual(day){
+  return (day&&day.boletim)||{};
+}
+function boletimRecebStats(day){
+  const data=(day&&day.recebArm)||emptyRecebArm();
+  const notas=Array.isArray(data.notas)?data.notas:[];
+  const agenda=recebArmAgendaSummary(data.agendaRows||[]);
+  const exact=recebArm997ExactSummary(data,day&&day.date);
+  const pendConf=Array.isArray(data.pendConf)?data.pendConf:[];
+  const nfVolumes=notas.reduce((s,n)=>s+boletimNum(n.volumes||n.caixas||0),0);
+  const nfSkus=notas.reduce((s,n)=>s+(Array.isArray(n.itens)?n.itens.length:0),0);
+  const confFinal=notas.filter(n=>n.confFinalizada||n.conferenciaFinalizada||n.statusConf==='finalizada').length;
+  const armFinal=notas.filter(n=>n.armFinalizada||n.armazenagemFinalizada||n.statusArm==='finalizada').length;
+  const emConf=notas.filter(n=>!n.confFinalizada&&n.statusConf!=='finalizada').length;
+  const emArm=notas.filter(n=>n.statusArm==='andamento'||n.emArmazenagem).length;
+  const recVol=nfVolumes||boletimNum(agenda.totalVolumes)||boletimNum(exact.today&&exact.today.vol);
+  const recSkus=nfSkus||boletimNum(agenda.totalSkus)||boletimNum(exact.today&&exact.today.skus);
+  const pendVol=boletimNum(exact.today&&exact.today.vol);
+  const pendSku=boletimNum(exact.today&&exact.today.skus);
+  return{
+    notas:notas.length,
+    confFinal,
+    emConf,
+    emArm,
+    armFinal,
+    pendConf:pendConf.length,
+    recVol,
+    recSkus,
+    pendVol,
+    pendSku,
+    pendVolPct:boletimPct(pendVol,recVol),
+    pendSkuPct:boletimPct(pendSku,recSkus)
+  };
+}
+function boletimNightStats(day){
+  day=day||{};
+  const hd=day.hd||{};
+  const med=sumActiveHoraField('Linhas Med.',hd,day.date);
+  const perf=sumActiveHoraField('Linhas Perf.',hd,day.date);
+  const checkoutVol=sumActiveHoraField('Vol. Checkout',hd,day.date);
+  const checkoutUn=sumActiveHoraField('Unid. Checkout',hd,day.date);
+  const psicoVol=sumActiveHoraField('Vol. Checkout Psico',hd,day.date);
+  const psicoUn=sumActiveHoraField('Unid. Checkout Psico',hd,day.date);
+  const especial=sumActiveHoraField('Vol. Especial',hd,day.date);
+  const expedicao=sumActiveHoraField('Vol. Doca',hd,day.date);
+  const routes=buildRotasMerged(day).filter(r=>r&&r.hPrev&&r.hReal);
+  const atrasadas=routes.filter(r=>calcAtraso(r.hPrev,r.hReal)>0).length;
+  const noHorario=routes.length-atrasadas;
+  const pctNoHorario=routes.length?Math.round(noHorario/routes.length*100):0;
+  const pctAtraso=routes.length?Math.round(atrasadas/routes.length*100):0;
+  const ini=day.cMed||day.cPer||day.ckOut||day.esp||day.exp||'';
+  const fim=day.cMedFim||day.cPerFim||day.ckOutFim||day.espFim||day.expFim||'';
+  return{
+    med,perf,checkoutVol,checkoutUn,psicoVol,psicoUn,especial,expedicao,
+    ini,fim,
+    medHora:boletimMedia(med,day.cMed,day.cMedFim),
+    perfHora:boletimMedia(perf,day.cPer,day.cPerFim),
+    checkoutVolHora:boletimMedia(checkoutVol,day.ckOut,day.ckOutFim),
+    checkoutUnHora:boletimMedia(checkoutUn,day.ckOut,day.ckOutFim),
+    psicoVolHora:boletimMedia(psicoVol,day.ckOut,day.ckOutFim),
+    psicoUnHora:boletimMedia(psicoUn,day.ckOut,day.ckOutFim),
+    especialHora:boletimMedia(especial,day.esp,day.espFim),
+    expPct:boletimPct(expedicao,day.pnDoca||day.pnCorreia),
+    routesTotal:routes.length,
+    noHorario,atrasadas,pctNoHorario,pctAtraso
+  };
+}
+function boletimField(label,key,value,type='number'){
+  return `<label class="boletim-field"><span>${label}</span><input type="${type}" value="${attrText(value||'')}" oninput="saveBoletimField('${key}',this.value)"></label>`;
+}
+function boletimTextarea(label,key,value){
+  return `<label class="boletim-field" style="grid-column:1/-1"><span>${label}</span><textarea oninput="saveBoletimField('${key}',this.value)">${excelText(value||'')}</textarea></label>`;
+}
+function boletimLine(label,value,detail=''){
+  return `<div class="boletim-line"><b>${label}</b><span><strong>${value}</strong>${detail?` <small>${detail}</small>`:''}</span></div>`;
+}
+function boletimSaveCurrent(day){
+  const idx=db.days.findIndex(d=>d.date===day.date);
+  if(idx>=0)db.days[idx]=mergeDayRecords(db.days[idx],day);else db.days.push(day);
+  db.days.sort((a,b)=>a.date.localeCompare(b.date));
+  save();
+}
+function saveBoletimField(key,value){
+  const dt=curDate||today();
+  const base=getDay(dt)||emptyDay(dt);
+  const day=JSON.parse(JSON.stringify(base));
+  const ts=Date.now();
+  day.boletim=day.boletim||{};
+  day.boletim._fieldUpdatedAt=day.boletim._fieldUpdatedAt||{};
+  day.boletim[key]=value;
+  day.boletim._fieldUpdatedAt[key]=ts;
+  day.boletim._updatedAt=ts;
+  day._updatedAt=ts;
+  boletimSaveCurrent(day);
+  boletimRefreshWhatsapp();
+}
+function boletimBuildWhatsapp(day){
+  const b=boletimManual(day);
+  const r=boletimRecebStats(day);
+  const n=boletimNightStats(day);
+  return [
+    `*BOLETIM INTERNO CD SJP*`,
+    `${fmtDate(day.date)}`,
+    ``,
+    `*OPERAÇÃO DIURNA*`,
+    `Recebimento: ${prodFmt(r.notas,0)} NF(s) no dia | Conferência 100%: ${prodFmt(r.confFinal,0)} | Pendência conferência: ${prodFmt(r.pendConf,0)}`,
+    `Armazenagem: recebidos ${prodFmt(r.recVol,0)} vol. / ${prodFmt(r.recSkus,0)} SKUs | pendentes ${prodFmt(r.pendVol,0)} vol. (${r.pendVolPct}%) / ${prodFmt(r.pendSku,0)} SKUs (${r.pendSkuPct}%)`,
+    `Abastecimento: abastecidas ${prodFmt(b.abastecidas,0)} | pendentes ${prodFmt(b.pendentes,0)} | canceladas ${prodFmt(b.canceladas,0)}`,
+    `Inventário: posições ${prodFmt(b.posicoesInventariadas,0)} | reserva liberada R$ ${prodFmt(b.valorReserva,2)}`,
+    b.manutencaoDiurna?`Manutenção diurna: ${String(b.manutencaoDiurna).trim()}`:`Manutenção diurna: sem apontamento.`,
+    ``,
+    `*OPERAÇÃO NOTURNA*`,
+    `Início: ${n.ini||'-'} | Finalização: ${n.fim||'-'}`,
+    `Correia Medicamento: ${prodFmt(n.med,0)} linhas | média/h ${prodFmt(n.medHora,0)}`,
+    `Correia Perfumaria: ${prodFmt(n.perf,0)} linhas | média/h ${prodFmt(n.perfHora,0)}`,
+    `Checkout: ${prodFmt(n.checkoutVol,0)} vol. / ${prodFmt(n.checkoutUn,0)} un. | médias/h ${prodFmt(n.checkoutVolHora,0)} vol. e ${prodFmt(n.checkoutUnHora,0)} un.`,
+    `Checkout Psico: ${prodFmt(n.psicoVol,0)} vol. / ${prodFmt(n.psicoUn,0)} un.`,
+    `Especial: ${prodFmt(n.especial,0)} vol. | média/h ${prodFmt(n.especialHora,0)}`,
+    `Expedição total: ${prodFmt(n.expedicao,0)} vol. | eficiência ${n.expPct}%`,
+    `Rotas: ${n.pctNoHorario}% no horário | ${n.pctAtraso}% atrasadas`,
+    b.manutencaoNoturna?`Manutenção noturna: ${String(b.manutencaoNoturna).trim()}`:`Manutenção noturna: sem apontamento.`
+  ].join('\n');
+}
+function boletimRefreshWhatsapp(){
+  const el=document.getElementById('boletimWhatsappText');
+  if(el)el.value=boletimBuildWhatsapp(getDay(curDate)||emptyDay(curDate||today()));
+}
+function copyBoletimWhatsapp(){
+  const text=boletimBuildWhatsapp(getDay(curDate)||emptyDay(curDate||today()));
+  const done=()=>showSyncStatus('Boletim copiado para WhatsApp',false);
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(done).catch(()=>{});
+  const tmp=document.createElement('textarea');
+  tmp.value=text;document.body.appendChild(tmp);tmp.select();
+  try{document.execCommand('copy');done();}catch(_){}
+  tmp.remove();
+}
+function renderBoletim(){
+  const wrap=document.getElementById('boletimPage');
+  if(!wrap)return;
+  const day=getDay(curDate)||emptyDay(curDate||today());
+  const b=boletimManual(day);
+  const r=boletimRecebStats(day);
+  const n=boletimNightStats(day);
+  wrap.innerHTML=`
+    <div class="boletim-head">
+      <div class="boletim-title">
+        <strong>Boletim Interno CD Diário</strong>
+        <span>${fmtDate(day.date)} | resumo para dashboard e WhatsApp</span>
+      </div>
+      <div class="boletim-actions">
+        <button class="boletim-btn green" type="button" onclick="copyBoletimWhatsapp()">Copiar WhatsApp</button>
+        <button class="boletim-btn gray" type="button" onclick="showAreaHub()">Trocar área</button>
+      </div>
+    </div>
+    <div class="boletim-grid">
+      <div class="boletim-card"><span>Notas no dia</span><strong>${prodFmt(r.notas,0)}</strong><small>Recebimento/armazenagem</small></div>
+      <div class="boletim-card"><span>Conferência 100%</span><strong style="color:#00e676">${prodFmt(r.confFinal,0)}</strong><small>NF(s) finalizadas</small></div>
+      <div class="boletim-card"><span>Pend. conferência</span><strong style="color:#ff466a">${prodFmt(r.pendConf,0)}</strong><small>Apontamentos manuais</small></div>
+      <div class="boletim-card"><span>Vol. recebidos</span><strong>${prodFmt(r.recVol,0)}</strong><small>${prodFmt(r.recSkus,0)} SKUs recebidos</small></div>
+      <div class="boletim-card"><span>Pend. armazenagem</span><strong style="color:#ff9800">${prodFmt(r.pendVol,0)}</strong><small>${r.pendVolPct}% dos volumes recebidos</small></div>
+      <div class="boletim-card"><span>Expedição noturna</span><strong style="color:#00e676">${prodFmt(n.expedicao,0)}</strong><small>${n.expPct}% produzido</small></div>
+    </div>
+    <div class="boletim-two">
+      <section class="boletim-section">
+        <div class="boletim-section-h">Operação diurna <small>Recebimento, armazenagem, abastecimento e inventário</small></div>
+        <div class="boletim-section-b">
+          <div class="boletim-list">
+            ${boletimLine('Lead time ponderado','Em implantação','será puxado dos gráficos')}
+            ${boletimLine('Volumes recebidos',prodFmt(r.recVol,0),`${prodFmt(r.recSkus,0)} SKUs`)}
+            ${boletimLine('Volumes pendentes de armazenagem',prodFmt(r.pendVol,0),`${r.pendVolPct}%`)}
+            ${boletimLine('SKUs pendentes de armazenagem',prodFmt(r.pendSku,0),`${r.pendSkuPct}%`)}
+          </div>
+          <div class="boletim-fields" style="margin-top:12px">
+            ${boletimField('Linhas abastecidas','abastecidas',b.abastecidas)}
+            ${boletimField('Linhas pendentes','pendentes',b.pendentes)}
+            ${boletimField('Linhas canceladas','canceladas',b.canceladas)}
+            ${boletimField('Posições inventariadas','posicoesInventariadas',b.posicoesInventariadas)}
+            ${boletimField('Valor liberado da reserva','valorReserva',b.valorReserva,'text')}
+            ${boletimTextarea('Manutenção / observações do dia','manutencaoDiurna',b.manutencaoDiurna)}
+          </div>
+        </div>
+      </section>
+      <section class="boletim-section">
+        <div class="boletim-section-h">Operação noturna <small>Leitura automática da produção noturna</small></div>
+        <div class="boletim-section-b">
+          <div class="boletim-list">
+            ${boletimLine('Horário de início',n.ini||'-')}
+            ${boletimLine('Finalização',n.fim||'-')}
+            ${boletimLine('Correia medicamento',prodFmt(n.med,0),`média/h ${prodFmt(n.medHora,0)}`)}
+            ${boletimLine('Correia perfumaria',prodFmt(n.perf,0),`média/h ${prodFmt(n.perfHora,0)}`)}
+            ${boletimLine('Checkout',`${prodFmt(n.checkoutVol,0)} vol. / ${prodFmt(n.checkoutUn,0)} un.`,`média/h ${prodFmt(n.checkoutVolHora,0)} vol.`)}
+            ${boletimLine('Checkout psico',`${prodFmt(n.psicoVol,0)} vol. / ${prodFmt(n.psicoUn,0)} un.`)}
+            ${boletimLine('Especial',prodFmt(n.especial,0),`média/h ${prodFmt(n.especialHora,0)}`)}
+            ${boletimLine('Rotas no horário / atrasadas',`${n.pctNoHorario}% / ${n.pctAtraso}%`,`${prodFmt(n.routesTotal,0)} rotas apuradas`)}
+          </div>
+          <div class="boletim-fields" style="margin-top:12px">
+            ${boletimTextarea('Manutenção / observações da noite','manutencaoNoturna',b.manutencaoNoturna)}
+          </div>
+        </div>
+      </section>
+    </div>
+    <section class="boletim-section">
+      <div class="boletim-section-h">Texto para WhatsApp <small>Copie e envie como jornal diário</small></div>
+      <div class="boletim-section-b">
+        <textarea class="boletim-whatsapp" id="boletimWhatsappText" readonly>${excelText(boletimBuildWhatsapp(day))}</textarea>
+      </div>
+    </section>`;
+}
+
 function recebArm997ConvertedRows(data){
   const baseRows=recebArmProductBaseRows(data);
   const baseByCode={};
@@ -8110,6 +8416,7 @@ function renderCurrentDay(day){
   renderProdSetoresDash(day);
   renderProdDiurnoDash(day);
   renderRecebArm();
+  renderBoletim();
 }
 function prepNewDay(){
   clearTimeout(autoSaveTimer);
@@ -9305,13 +9612,13 @@ function applyRoleUI(){
   const hide=id=>{const e=document.getElementById(id);if(e)e.style.display='none';};
   if(r==='admin'){
     adminOk=true;
-    show('tabAdm');show('tabProdDash');show('tabProdSetores');show('tabProdDashDia');show('tabProdDia');show('tabRecebArm');show('floatBtn');hide('tabPreench');
+    show('tabAdm');show('tabProdDash');show('tabProdSetores');show('tabProdDashDia');show('tabProdDia');show('tabRecebArm');show('tabBoletim');show('floatBtn');hide('tabPreench');
     document.querySelectorAll('.adm-restricted').forEach(e=>e.style.display='');
   }else if(r==='supervisor'){
-    show('tabProdDash');show('tabProdSetores');show('tabProdDashDia');show('tabProdDia');show('tabRecebArm');hide('floatBtn');hide('tabAdm');hide('tabPreench');
+    show('tabProdDash');show('tabProdSetores');show('tabProdDashDia');show('tabProdDia');show('tabRecebArm');show('tabBoletim');hide('floatBtn');hide('tabAdm');hide('tabPreench');
   }else if(r==='operador'){
     adminOk=true;
-    show('tabPreench');show('tabAdm');show('tabProdDash');show('tabProdSetores');show('tabProdDashDia');show('tabProdDia');show('tabRecebArm');
+    show('tabPreench');show('tabAdm');show('tabProdDash');show('tabProdSetores');show('tabProdDashDia');show('tabProdDia');show('tabRecebArm');show('tabBoletim');
     hide('floatBtn');hide('tabHist');hide('tabComp');hide('tabRotas');
     document.querySelectorAll('.adm-restricted').forEach(e=>e.style.display='none');
   }
