@@ -6087,6 +6087,7 @@ function boletimNightStats(day){
   const checkoutUn=sumActiveHoraField('Unid. Checkout',hd,day.date);
   const psicoVol=sumActiveHoraField('Vol. Checkout Psico',hd,day.date);
   const psicoUn=sumActiveHoraField('Unid. Checkout Psico',hd,day.date);
+  const vales=sumActiveHoraField('Vales',hd,day.date);
   const especial=sumActiveHoraField('Vol. Especial',hd,day.date);
   const expedicao=sumActiveHoraField('Vol. Doca',hd,day.date);
   const routes=buildRotasMerged(day).filter(r=>r&&r.hPrev&&r.hReal);
@@ -6097,7 +6098,7 @@ function boletimNightStats(day){
   const ini=day.cMed||day.cPer||day.ckOut||day.esp||day.exp||'';
   const fim=day.cMedFim||day.cPerFim||day.ckOutFim||day.espFim||day.expFim||'';
   return{
-    med,perf,checkoutVol,checkoutUn,psicoVol,psicoUn,especial,expedicao,
+    med,perf,checkoutVol,checkoutUn,psicoVol,psicoUn,vales,especial,expedicao,
     ini,fim,
     medHora:boletimMedia(med,day.cMed,day.cMedFim),
     perfHora:boletimMedia(perf,day.cPer,day.cPerFim),
@@ -6161,6 +6162,7 @@ function boletimBuildWhatsapp(day){
     `Correia Perfumaria: ${prodFmt(n.perf,0)} linhas | média/h ${prodFmt(n.perfHora,0)}`,
     `Checkout: ${prodFmt(n.checkoutVol,0)} vol. / ${prodFmt(n.checkoutUn,0)} un. | médias/h ${prodFmt(n.checkoutVolHora,0)} vol. e ${prodFmt(n.checkoutUnHora,0)} un.`,
     `Checkout Psico: ${prodFmt(n.psicoVol,0)} vol. / ${prodFmt(n.psicoUn,0)} un.`,
+    `Vales gerados: ${prodFmt(n.vales,0)}`,
     `Especial: ${prodFmt(n.especial,0)} vol. | média/h ${prodFmt(n.especialHora,0)}`,
     `Expedição total: ${prodFmt(n.expedicao,0)} vol. | eficiência ${n.expPct}%`,
     `Rotas: ${n.pctNoHorario}% no horário | ${n.pctAtraso}% atrasadas`,
@@ -6246,6 +6248,7 @@ function renderBoletim(){
             ${boletimLine('Correia perfumaria',prodFmt(n.perf,0),`média/h ${prodFmt(n.perfHora,0)}`)}
             ${boletimLine('Checkout',`${prodFmt(n.checkoutVol,0)} vol. / ${prodFmt(n.checkoutUn,0)} un.`,`média/h ${prodFmt(n.checkoutVolHora,0)} vol.`)}
             ${boletimLine('Checkout psico',`${prodFmt(n.psicoVol,0)} vol. / ${prodFmt(n.psicoUn,0)} un.`)}
+            ${boletimLine('Vales gerados',prodFmt(n.vales,0))}
             ${boletimLine('Especial',prodFmt(n.especial,0),`média/h ${prodFmt(n.especialHora,0)}`)}
             ${boletimLine('Rotas no horário / atrasadas',`${n.pctNoHorario}% / ${n.pctAtraso}%`,`${prodFmt(n.routesTotal,0)} rotas apuradas`)}
           </div>
