@@ -91,6 +91,7 @@ body.area-home-view .day-nav{display:none!important}
 .area-choice.disabled{cursor:default;color:#607080;background:#f4f7fa;font-weight:600}
 .area-choice.disabled::after{content:'EM BREVE';background:#d9e3ec;color:#607080;min-width:68px}
 .area-choice.disabled:hover{background:#f4f7fa;color:#607080}
+.area-panel .area-choice.disabled:nth-child(6){display:none}
 body.recebarm-view #kpiBar1,
 body.recebarm-view #flowBar,
 body.recebarm-view #prevEncPanel{display:none!important}
@@ -142,6 +143,44 @@ body.boletim-view .tabs{padding-top:8px;background:#071525}
 body.boletim-view .tabs .tab:not(#tabAreas):not(#tabBoletim){display:none!important}
 body.boletim-view #tabBoletim{font-size:13px;padding:10px 18px}
 body.boletim-view .day-nav{justify-content:flex-start;padding:8px 14px}
+.devolucao-page{padding:12px 14px;background:#f4f8fb;color:#0a2340;min-height:calc(100vh - 132px)}
+.devolucao-head{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#0a2340;border:1px solid #1e4a72;border-radius:6px;padding:12px 16px;margin-bottom:12px}
+.devolucao-title{display:flex;flex-direction:column;gap:4px}
+.devolucao-title strong{color:#00e676;font-size:14px;text-transform:uppercase;letter-spacing:0}
+.devolucao-title span{color:#6ab7ff;font-size:11px}
+.devolucao-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.devolucao-btn{border:0;border-radius:5px;padding:9px 14px;font-size:12px;font-weight:800;cursor:pointer;color:#fff;background:#1e88e5}
+.devolucao-btn.green{background:#00a86b}.devolucao-btn.gray{background:#526676}
+.devolucao-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(185px,1fr));gap:8px;margin-bottom:12px}
+.devolucao-card{background:#122033;border:1px solid #1a3550;border-radius:6px;padding:12px;min-height:86px}
+.devolucao-card span{display:block;color:#6ab7ff;font-size:10px;text-transform:uppercase;margin-bottom:8px}
+.devolucao-card strong{display:block;color:#ffd700;font-size:24px;line-height:1.1}
+.devolucao-card small{display:block;color:#9fc7e6;font-size:11px;margin-top:6px}
+.devolucao-section{background:#fff;border:1px solid #c8d9e8;border-radius:6px;margin-bottom:12px;overflow:hidden}
+.devolucao-section-h{display:flex;align-items:center;justify-content:space-between;gap:12px;background:#0a2340;color:#ffd700;padding:10px 14px;font-size:12px;font-weight:800;text-transform:uppercase}
+.devolucao-section-h small{color:#6ab7ff;font-weight:600;text-transform:none}
+.devolucao-section-b{padding:12px}
+.devolucao-two{display:grid;grid-template-columns:repeat(auto-fit,minmax(310px,1fr));gap:10px}
+.devolucao-fields{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:10px}
+.devolucao-subhead{margin:12px 0 8px;padding:7px 10px;background:#eaf4ff;border-left:4px solid #1e88e5;color:#003b6f;font-size:12px;font-weight:900;text-transform:uppercase}
+.devolucao-subhead:first-child{margin-top:0}
+.devolucao-field{display:flex;flex-direction:column;gap:4px;color:#0b3b63;font-size:11px;font-weight:800}
+.devolucao-field input,.devolucao-field textarea{border:1px solid #9fc7e6;border-radius:5px;padding:8px;background:#fff;color:#0a2340;font-weight:700;font-size:12px;min-width:0}
+.devolucao-field textarea{min-height:82px;resize:vertical;font-weight:600}
+.devolucao-progress{display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #dbe8f3}
+.devolucao-progress b{color:#003b6f;font-size:12px}
+.devolucao-progress strong{color:#004b8d;font-size:12px}
+.devolucao-bar{grid-column:1/-1;height:12px;background:#dbe8f3;border-radius:6px;overflow:hidden}
+.devolucao-fill{height:100%;background:#00a86b;border-radius:6px}
+.devolucao-fill.warn{background:#ff466a}
+.devolucao-resumo{width:100%;min-height:190px;border:1px solid #9fc7e6;border-radius:6px;padding:12px;font-size:12px;line-height:1.45;color:#0a2340;background:#fff;resize:vertical}
+body.devolucao-view #kpiBar1,
+body.devolucao-view #flowBar,
+body.devolucao-view #prevEncPanel{display:none!important}
+body.devolucao-view .tabs{padding-top:8px;background:#071525}
+body.devolucao-view .tabs .tab:not(#tabAreas):not(#tabDevolucao){display:none!important}
+body.devolucao-view #tabDevolucao{font-size:13px;padding:10px 18px}
+body.devolucao-view .day-nav{justify-content:flex-start;padding:8px 14px}
 /* CHARTS */
 .chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:8px}
 .chart-box{background:#122033;border-radius:6px;padding:8px;border:1px solid #1a3550}
@@ -831,6 +870,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
   <div class="tab"     id="tabProdDashDia" onclick="switchTab('proddashdia')" style="display:none">Dashboard Prod. Individual (Diurno)</div>
   <div class="tab"     id="tabProdDia" onclick="switchTab('proddia')" style="display:none">Produtividade Individual (Diurno)</div>
   <div class="tab"     id="tabRecebArm" onclick="switchTab('recebarm')" style="display:none">Recebimento/Armazenagem</div>
+  <div class="tab"     id="tabDevolucao" onclick="switchTab('devolucao')" style="display:none">Devolu&ccedil;&atilde;o</div>
   <div class="tab"     id="tabBoletim" onclick="switchTab('boletim')" style="display:none">Boletim Interno CD Diário</div>
 </div>
 
@@ -841,6 +881,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
       <button type="button" class="area-choice" onclick="selectArea('noturno','dash')">PRODUÇÃO NOTURNA</button>
       <button type="button" class="area-choice" onclick="selectArea('recebimento','recebarm')">RECEBIMENTO</button>
       <button type="button" class="area-choice disabled" aria-disabled="true">ABASTECIMENTO</button>
+      <button type="button" class="area-choice" onclick="selectArea('devolucao','devolucao')">DEVOLU&ccedil;&atilde;o</button>
       <button type="button" class="area-choice disabled" aria-disabled="true">INVENTÁRIO</button>
       <button type="button" class="area-choice disabled" aria-disabled="true">DEVOLUÇÃO</button>
       <button type="button" class="area-choice disabled" aria-disabled="true">FLUXOGRAMAS</button>
@@ -853,6 +894,11 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 <!-- TAB BOLETIM -->
 <div class="tab-body" id="tb-boletim">
   <div class="boletim-page" id="boletimPage"></div>
+</div>
+
+<!-- TAB DEVOLUCAO -->
+<div class="tab-body" id="tb-devolucao">
+  <div class="devolucao-page" id="devolucaoPage"></div>
 </div>
 
 <!-- TAB DASHBOARD -->
@@ -2145,7 +2191,7 @@ function mergeHourData(current,next,chosen){
 
 function mergeDayRootFields(current,next,chosen){
   const out={...chosen};
-  const skip=new Set(['date','_updatedAt','_fieldUpdatedAt','rotas','prodSetores','prodDiurno','recebArm','boletim','hd']);
+  const skip=new Set(['date','_updatedAt','_fieldUpdatedAt','rotas','prodSetores','prodDiurno','recebArm','boletim','devolucao','hd']);
   const keys=new Set([...Object.keys(current||{}),...Object.keys(next||{}),...Object.keys(chosen||{})]);
   keys.forEach(key=>{
     if(skip.has(key))return;
@@ -2524,6 +2570,39 @@ function mergeBoletim(current,next){
   return out;
 }
 
+function mergeDevolucao(current,next){
+  if(!current&&!next)return null;
+  const a=current||{};
+  const b=next||{};
+  const out={};
+  const aft=a._fieldUpdatedAt||{};
+  const bft=b._fieldUpdatedAt||{};
+  const keys=new Set([...Object.keys(a),...Object.keys(b)]);
+  keys.forEach(key=>{
+    if(key==='_fieldUpdatedAt'||key==='_updatedAt')return;
+    const av=a[key],bv=b[key];
+    const ats=+aft[key]||0;
+    const bts=+bft[key]||0;
+    const hasA=av!==undefined&&av!==null;
+    const hasB=bv!==undefined&&bv!==null;
+    if(ats||bts){
+      out[key]=bts>=ats&&hasB?bv:av;
+      return;
+    }
+    if(hasB&&dayFieldHasValue(bv))out[key]=bv;
+    else if(hasA&&dayFieldHasValue(av))out[key]=av;
+    else if(hasB)out[key]=bv;
+    else if(hasA)out[key]=av;
+  });
+  out._fieldUpdatedAt={...aft,...bft};
+  Object.keys(aft).forEach(key=>{
+    if((+aft[key]||0)>(+bft[key]||0))out._fieldUpdatedAt[key]=aft[key];
+  });
+  const ts=Math.max(+a._updatedAt||0,+b._updatedAt||0);
+  if(ts)out._updatedAt=ts;
+  return out;
+}
+
 function mergeDayRecords(current,next){
   if(!current)return next;
   if(!next)return current;
@@ -2542,8 +2621,9 @@ function mergeDayRecords(current,next){
   const prodDiurno=mergeProdDiurno(current.prodDiurno,next.prodDiurno);
   const recebArm=mergeRecebArm(current.recebArm,next.recebArm);
   const boletim=mergeBoletim(current.boletim,next.boletim);
+  const devolucao=mergeDevolucao(current.devolucao,next.devolucao);
   const root=mergeDayRootFields(current,next,chosen);
-  return {...root,...(rotas.length?{rotas}:{}),...(prodSetores?{prodSetores}:{}),...(prodDiurno?{prodDiurno}:{}),...(recebArm?{recebArm}:{}),...(boletim?{boletim}:{})};
+  return {...root,...(rotas.length?{rotas}:{}),...(prodSetores?{prodSetores}:{}),...(prodDiurno?{prodDiurno}:{}),...(recebArm?{recebArm}:{}),...(boletim?{boletim}:{}),...(devolucao?{devolucao}:{})};
 }
 
 function mergeDays(remoteDays,localDays){
@@ -3374,7 +3454,8 @@ function updateRecebArmViewMode(id){
   document.body.classList.toggle('area-home-view',id==='areas');
   document.body.classList.toggle('recebarm-view',id==='recebarm');
   document.body.classList.toggle('boletim-view',id==='boletim');
-  if(id==='recebarm'||id==='boletim'){
+  document.body.classList.toggle('devolucao-view',id==='devolucao');
+  if(id==='recebarm'||id==='boletim'||id==='devolucao'){
     const panel=document.getElementById('prevEncPanel');
     if(panel)panel.style.display='none';
   }
@@ -3385,7 +3466,8 @@ let currentAreaMode='home';
 const AREA_TAB_IDS={
   noturno:['tabDash','tabHist','tabComp','tabRotas','tabPreench','tabAdm','tabProdDash','tabProdSetores'],
   recebimento:['tabRecebArm','tabProdDashDia','tabProdDia'],
-  boletim:['tabBoletim']
+  boletim:['tabBoletim'],
+  devolucao:['tabDevolucao']
 };
 const TAB_ID_BY_BODY={
   areas:'tabAreas',
@@ -3400,7 +3482,8 @@ const TAB_ID_BY_BODY={
   proddashdia:'tabProdDashDia',
   proddia:'tabProdDia',
   recebarm:'tabRecebArm',
-  boletim:'tabBoletim'
+  boletim:'tabBoletim',
+  devolucao:'tabDevolucao'
 };
 function captureRoleTabs(){
   document.querySelectorAll('.tab').forEach(tab=>{
@@ -3435,7 +3518,7 @@ function restoreAreaState(){
     return;
   }
   applyAreaTabs(area);
-  const fallback=area==='recebimento'?'recebarm':(area==='boletim'?'boletim':'dash');
+  const fallback=area==='recebimento'?'recebarm':(area==='boletim'?'boletim':(area==='devolucao'?'devolucao':'dash'));
   switchTab(canOpenStoredTab(saved&&saved.tab)?saved.tab:fallback);
 }
 function showAreaHub(){
@@ -3445,7 +3528,7 @@ function showAreaHub(){
 function selectArea(area,initialTab){
   if(!AREA_TAB_IDS[area])return;
   applyAreaTabs(area);
-  switchTab(initialTab||(area==='recebimento'?'recebarm':(area==='boletim'?'boletim':'dash')));
+  switchTab(initialTab||(area==='recebimento'?'recebarm':(area==='boletim'?'boletim':(area==='devolucao'?'devolucao':'dash'))));
 }
 
 function switchTab(id){
@@ -3464,6 +3547,7 @@ function switchTab(id){
   if(id==='proddia')renderProdDiurno();
   if(id==='recebarm')renderRecebArm();
   if(id==='boletim')renderBoletim();
+  if(id==='devolucao')renderDevolucao();
 }
 
 // ── DAY NAV ───────────────────────────────────────────────
@@ -6019,6 +6103,230 @@ function renderRecebArm(){
   renderRecebArm997Report();
 }
 
+function devolucaoNum(v){return parseSumNumber(v);}
+function devolucaoPct(part,total){total=devolucaoNum(total);return total?Math.round((devolucaoNum(part)/total)*100):0;}
+function devolucaoManual(day){return (day&&day.devolucao)||{};}
+function devolucaoSum(d,keys){
+  return keys.reduce((s,k)=>s+devolucaoNum(d[k]),0);
+}
+function devolucaoTotals(d){
+  const inicioPalletsTrans=devolucaoSum(d,['inicioPalletsTranslog','inicioPalletsRondolog','inicioPalletsCeresul']);
+  const inicioNfsTrans=devolucaoSum(d,['inicioNfsTranslog','inicioNfsRondolog','inicioNfsCeresul']);
+  const inicioVolTrans=devolucaoSum(d,['inicioVolumesTranslog','inicioVolumesRondolog','inicioVolumesCeresul']);
+  const inicioPallets=devolucaoNum(d.inicioPallets)||inicioPalletsTrans;
+  const inicioNfs=devolucaoNum(d.inicioNfs)||inicioNfsTrans;
+  const inicioVolumes=devolucaoNum(d.inicioVolumes)||inicioVolTrans;
+  const palletsConf=devolucaoNum(d.palletsConferidos);
+  const palletsPend=devolucaoNum(d.palletsPendentesConferencia);
+  const menu24Guardados=devolucaoNum(d.menu24Guardados);
+  const menu24Pend=devolucaoNum(d.menu24PendenteGuarda);
+  const faltaVolInicio=devolucaoNum(d.gppFaltaVolumeInicio);
+  const faltaVolFinal=devolucaoNum(d.gppFaltaVolumeFinal);
+  const faltaVolProd=Math.max(faltaVolInicio-faltaVolFinal,0);
+  const faltaMercInicio=devolucaoNum(d.gppFaltaMercadoriaInicio);
+  const faltaMercFinal=devolucaoNum(d.gppFaltaMercadoriaFinal);
+  const faltaMercProd=Math.max(faltaMercInicio-faltaMercFinal,0);
+  return {inicioPallets,inicioNfs,inicioVolumes,palletsConf,palletsPend,menu24Guardados,menu24Pend,faltaVolInicio,faltaVolFinal,faltaVolProd,faltaMercInicio,faltaMercFinal,faltaMercProd};
+}
+function devolucaoField(label,key,value,type='number'){
+  return `<label class="devolucao-field"><span>${label}</span><input type="${type}" value="${attrText(value||'')}" oninput="saveDevolucaoField('${key}',this.value)"></label>`;
+}
+function devolucaoTextarea(label,key,value){
+  return `<label class="devolucao-field" style="grid-column:1/-1"><span>${label}</span><textarea oninput="saveDevolucaoField('${key}',this.value)">${excelText(value||'')}</textarea></label>`;
+}
+function devolucaoCard(label,value,small='',color=''){
+  return `<div class="devolucao-card"><span>${label}</span><strong${color?` style="color:${color}"`:''}>${value}</strong>${small?`<small>${small}</small>`:''}</div>`;
+}
+function devolucaoProgress(label,part,total,kind='ok'){
+  const pct=devolucaoPct(part,total);
+  const pend=Math.max(devolucaoNum(total)-devolucaoNum(part),0);
+  return `<div class="devolucao-progress"><b>${label}</b><strong>${prodFmt(part,0)} de ${prodFmt(total,0)} (${pct}%)</strong><div class="devolucao-bar"><div class="devolucao-fill ${kind==='warn'?'warn':''}" style="width:${Math.min(pct,100)}%"></div></div><b>Pendente</b><strong>${prodFmt(pend,0)}</strong></div>`;
+}
+function devolucaoSaveCurrent(day){
+  const idx=db.days.findIndex(d=>d.date===day.date);
+  if(idx>=0)db.days[idx]=mergeDayRecords(db.days[idx],day);else db.days.push(day);
+  db.days=mergeDays(db.days,[]);
+  save();
+}
+function saveDevolucaoField(key,value){
+  const dt=curDate||today();
+  const base=getDay(dt)||emptyDay(dt);
+  const day=JSON.parse(JSON.stringify(base));
+  const ts=Date.now();
+  day.devolucao=day.devolucao||{};
+  day.devolucao._fieldUpdatedAt=day.devolucao._fieldUpdatedAt||{};
+  day.devolucao[key]=value;
+  day.devolucao._fieldUpdatedAt[key]=ts;
+  day.devolucao._updatedAt=ts;
+  day._updatedAt=ts;
+  devolucaoSaveCurrent(day);
+  devolucaoRefreshResumo();
+}
+function devolucaoBuildResumo(day){
+  const d=devolucaoManual(day);
+  const t=devolucaoTotals(d);
+  return [
+    `DEVOLUCAO CD SJP`,
+    `${fmtDate(day.date)}`,
+    ``,
+    `INICIO DO DIA`,
+    `Pallets recebidos: ${prodFmt(t.inicioPallets,0)}`,
+    `Notas fiscais: ${prodFmt(t.inicioNfs,0)}`,
+    `Volumes recebidos: ${prodFmt(t.inicioVolumes,0)}`,
+    ``,
+    `FINAL DO DIA`,
+    `Pallets conferidos: ${prodFmt(t.palletsConf,0)}`,
+    `Pallets pendentes de conferencia: ${prodFmt(t.palletsPend,0)}`,
+    `Notas processadas: ${prodFmt(d.notasProcessadas||0,0)}`,
+    `Notas com erro: ${prodFmt(d.notasErro||0,0)}`,
+    `Menu 24 guardados: ${prodFmt(t.menu24Guardados,0)}`,
+    `Menu 24 pendentes de guarda: ${prodFmt(t.menu24Pend,0)}`,
+    ``,
+    `GPP - FALTA DE VOLUME`,
+    `Inicio: ${prodFmt(t.faltaVolInicio,0)} | Final: ${prodFmt(t.faltaVolFinal,0)} | Produzido: ${prodFmt(t.faltaVolProd,0)}`,
+    `Retidos por atraso na preparacao: ${prodFmt(d.volRetidoAtraso||0,0)}`,
+    `Retidos por falta no estoque: ${prodFmt(d.volRetidoEstoque||0,0)}`,
+    `Rotas com mais ocorrencias: ${d.rotasMaisOcorrencias||'-'}`,
+    ``,
+    `GPP - FALTA DE MERCADORIA`,
+    `Inicio: ${prodFmt(t.faltaMercInicio,0)} | Final: ${prodFmt(t.faltaMercFinal,0)} | Produzido: ${prodFmt(t.faltaMercProd,0)}`,
+    `Ocorrencias analisadas nas cameras: ${prodFmt(d.ocorrenciasComCamera||0,0)}`,
+    `Ocorrencias sem analise nas cameras: ${prodFmt(d.ocorrenciasSemCamera||0,0)}`,
+    `Notas lancadas: ${prodFmt(d.notasFaltaMercadoria||0,0)}`,
+    ``,
+    d.observacoesDevolucao?`OBS: ${d.observacoesDevolucao}`:`OBS: -`
+  ].join('\n');
+}
+function devolucaoRefreshResumo(){
+  const el=document.getElementById('devolucaoResumoText');
+  if(el)el.value=devolucaoBuildResumo(getDay(curDate)||emptyDay(curDate||today()));
+}
+function copyDevolucaoResumo(){
+  const text=devolucaoBuildResumo(getDay(curDate)||emptyDay(curDate||today()));
+  const done=()=>showSyncStatus('Resumo da devolucao copiado',false);
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(text).then(done).catch(()=>{});
+  const tmp=document.createElement('textarea');
+  tmp.value=text;document.body.appendChild(tmp);tmp.select();
+  try{document.execCommand('copy');done();}catch(_){}
+  tmp.remove();
+}
+function renderDevolucao(){
+  const wrap=document.getElementById('devolucaoPage');
+  if(!wrap)return;
+  const day=getDay(curDate)||emptyDay(curDate||today());
+  const d=devolucaoManual(day);
+  const t=devolucaoTotals(d);
+  wrap.innerHTML=`
+    <div class="devolucao-head">
+      <div class="devolucao-title">
+        <strong>&Aacute;rea de Devolu&ccedil;&atilde;o</strong>
+        <span>${fmtDate(day.date)} | acompanhamento manual por dia</span>
+      </div>
+      <div class="devolucao-actions">
+        <button class="devolucao-btn green" type="button" onclick="copyDevolucaoResumo()">Copiar resumo</button>
+        <button class="devolucao-btn" type="button" onclick="renderDevolucao()">Atualizar resumo</button>
+        <button class="devolucao-btn gray" type="button" onclick="showAreaHub()">Trocar &aacute;rea</button>
+      </div>
+    </div>
+    <div class="devolucao-grid">
+      ${devolucaoCard('Pallets recebidos',prodFmt(t.inicioPallets,0),'in&iacute;cio do dia')}
+      ${devolucaoCard('Notas fiscais',prodFmt(t.inicioNfs,0),'in&iacute;cio do dia','#00e676')}
+      ${devolucaoCard('Volumes recebidos',prodFmt(t.inicioVolumes,0),'in&iacute;cio do dia')}
+      ${devolucaoCard('Pallets conferidos',prodFmt(t.palletsConf,0),`${devolucaoPct(t.palletsConf,t.inicioPallets)}% do recebido`,'#00e676')}
+      ${devolucaoCard('Pend. confer&ecirc;ncia',prodFmt(t.palletsPend,0),'pallets pendentes','#ff466a')}
+      ${devolucaoCard('Menu 24 pendente',prodFmt(t.menu24Pend,0),'guarda pendente','#ff9800')}
+    </div>
+    <div class="devolucao-two">
+      <section class="devolucao-section">
+        <div class="devolucao-section-h">Entrada do dia <small>transportadoras e volumes recebidos</small></div>
+        <div class="devolucao-section-b">
+          <div class="devolucao-fields">
+            ${devolucaoField('Quantidade de pallets recebidos','inicioPallets',d.inicioPallets)}
+            ${devolucaoField('Quantidade de notas fiscais','inicioNfs',d.inicioNfs)}
+            ${devolucaoField('Volumes recebidos','inicioVolumes',d.inicioVolumes)}
+          </div>
+          <div class="devolucao-subhead">Translog</div>
+          <div class="devolucao-fields">
+            ${devolucaoField('Pallets','inicioPalletsTranslog',d.inicioPalletsTranslog)}
+            ${devolucaoField('Notas fiscais','inicioNfsTranslog',d.inicioNfsTranslog)}
+            ${devolucaoField('Volumes','inicioVolumesTranslog',d.inicioVolumesTranslog)}
+          </div>
+          <div class="devolucao-subhead">Rondolog</div>
+          <div class="devolucao-fields">
+            ${devolucaoField('Pallets','inicioPalletsRondolog',d.inicioPalletsRondolog)}
+            ${devolucaoField('Notas fiscais','inicioNfsRondolog',d.inicioNfsRondolog)}
+            ${devolucaoField('Volumes','inicioVolumesRondolog',d.inicioVolumesRondolog)}
+          </div>
+          <div class="devolucao-subhead">Ceresul</div>
+          <div class="devolucao-fields">
+            ${devolucaoField('Pallets','inicioPalletsCeresul',d.inicioPalletsCeresul)}
+            ${devolucaoField('Notas fiscais','inicioNfsCeresul',d.inicioNfsCeresul)}
+            ${devolucaoField('Volumes','inicioVolumesCeresul',d.inicioVolumesCeresul)}
+          </div>
+        </div>
+      </section>
+      <section class="devolucao-section">
+        <div class="devolucao-section-h">Final do dia <small>confer&ecirc;ncia, notas e menu 24</small></div>
+        <div class="devolucao-section-b">
+          <div class="devolucao-fields">
+            ${devolucaoField('Quantidade de pallets conferidos','palletsConferidos',d.palletsConferidos)}
+            ${devolucaoField('Pallets pendentes de confer&ecirc;ncia','palletsPendentesConferencia',d.palletsPendentesConferencia)}
+            ${devolucaoField('Notas processadas','notasProcessadas',d.notasProcessadas)}
+            ${devolucaoField('Notas com erro','notasErro',d.notasErro)}
+            ${devolucaoField('Pallets menu 24 guardados','menu24Guardados',d.menu24Guardados)}
+            ${devolucaoField('Pallets menu 24 pendente de guarda','menu24PendenteGuarda',d.menu24PendenteGuarda)}
+            ${devolucaoField('Pallets menu 24 com erro','menu24Erro',d.menu24Erro)}
+          </div>
+          ${devolucaoProgress('Pallets conferidos',t.palletsConf,t.inicioPallets)}
+          ${devolucaoProgress('Menu 24 guardados',t.menu24Guardados,t.menu24Guardados+t.menu24Pend)}
+        </div>
+      </section>
+    </div>
+    <section class="devolucao-section">
+      <div class="devolucao-section-h">GPP - Gest&atilde;o de preven&ccedil;&atilde;o de perdas <small>falta de volume e falta de mercadoria</small></div>
+      <div class="devolucao-section-b">
+        <div class="devolucao-two">
+          <div>
+            <div class="devolucao-subhead">Ocorr&ecirc;ncias falta de volume</div>
+            <div class="devolucao-fields">
+              ${devolucaoField('Total no in&iacute;cio do dia','gppFaltaVolumeInicio',d.gppFaltaVolumeInicio)}
+              ${devolucaoField('Total no final do dia','gppFaltaVolumeFinal',d.gppFaltaVolumeFinal)}
+              ${devolucaoField('Volumes retidos por atraso na prepara&ccedil;&atilde;o','volRetidoAtraso',d.volRetidoAtraso)}
+              ${devolucaoField('Volumes retidos por falta no estoque','volRetidoEstoque',d.volRetidoEstoque)}
+              ${devolucaoField('M&eacute;dia expedi&ccedil;&atilde;o -> ocorr&ecirc;ncia','mediaTempoOcorrencia',d.mediaTempoOcorrencia,'text')}
+              ${devolucaoField('Notas lan&ccedil;adas como extravio falta (R$)','valorExtravioFalta',d.valorExtravioFalta,'text')}
+              ${devolucaoField('Custo transportador direcionado (R$)','custoTransportador',d.custoTransportador,'text')}
+              ${devolucaoField('Custo Translog (R$)','custoTranslog',d.custoTranslog,'text')}
+              ${devolucaoField('Custo Rondolog (R$)','custoRondolog',d.custoRondolog,'text')}
+              ${devolucaoField('Custo Ceresul (R$)','custoCeresul',d.custoCeresul,'text')}
+              ${devolucaoField('Custo GAM (R$)','custoGam',d.custoGam,'text')}
+              ${devolucaoTextarea('Rotas com mais ocorr&ecirc;ncias de falta de volume','rotasMaisOcorrencias',d.rotasMaisOcorrencias)}
+            </div>
+            ${devolucaoProgress('Ocorr&ecirc;ncias produzidas',t.faltaVolProd,t.faltaVolInicio)}
+          </div>
+          <div>
+            <div class="devolucao-subhead">Ocorr&ecirc;ncias falta de mercadoria</div>
+            <div class="devolucao-fields">
+              ${devolucaoField('Total no in&iacute;cio do dia','gppFaltaMercadoriaInicio',d.gppFaltaMercadoriaInicio)}
+              ${devolucaoField('Total no final do dia','gppFaltaMercadoriaFinal',d.gppFaltaMercadoriaFinal)}
+              ${devolucaoField('Finalizadas analisadas nas c&acirc;meras','ocorrenciasComCamera',d.ocorrenciasComCamera)}
+              ${devolucaoField('Finalizadas sem an&aacute;lise nas c&acirc;meras','ocorrenciasSemCamera',d.ocorrenciasSemCamera)}
+              ${devolucaoField('Notas de falta de mercadoria lan&ccedil;adas','notasFaltaMercadoria',d.notasFaltaMercadoria)}
+              ${devolucaoTextarea('Manuten&ccedil;&atilde;o / observa&ccedil;&otilde;es da devolu&ccedil;&atilde;o','observacoesDevolucao',d.observacoesDevolucao)}
+            </div>
+            ${devolucaoProgress('Ocorr&ecirc;ncias produzidas',t.faltaMercProd,t.faltaMercInicio)}
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="devolucao-section">
+      <div class="devolucao-section-h">Resumo para acompanhamento <small>texto copi&aacute;vel</small></div>
+      <div class="devolucao-section-b">
+        <textarea class="devolucao-resumo" id="devolucaoResumoText" readonly>${excelText(devolucaoBuildResumo(day))}</textarea>
+      </div>
+    </section>`;
+}
+
 function boletimNum(v){return parseSumNumber(v);}
 function boletimPct(part,total){total=boletimNum(total);return total?Math.round((boletimNum(part)/total)*100):0;}
 function boletimTimeToMinutes(value){
@@ -8457,6 +8765,7 @@ function renderCurrentDay(day){
   renderProdDiurnoDash(day);
   renderRecebArm();
   renderBoletim();
+  renderDevolucao();
 }
 function prepNewDay(){
   clearTimeout(autoSaveTimer);
@@ -9652,13 +9961,13 @@ function applyRoleUI(){
   const hide=id=>{const e=document.getElementById(id);if(e)e.style.display='none';};
   if(r==='admin'){
     adminOk=true;
-    show('tabAdm');show('tabProdDash');show('tabProdSetores');show('tabProdDashDia');show('tabProdDia');show('tabRecebArm');show('tabBoletim');show('floatBtn');hide('tabPreench');
+    show('tabAdm');show('tabProdDash');show('tabProdSetores');show('tabProdDashDia');show('tabProdDia');show('tabRecebArm');show('tabBoletim');show('tabDevolucao');show('floatBtn');hide('tabPreench');
     document.querySelectorAll('.adm-restricted').forEach(e=>e.style.display='');
   }else if(r==='supervisor'){
-    show('tabProdDash');show('tabProdSetores');show('tabProdDashDia');show('tabProdDia');show('tabRecebArm');show('tabBoletim');hide('floatBtn');hide('tabAdm');hide('tabPreench');
+    show('tabProdDash');show('tabProdSetores');show('tabProdDashDia');show('tabProdDia');show('tabRecebArm');show('tabBoletim');show('tabDevolucao');hide('floatBtn');hide('tabAdm');hide('tabPreench');
   }else if(r==='operador'){
     adminOk=true;
-    show('tabPreench');show('tabAdm');show('tabProdDash');show('tabProdSetores');show('tabProdDashDia');show('tabProdDia');show('tabRecebArm');show('tabBoletim');
+    show('tabPreench');show('tabAdm');show('tabProdDash');show('tabProdSetores');show('tabProdDashDia');show('tabProdDia');show('tabRecebArm');show('tabBoletim');show('tabDevolucao');
     hide('floatBtn');hide('tabHist');hide('tabComp');hide('tabRotas');
     document.querySelectorAll('.adm-restricted').forEach(e=>e.style.display='none');
   }
