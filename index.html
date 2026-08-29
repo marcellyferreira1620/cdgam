@@ -6152,6 +6152,10 @@ function boletimBuildWhatsapp(day){
     `*OPERAÇÃO DIURNA*`,
     `Recebimento: ${prodFmt(r.notas,0)} NF(s) no dia | Conferência 100%: ${prodFmt(r.confFinal,0)} | Pendência conferência: ${prodFmt(r.pendConf,0)}`,
     `Lead time ponderado: ${String(b.leadTimePonderado||'-').trim()||'-'}`,
+    `Lead time pedido → emissão: ${String(b.leadTimePedidoEmissao||'-').trim()||'-'}`,
+    `Lead time emissão → recebimento: ${String(b.leadTimeEmissaoRecebimento||'-').trim()||'-'}`,
+    `Lead time trânsito: ${String(b.leadTimeTransito||'-').trim()||'-'}`,
+    `Lead time liberação CD → processamento da NF: ${String(b.leadTimeLiberacaoProcessamento||'-').trim()||'-'}`,
     `Armazenagem: recebidos ${prodFmt(r.recVol,0)} vol. / ${prodFmt(r.recSkus,0)} SKUs | armazenados ${prodFmt(r.storedVol,0)} vol. (${r.storedVolPct}%) / ${prodFmt(r.storedSku,0)} SKUs (${r.storedSkuPct}%) | pendentes ${prodFmt(r.pendVol,0)} vol. (${r.pendVolPct}%) / ${prodFmt(r.pendSku,0)} SKUs (${r.pendSkuPct}%)`,
     `Abastecimento 1° turno: abastecidas ${prodFmt(b.abastecidas,0)} | pendentes ${prodFmt(b.pendentes,0)} | canceladas ${prodFmt(b.canceladas,0)}`,
     `Inventário: posições ${prodFmt(b.posicoesInventariadas,0)} | reserva liberada R$ ${prodFmt(b.valorReserva,2)}`,
@@ -6219,6 +6223,10 @@ function renderBoletim(){
           </div>
           <div class="boletim-fields" style="margin-top:12px">
             ${boletimField('Lead time ponderado','leadTimePonderado',b.leadTimePonderado,'text')}
+            ${boletimField('Pedido → emissão','leadTimePedidoEmissao',b.leadTimePedidoEmissao,'text')}
+            ${boletimField('Emissão → recebimento','leadTimeEmissaoRecebimento',b.leadTimeEmissaoRecebimento,'text')}
+            ${boletimField('Trânsito','leadTimeTransito',b.leadTimeTransito,'text')}
+            ${boletimField('Liberação CD → processamento da NF','leadTimeLiberacaoProcessamento',b.leadTimeLiberacaoProcessamento,'text')}
           </div>
           <div class="boletim-list">
             <div class="boletim-subhead">Setor Armazenagem</div>
