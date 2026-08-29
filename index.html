@@ -6223,21 +6223,33 @@ function renderDevolucaoCharts(t){
       y:{stacked:true,ticks:{color:'#00385f',font:{size:10,weight:'bold'}},grid:{display:false}}
     }
   });
-  const makeStacked=(key,canvasId,labels,doneData,pendingData,doneLabel='Produzido',pendingLabel='Pendente')=>{
+  const makeStacked=(key,canvasId,labels,doneData,pendingData,doneLabel='Produzido',pendingLabel='Pendente',doneColor='#00a86b',pendingColor='#ff466a',doneLabels=null,pendingLabels=null)=>{
     const canvas=document.getElementById(canvasId);
     destroy(key);
     if(!canvas)return;
     CH[key]=new Chart(canvas,{type:'bar',
       data:{labels,datasets:[
-        {label:doneLabel,data:doneData,backgroundColor:'#00a86b',borderRadius:4,valueLabels:doneData.map(v=>v?prodFmt(v,0):'')},
-        {label:pendingLabel,data:pendingData,backgroundColor:'#ff466a',borderRadius:4,valueLabels:pendingData.map(v=>v?prodFmt(v,0):'')}
+        {label:doneLabel,data:doneData,backgroundColor:doneColor,borderRadius:4,valueLabels:doneLabels||doneData.map(v=>v?prodFmt(v,0):'')},
+        {label:pendingLabel,data:pendingData,backgroundColor:pendingColor,borderRadius:4,valueLabels:pendingLabels||pendingData.map(v=>v?prodFmt(v,0):'')}
       ]},
       options:commonOptions(key)
     });
   };
+  const gppLabels=(done,pending,total)=>{
+    const donePct=total?Math.round((done/total)*100):0;
+    const pendingPct=total?Math.max(0,100-donePct):0;
+    return {
+      done:done?`${prodFmt(done,0)} (${donePct}%)`:'',
+      pending:pending?`${prodFmt(pending,0)} (${pendingPct}%)`:''
+    };
+  };
   makeStacked('devolucaoConf','cDevolucaoConf',['Pallets recebidos'],[t.palletsConf],[Math.max(t.inicioPallets-t.palletsConf,0)],'Conferido','Pendente');
   makeStacked('devolucaoMenu24','cDevolucaoMenu24',['Menu 24'],[t.menu24Guardados],[t.menu24Pend],'Guardado','Pendente');
-  makeStacked('devolucaoGpp','cDevolucaoGpp',['Falta de volume','Falta de mercadoria'],[t.faltaVolProd,t.faltaMercProd],[t.faltaVolFinal,t.faltaMercFinal],'Produzido','Pendente');
+  const faltaVolLabels=gppLabels(t.faltaVolProd,t.faltaVolFinal,t.faltaVolInicio);
+  const faltaMercLabels=gppLabels(t.faltaMercProd,t.faltaMercFinal,t.faltaMercInicio);
+  makeStacked('devolucaoGppVolume','cDevolucaoGppVolume',['Total falta de volume'],[t.faltaVolProd],[t.faltaVolFinal],'Finalizado','Restante','#1e88e5','#ff466a',[faltaVolLabels.done],[faltaVolLabels.pending]);
+  makeStacked('devolucaoGppMercadoria','cDevolucaoGppMercadoria',['Total falta de mercadoria'],[t.faltaMercProd],[t.faltaMercFinal],'Finalizado','Restante','#1e88e5','#ff466a',[faltaMercLabels.done],[faltaMercLabels.pending]);
+  destroy('devolucaoGpp');
 }
 function renderDevolucao(){
   const wrap=document.getElementById('devolucaoPage');
@@ -6349,7 +6361,7 @@ function renderDevolucao(){
       </div>
     </section>
     <section class="devolucao-section">
-      <div class="devolucao-section-h">Dashboard da devolu&ccedil;&atilde;o <small>verde produzido | vermelho pendente</small></div>
+      <div class="devolucao-section-h">Dashboard da devolu&ccedil;&atilde;o <small>azul finalizado | vermelho pendente</small></div>
       <div class="devolucao-section-b">
         <div class="chart-grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));padding:0">
           <div class="chart-box">
@@ -6361,8 +6373,12 @@ function renderDevolucao(){
             <div style="position:relative;height:190px"><canvas id="cDevolucaoMenu24" role="img" aria-label="Guarda Menu 24 da devolucao"></canvas></div>
           </div>
           <div class="chart-box">
-            <div class="chart-ttl">GPP - ocorr&ecirc;ncias</div>
-            <div style="position:relative;height:220px"><canvas id="cDevolucaoGpp" role="img" aria-label="GPP ocorrencias da devolucao"></canvas></div>
+            <div class="chart-ttl">GPP - falta de volume</div>
+            <div style="position:relative;height:190px"><canvas id="cDevolucaoGppVolume" role="img" aria-label="GPP falta de volume da devolucao"></canvas></div>
+          </div>
+          <div class="chart-box">
+            <div class="chart-ttl">GPP - falta de mercadoria</div>
+            <div style="position:relative;height:190px"><canvas id="cDevolucaoGppMercadoria" role="img" aria-label="GPP falta de mercadoria da devolucao"></canvas></div>
           </div>
         </div>
       </div>
