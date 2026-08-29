@@ -206,13 +206,18 @@ body.devolucao-view .day-nav{justify-content:flex-start;padding:8px 14px}
 .inventario-field{display:flex;flex-direction:column;gap:4px;color:#0b3b63;font-size:11px;font-weight:800}
 .inventario-field input,.inventario-field textarea{border:1px solid #9fc7e6;border-radius:5px;padding:8px;background:#fff;color:#0a2340;font-weight:700;font-size:12px;min-width:0}
 .inventario-field textarea{min-height:72px;resize:vertical;font-weight:600}
-.inventario-farol{display:grid;grid-template-columns:repeat(auto-fill,minmax(78px,1fr));gap:8px;background:#fff;border:1px solid #dbe8f3;border-radius:6px;padding:10px;margin-top:10px}
-.inventario-local{height:58px;border:2px solid #9fc7e6;border-radius:6px;background:#f8fbff;color:#003b6f;font-weight:900;font-size:13px;cursor:pointer;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px}
-.inventario-local small{font-size:9px;color:#6a9fc0;text-transform:uppercase}
-.inventario-local.baixo{background:#00a86b;border-color:#008a58;color:#fff}
-.inventario-local.baixo small{color:#e6fff5}
-.inventario-local.alto{background:#00a86b;border-color:#ffd700;color:#fff;box-shadow:inset 0 0 0 2px #ffd700}
-.inventario-local.alto::after{content:'OK';display:block;background:#ffd700;color:#0a2340;border-radius:3px;padding:1px 6px;font-size:10px;line-height:1;font-weight:900}
+.inventario-map-scroll{overflow:auto;background:#eaf0f4;border:1px solid #aeb8c2;border-radius:4px;padding:8px}
+.inventario-farol{position:relative;width:1488px;height:454px;background:#fff;box-shadow:0 0 0 1px #000 inset;background-image:linear-gradient(#dfe5ea 1px,transparent 1px),linear-gradient(90deg,#dfe5ea 1px,transparent 1px);background-size:22px 18px}
+.inventario-map-top{position:absolute;left:0;top:0;right:0;height:12px;background:#000}
+.inventario-map-label{position:absolute;color:#000;font-size:12px;line-height:1;font-weight:900;text-align:center;text-transform:uppercase;letter-spacing:0}
+.inventario-map-label.doca{font-size:16px}
+.inventario-map-area{position:absolute;border:2px solid #000;background:#fff}
+.inventario-map-conf{position:absolute;right:0;top:162px;width:86px;height:240px;background:#11aee3;border:2px solid #000;color:#001f33;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:800;letter-spacing:3px;writing-mode:vertical-rl;text-orientation:upright}
+.inventario-map-block{position:absolute;display:grid;gap:0}
+.inventario-local{width:100%;height:100%;border:1px solid #000;background:#fff;color:#003b6f;font-weight:900;font-size:9px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+.inventario-local.baixo{background:#00a86b;color:#fff}
+.inventario-local.alto{background:#00a86b;color:#fff;box-shadow:inset 0 0 0 2px #ffd700}
+.inventario-local.alto::after{content:'OK';background:#ffd700;color:#0a2340;border-radius:2px;padding:1px 3px;font-size:9px;font-weight:900}
 .inventario-resumo{width:100%;min-height:165px;border:1px solid #9fc7e6;border-radius:6px;padding:12px;font-size:12px;line-height:1.45;color:#0a2340;background:#fff;resize:vertical}
 body.inventario-view #kpiBar1,
 body.inventario-view #flowBar,
@@ -6485,11 +6490,33 @@ function renderDevolucao(){
 function inventarioNum(v){return parseSumNumber(v);}
 function inventarioPct(part,total){total=inventarioNum(total);return total?Math.round((inventarioNum(part)/total)*100):0;}
 function inventarioManual(day){return (day&&day.inventario)||{};}
-function inventarioDefaultLocais(){return Array.from({length:40},(_,i)=>String(i+1).padStart(2,'0'));}
+const INVENTARIO_FAROL_LAYOUT=[
+  {x:8,y:18,cols:7,rows:3,p:'R07-A'},{x:156,y:18,cols:8,rows:3,p:'R07-B'},{x:337,y:18,cols:14,rows:3,p:'R07-C'},
+  {x:747,y:38,cols:13,rows:2,p:'R07-D'},{x:1132,y:38,cols:10,rows:2,p:'R07-E'},{x:1438,y:38,cols:4,rows:2,p:'R07-F'},
+  {x:8,y:74,cols:24,rows:2,p:'R07-G'},{x:747,y:92,cols:13,rows:3,p:'R07-H'},{x:1132,y:92,cols:12,rows:3,p:'R07-I'},{x:1410,y:92,cols:4,rows:3,p:'R07-J'},
+  {x:8,y:210,cols:26,rows:2,p:'R01-A'},{x:747,y:146,cols:30,rows:1,p:'R01-B'},{x:747,y:218,cols:30,rows:1,p:'R01-C'},
+  {x:8,y:254,cols:7,rows:3,p:'R01-D'},{x:156,y:254,cols:8,rows:3,p:'R01-E'},{x:337,y:254,cols:14,rows:3,p:'R01-F'},
+  {x:747,y:254,cols:7,rows:3,p:'R01-G'},{x:963,y:254,cols:7,rows:3,p:'R01-H'},{x:1185,y:289,cols:5,rows:2,p:'PSI-A'},
+  {x:8,y:308,cols:7,rows:3,p:'R01-I'},{x:156,y:308,cols:8,rows:3,p:'R01-J'},{x:337,y:308,cols:14,rows:3,p:'R01-K'},
+  {x:747,y:308,cols:7,rows:3,p:'R01-L'},{x:963,y:308,cols:7,rows:3,p:'R01-M'},{x:1185,y:347,cols:5,rows:2,p:'PSI-B'},
+  {x:8,y:364,cols:7,rows:3,p:'R01-N'},{x:156,y:364,cols:8,rows:2,p:'R01-O'},{x:337,y:364,cols:14,rows:3,p:'R01-P'},
+  {x:747,y:364,cols:7,rows:3,p:'R01-Q'},{x:963,y:364,cols:7,rows:3,p:'R01-R'}
+];
+const INVENTARIO_FAROL_AREAS=[
+  {x:128,y:128,w:568,h:55},{x:747,y:164,w:664,h:55},{x:1132,y:254,w:278,h:148}
+];
+function inventarioLayoutLocais(){
+  const locais=[];
+  INVENTARIO_FAROL_LAYOUT.forEach(block=>{
+    for(let i=1;i<=block.cols*block.rows;i++)locais.push(`${block.p}${String(i).padStart(3,'0')}`);
+  });
+  return locais;
+}
+function inventarioDefaultLocais(){return inventarioLayoutLocais();}
 function inventarioLocais(d){
-  const txt=String((d&&d.farolLocais)||'').trim();
-  if(!txt)return inventarioDefaultLocais();
-  return txt.split(/[\n,;]+/).map(v=>v.trim()).filter(Boolean).slice(0,120);
+  const base=inventarioDefaultLocais();
+  const extra=Object.keys((d&&d.farol)||{}).filter(k=>!base.includes(k));
+  return base.concat(extra);
 }
 function inventarioFarolStats(d){
   const locais=inventarioLocais(d);
@@ -6651,16 +6678,32 @@ function inventarioErroSetor(setor,label,d){
     </div>
   </div>`;
 }
-function renderInventarioFarol(d){
-  const stats=inventarioFarolStats(d);
-  const farol=d.farol||{};
-  return stats.locais.map(local=>{
+function inventarioMapCell(local,farol){
     const st=+farol[local]||0;
     const cls=st>=2?'alto':(st>=1?'baixo':'');
-    const status=st>=2?'baixo + alto':(st>=1?'baixo':'pendente');
+    const status=st>=2?'baixo + alto OK':(st>=1?'baixo inventariado':'pendente');
     const arg=JSON.stringify(String(local||'')).replace(/"/g,'&quot;');
-    return `<button type="button" class="inventario-local ${cls}" onclick="toggleInventarioLocal(${arg})"><span>${excelText(local)}</span><small>${status}</small></button>`;
+    return `<button type="button" class="inventario-local ${cls}" title="${excelText(local)} - ${status}" aria-label="${excelText(local)} - ${status}" onclick="toggleInventarioLocal(${arg})"></button>`;
+}
+function renderInventarioFarol(d){
+  const farol=d.farol||{};
+  const blocks=INVENTARIO_FAROL_LAYOUT.map(block=>{
+    let cells='';
+    for(let i=1;i<=block.cols*block.rows;i++){
+      const local=`${block.p}${String(i).padStart(3,'0')}`;
+      cells+=inventarioMapCell(local,farol);
+    }
+    return `<div class="inventario-map-block" style="left:${block.x}px;top:${block.y}px;grid-template-columns:repeat(${block.cols},22px);grid-template-rows:repeat(${block.rows},18px)">${cells}</div>`;
   }).join('');
+  const areas=INVENTARIO_FAROL_AREAS.map(a=>`<div class="inventario-map-area" style="left:${a.x}px;top:${a.y}px;width:${a.w}px;height:${a.h}px"></div>`).join('');
+  return `<div class="inventario-map-top"></div>
+    <div class="inventario-map-label" style="left:510px;top:18px;width:90px">RUA 07</div>
+    <div class="inventario-map-label" style="left:500px;top:406px;width:95px">RUA 01</div>
+    <div class="inventario-map-label" style="left:994px;top:406px;width:95px">RUA 01</div>
+    <div class="inventario-map-label doca" style="left:712px;top:428px;width:80px">DOCA</div>
+    <div class="inventario-map-label" style="left:1235px;top:406px;width:85px">PSICO</div>
+    ${areas}${blocks}
+    <div class="inventario-map-conf">Conferencia</div>`;
 }
 function renderInventario(){
   const wrap=document.getElementById('inventarioPage');
@@ -6710,10 +6753,9 @@ function renderInventario(){
     <section class="inventario-section">
       <div class="inventario-section-h">Farol de posi&ccedil;&otilde;es inventariadas <small>clique para alternar: pendente, baixo, baixo + alto OK</small></div>
       <div class="inventario-section-b">
-        <div class="inventario-fields">
-          ${inventarioTextarea('Locais do farol (separe por v&iacute;rgula ou linha)','farolLocais',d.farolLocais)}
+        <div class="inventario-map-scroll">
+          <div class="inventario-farol">${renderInventarioFarol(d)}</div>
         </div>
-        <div class="inventario-farol">${renderInventarioFarol(d)}</div>
       </div>
     </section>
     <section class="inventario-section">
