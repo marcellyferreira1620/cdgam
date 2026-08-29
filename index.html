@@ -6151,7 +6151,7 @@ function boletimBuildWhatsapp(day){
     `*OPERAÇÃO DIURNA*`,
     `Recebimento: ${prodFmt(r.notas,0)} NF(s) no dia | Conferência 100%: ${prodFmt(r.confFinal,0)} | Pendência conferência: ${prodFmt(r.pendConf,0)}`,
     `Armazenagem: recebidos ${prodFmt(r.recVol,0)} vol. / ${prodFmt(r.recSkus,0)} SKUs | armazenados ${prodFmt(r.storedVol,0)} vol. (${r.storedVolPct}%) / ${prodFmt(r.storedSku,0)} SKUs (${r.storedSkuPct}%) | pendentes ${prodFmt(r.pendVol,0)} vol. (${r.pendVolPct}%) / ${prodFmt(r.pendSku,0)} SKUs (${r.pendSkuPct}%)`,
-    `Abastecimento: abastecidas ${prodFmt(b.abastecidas,0)} | pendentes ${prodFmt(b.pendentes,0)} | canceladas ${prodFmt(b.canceladas,0)}`,
+    `Abastecimento 1° turno: abastecidas ${prodFmt(b.abastecidas,0)} | pendentes ${prodFmt(b.pendentes,0)} | canceladas ${prodFmt(b.canceladas,0)}`,
     `Inventário: posições ${prodFmt(b.posicoesInventariadas,0)} | reserva liberada R$ ${prodFmt(b.valorReserva,2)}`,
     b.manutencaoDiurna?`Manutenção diurna: ${String(b.manutencaoDiurna).trim()}`:`Manutenção diurna: sem apontamento.`,
     ``,
@@ -6164,6 +6164,7 @@ function boletimBuildWhatsapp(day){
     `Especial: ${prodFmt(n.especial,0)} vol. | média/h ${prodFmt(n.especialHora,0)}`,
     `Expedição total: ${prodFmt(n.expedicao,0)} vol. | eficiência ${n.expPct}%`,
     `Rotas: ${n.pctNoHorario}% no horário | ${n.pctAtraso}% atrasadas`,
+    `Abastecimento 3° turno: abastecidas ${prodFmt(b.abastecidas3Turno,0)} | pendentes ${prodFmt(b.pendentes3Turno,0)} | canceladas ${prodFmt(b.canceladas3Turno,0)}`,
     b.manutencaoNoturna?`Manutenção noturna: ${String(b.manutencaoNoturna).trim()}`:`Manutenção noturna: sem apontamento.`
   ].join('\n');
 }
@@ -6221,7 +6222,7 @@ function renderBoletim(){
             ${boletimLine('SKUs armazenados',prodFmt(r.storedSku,0),`${r.storedSkuPct}%`)}
             ${boletimLine('SKUs pendentes de armazenagem',prodFmt(r.pendSku,0),`${r.pendSkuPct}%`)}
           </div>
-          <div class="boletim-subhead">Setor de Abastecimento</div>
+          <div class="boletim-subhead">Setor de Abastecimento - 1° turno</div>
           <div class="boletim-fields" style="margin-top:12px">
             ${boletimField('Linhas abastecidas','abastecidas',b.abastecidas)}
             ${boletimField('Linhas pendentes','pendentes',b.pendentes)}
@@ -6247,6 +6248,12 @@ function renderBoletim(){
             ${boletimLine('Checkout psico',`${prodFmt(n.psicoVol,0)} vol. / ${prodFmt(n.psicoUn,0)} un.`)}
             ${boletimLine('Especial',prodFmt(n.especial,0),`média/h ${prodFmt(n.especialHora,0)}`)}
             ${boletimLine('Rotas no horário / atrasadas',`${n.pctNoHorario}% / ${n.pctAtraso}%`,`${prodFmt(n.routesTotal,0)} rotas apuradas`)}
+          </div>
+          <div class="boletim-subhead">Setor de Abastecimento - 3° turno</div>
+          <div class="boletim-fields" style="margin-top:12px">
+            ${boletimField('Linhas abastecidas','abastecidas3Turno',b.abastecidas3Turno)}
+            ${boletimField('Linhas pendentes','pendentes3Turno',b.pendentes3Turno)}
+            ${boletimField('Linhas canceladas','canceladas3Turno',b.canceladas3Turno)}
           </div>
           <div class="boletim-fields" style="margin-top:12px">
             ${boletimTextarea('Manutenção / observações da noite','manutencaoNoturna',b.manutencaoNoturna)}
