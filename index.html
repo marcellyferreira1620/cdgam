@@ -6214,7 +6214,8 @@ function renderBoletim(){
             <div class="boletim-subhead">Setor Recebimento</div>
             ${boletimLine('Lead time ponderado','Em implantação','será puxado dos gráficos')}
             <div class="boletim-subhead">Setor Armazenagem</div>
-            ${boletimLine('Volumes recebidos',prodFmt(r.recVol,0),`${prodFmt(r.recSkus,0)} SKUs`)}
+            ${boletimLine('Volumes recebidos',prodFmt(r.recVol,0),'volumes')}
+            ${boletimLine('SKUs recebidos',prodFmt(r.recSkus,0),'SKUs')}
             ${boletimLine('Volumes armazenados',prodFmt(r.storedVol,0),`${r.storedVolPct}%`)}
             ${boletimLine('Volumes pendentes de armazenagem',prodFmt(r.pendVol,0),`${r.pendVolPct}%`)}
             ${boletimLine('SKUs armazenados',prodFmt(r.storedSku,0),`${r.storedSkuPct}%`)}
