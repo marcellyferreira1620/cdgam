@@ -6210,6 +6210,35 @@ function copyDevolucaoResumo(){
   try{document.execCommand('copy');done();}catch(_){}
   tmp.remove();
 }
+function renderDevolucaoCharts(t){
+  if(typeof Chart==='undefined')return;
+  const destroy=key=>{if(CH[key]){CH[key].destroy();delete CH[key];}};
+  const commonOptions=(title)=>({
+    indexAxis:'y',
+    responsive:true,
+    maintainAspectRatio:false,
+    plugins:{legend:{position:'bottom',labels:{color:'#00385f',font:{size:10,weight:'bold'}}},title:{display:false,text:title}},
+    scales:{
+      x:{stacked:true,beginAtZero:true,ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'}},
+      y:{stacked:true,ticks:{color:'#00385f',font:{size:10,weight:'bold'}},grid:{display:false}}
+    }
+  });
+  const makeStacked=(key,canvasId,labels,doneData,pendingData,doneLabel='Produzido',pendingLabel='Pendente')=>{
+    const canvas=document.getElementById(canvasId);
+    destroy(key);
+    if(!canvas)return;
+    CH[key]=new Chart(canvas,{type:'bar',
+      data:{labels,datasets:[
+        {label:doneLabel,data:doneData,backgroundColor:'#00a86b',borderRadius:4,valueLabels:doneData.map(v=>v?prodFmt(v,0):'')},
+        {label:pendingLabel,data:pendingData,backgroundColor:'#ff466a',borderRadius:4,valueLabels:pendingData.map(v=>v?prodFmt(v,0):'')}
+      ]},
+      options:commonOptions(key)
+    });
+  };
+  makeStacked('devolucaoConf','cDevolucaoConf',['Pallets recebidos'],[t.palletsConf],[Math.max(t.inicioPallets-t.palletsConf,0)],'Conferido','Pendente');
+  makeStacked('devolucaoMenu24','cDevolucaoMenu24',['Menu 24'],[t.menu24Guardados],[t.menu24Pend],'Guardado','Pendente');
+  makeStacked('devolucaoGpp','cDevolucaoGpp',['Falta de volume','Falta de mercadoria'],[t.faltaVolProd,t.faltaMercProd],[t.faltaVolFinal,t.faltaMercFinal],'Produzido','Pendente');
+}
 function renderDevolucao(){
   const wrap=document.getElementById('devolucaoPage');
   if(!wrap)return;
@@ -6320,11 +6349,31 @@ function renderDevolucao(){
       </div>
     </section>
     <section class="devolucao-section">
+      <div class="devolucao-section-h">Dashboard da devolu&ccedil;&atilde;o <small>verde produzido | vermelho pendente</small></div>
+      <div class="devolucao-section-b">
+        <div class="chart-grid" style="grid-template-columns:repeat(auto-fit,minmax(300px,1fr));padding:0">
+          <div class="chart-box">
+            <div class="chart-ttl">Confer&ecirc;ncia de pallets</div>
+            <div style="position:relative;height:190px"><canvas id="cDevolucaoConf" role="img" aria-label="Conferencia de pallets da devolucao"></canvas></div>
+          </div>
+          <div class="chart-box">
+            <div class="chart-ttl">Guarda Menu 24</div>
+            <div style="position:relative;height:190px"><canvas id="cDevolucaoMenu24" role="img" aria-label="Guarda Menu 24 da devolucao"></canvas></div>
+          </div>
+          <div class="chart-box">
+            <div class="chart-ttl">GPP - ocorr&ecirc;ncias</div>
+            <div style="position:relative;height:220px"><canvas id="cDevolucaoGpp" role="img" aria-label="GPP ocorrencias da devolucao"></canvas></div>
+          </div>
+        </div>
+      </div>
+    </section>
+    <section class="devolucao-section">
       <div class="devolucao-section-h">Resumo para acompanhamento <small>texto copi&aacute;vel</small></div>
       <div class="devolucao-section-b">
         <textarea class="devolucao-resumo" id="devolucaoResumoText" readonly>${excelText(devolucaoBuildResumo(day))}</textarea>
       </div>
     </section>`;
+  renderDevolucaoCharts(t);
 }
 
 function boletimNum(v){return parseSumNumber(v);}
