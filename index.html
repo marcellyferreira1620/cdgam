@@ -5231,11 +5231,12 @@ function recebArm997PartialStoredItems(prevItems,currentItems,dayDate){
   const aggregate=items=>{
     const map={};
     (Array.isArray(items)?items:[]).forEach(item=>{
-      if(!item||item.category!=='today'||item.date!==dayDate)return;
+      if(!item)return;
+      const date=item.date||dayDate||curDate||today();
       const sku=String(item.sku||'').trim();
       if(!sku)return;
-      const key=[item.date,sku].join('|');
-      if(!map[key])map[key]={key,date:item.date,sku,descricao:item.descricao||'',qtd:0,vol:0,linhas:0};
+      const key=[date,sku].join('|');
+      if(!map[key])map[key]={key,date,sku,descricao:item.descricao||'',qtd:0,vol:0,linhas:0};
       map[key].qtd+=+item.qtd||0;
       map[key].vol+=+item.vol||0;
       map[key].linhas+=+item.linhas||1;
@@ -6146,10 +6147,11 @@ function recebArm997PartialRowsFromImports(imports){
   const list=(Array.isArray(imports)?imports:[]).slice().sort((a,b)=>(+a.importedAt||0)-(+b.importedAt||0));
   list.forEach((r,idx)=>{
     const hour=r.importedAt?new Date(r.importedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'-';
-    let partials=Array.isArray(r.partials)?r.partials:[];
-    if(!partials.length&&idx>0&&Array.isArray(list[idx-1].items)&&Array.isArray(r.items)){
-      partials=recebArm997PartialStoredItems(list[idx-1].items,r.items,r.dayDate||list[idx-1].dayDate||curDate||today());
-    }
+    const savedPartials=Array.isArray(r.partials)?r.partials:[];
+    const recalculated=(idx>0&&Array.isArray(list[idx-1].items)&&Array.isArray(r.items))
+      ?recebArm997PartialStoredItems(list[idx-1].items,r.items,r.dayDate||list[idx-1].dayDate||curDate||today())
+      :[];
+    const partials=recalculated.length?recalculated:savedPartials;
     partials.forEach(item=>{
       rows.push({...item,hour,fileName:r.fileName||'997'});
     });
@@ -6163,7 +6165,7 @@ function recebArm997PartialAlertsTable(imports){
   const body=rows.length?rows.map(r=>`<tr><td>${excelText(r.hour)}</td><td>${excelText(r.fileName)}</td><td>${excelText(fmtDateShort(r.entrada))}</td><td>${excelText(r.sku)}</td><td style="text-align:left">${excelText(r.descricao||'')}</td><td>${prodFmt(+r.qtdAntes||0,0)}</td><td>${prodFmt(+r.qtdAtual||0,0)}</td><td style="font-weight:bold;color:#00e676">${prodFmt(+r.qtdSaida||0,0)}</td><td style="font-weight:bold;color:#00e676">${prodFmt(+r.volSaida||0,0)}</td></tr>`).join(''):'<tr><td colspan="9">Sem item parcialmente armazenado nesta compara&ccedil;&atilde;o.</td></tr>';
   return `<div style="overflow-x:auto;margin-top:8px">
     <table class="receb-arm-tbl">
-      <thead><tr><th colspan="9">Alerta - armazenagem parcial</th></tr><tr><th>Hora</th><th>Arquivo</th><th>Data entrada</th><th>Código</th><th>Descrição</th><th>QT. anterior</th><th>QT. atual</th><th>QT. saída</th><th>Volumes saída</th></tr></thead>
+      <thead><tr><th colspan="9">ALERTA - ARMAZENAGEM PARCIAL</th></tr><tr><th>HORA</th><th>ARQUIVO</th><th>DATA ENTRADA</th><th>C&Oacute;DIGO</th><th>DESCRI&Ccedil;&Atilde;O</th><th>QT. ANTERIOR</th><th>QT. ATUAL</th><th>QT. SA&Iacute;DA</th><th>VOLUMES SA&Iacute;DA</th></tr></thead>
       <tbody>${body}</tbody>
     </table>
   </div>`;
