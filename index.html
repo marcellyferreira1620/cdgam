@@ -6879,6 +6879,12 @@ function boletimMedia(total,start,end){
 function boletimManual(day){
   return (day&&day.boletim)||{};
 }
+function boletimIsFinalDay(day){
+  const data=(day&&day.recebArm)||{};
+  if(data.finalDia||data.diaEncerrado||data.qrpFinalDia)return true;
+  const dt=(day&&day.date)||curDate||today();
+  return String(dt)<today();
+}
 function boletimIsoAddDays(dt,days){
   const d=new Date(String(dt||today())+'T12:00:00');
   if(Number.isNaN(d.getTime()))return dt||today();
@@ -7053,6 +7059,11 @@ function renderBoletim(){
   const b=boletimManual(day);
   const r=boletimRecebStats(day);
   const n=boletimNightStats(day);
+  const armFinalRows=boletimIsFinalDay(day)?`
+            ${boletimLine('Volumes armazenados',prodFmt(r.storedVol,0),`${r.storedVolPct}%`)}
+            ${boletimLine('Volumes pendentes de armazenagem',prodFmt(r.pendVol,0),`${r.pendVolPct}%`)}
+            ${boletimLine('SKUs armazenados',prodFmt(r.storedSku,0),`${r.storedSkuPct}%`)}
+            ${boletimLine('SKUs pendentes de armazenagem',prodFmt(r.pendSku,0),`${r.pendSkuPct}%`)}`:'';
   wrap.innerHTML=`
     <div class="boletim-head">
       <div class="boletim-title">
@@ -7090,10 +7101,7 @@ function renderBoletim(){
             <div class="boletim-subhead">Setor Armazenagem</div>
             ${boletimLine('Volumes recebidos',prodFmt(r.recVol,0),'volumes')}
             ${boletimLine('SKUs recebidos',prodFmt(r.recSkus,0),'SKUs')}
-            ${boletimLine('Volumes armazenados',prodFmt(r.storedVol,0),`${r.storedVolPct}%`)}
-            ${boletimLine('Volumes pendentes de armazenagem',prodFmt(r.pendVol,0),`${r.pendVolPct}%`)}
-            ${boletimLine('SKUs armazenados',prodFmt(r.storedSku,0),`${r.storedSkuPct}%`)}
-            ${boletimLine('SKUs pendentes de armazenagem',prodFmt(r.pendSku,0),`${r.pendSkuPct}%`)}
+            ${armFinalRows}
           </div>
           <div class="boletim-subhead">Setor de Abastecimento - 1° turno</div>
           <div class="boletim-fields" style="margin-top:12px">
