@@ -6042,11 +6042,12 @@ function recebArm997PartialAlertsTable(imports){
       rows.push({...item,hour,fileName:r.fileName||'997'});
     });
   });
-  if(!rows.length)return '';
+  if(!rows.length&&!(Array.isArray(imports)&&imports.length))return '';
+  const body=rows.length?rows.map(r=>`<tr><td>${excelText(r.hour)}</td><td>${excelText(r.fileName)}</td><td>${excelText(fmtDateShort(r.entrada))}</td><td>${excelText(r.sku)}</td><td style="text-align:left">${excelText(r.descricao||'')}</td><td>${prodFmt(+r.qtdAntes||0,0)}</td><td>${prodFmt(+r.qtdAtual||0,0)}</td><td style="font-weight:bold;color:#00e676">${prodFmt(+r.qtdSaida||0,0)}</td><td style="font-weight:bold;color:#00e676">${prodFmt(+r.volSaida||0,0)}</td></tr>`).join(''):'<tr><td colspan="9">Sem item parcialmente armazenado nesta compara&ccedil;&atilde;o.</td></tr>';
   return `<div style="overflow-x:auto;margin-top:8px">
     <table class="receb-arm-tbl">
       <thead><tr><th colspan="9">Alerta - armazenagem parcial</th></tr><tr><th>Hora</th><th>Arquivo</th><th>Data entrada</th><th>Código</th><th>Descrição</th><th>QT. anterior</th><th>QT. atual</th><th>QT. saída</th><th>Volumes saída</th></tr></thead>
-      <tbody>${rows.map(r=>`<tr><td>${excelText(r.hour)}</td><td>${excelText(r.fileName)}</td><td>${excelText(fmtDateShort(r.entrada))}</td><td>${excelText(r.sku)}</td><td style="text-align:left">${excelText(r.descricao||'')}</td><td>${prodFmt(+r.qtdAntes||0,0)}</td><td>${prodFmt(+r.qtdAtual||0,0)}</td><td style="font-weight:bold;color:#00e676">${prodFmt(+r.qtdSaida||0,0)}</td><td style="font-weight:bold;color:#00e676">${prodFmt(+r.volSaida||0,0)}</td></tr>`).join('')}</tbody>
+      <tbody>${body}</tbody>
     </table>
   </div>`;
 }
@@ -6179,9 +6180,9 @@ function renderRecebArm997Report(){
       ${recebArm997DetailSummaryTable('Resumo por mês de entrada - 997',detail.months,'month')}
     </div>
     ${recebArm997HourlyStoredTable(imports)}
-    ${recebArm997PartialAlertsTable(imports)}
     ${recebArm997FinalDayTable(data,day.date)}
-    ${recebArm997PendingSplitTable(data,day.date)}`;
+    ${recebArm997PendingSplitTable(data,day.date)}
+    ${recebArm997PartialAlertsTable(imports)}`;
 }
 
 function renderRecebArm(){
@@ -6878,6 +6879,21 @@ function boletimMedia(total,start,end){
 function boletimManual(day){
   return (day&&day.boletim)||{};
 }
+function boletimIsoAddDays(dt,days){
+  const d=new Date(String(dt||today())+'T12:00:00');
+  if(Number.isNaN(d.getTime()))return dt||today();
+  d.setDate(d.getDate()+days);
+  return d.toISOString().slice(0,10);
+}
+function boletimNightSourceDay(day){
+  const dt=(day&&day.date)||curDate||today();
+  const d=new Date(String(dt)+'T12:00:00');
+  if(!Number.isNaN(d.getTime())&&d.getDay()===1){
+    const friday=getDay(boletimIsoAddDays(dt,-3));
+    if(friday)return friday;
+  }
+  return day||{};
+}
 function boletimRecebStats(day){
   const data=(day&&day.recebArm)||emptyRecebArm();
   const notas=Array.isArray(data.notas)?data.notas:[];
@@ -6890,8 +6906,13 @@ function boletimRecebStats(day){
   const armFinal=notas.filter(n=>n.armFinalizada||n.armazenagemFinalizada||n.statusArm==='finalizada').length;
   const emConf=notas.filter(n=>!n.confFinalizada&&n.statusConf!=='finalizada').length;
   const emArm=notas.filter(n=>n.statusArm==='andamento'||n.emArmazenagem).length;
-  const recVol=nfVolumes||boletimNum(agenda.totalVolumes)||boletimNum(exact.today&&exact.today.vol);
-  const recSkus=nfSkus||boletimNum(agenda.totalSkus)||boletimNum(exact.today&&exact.today.skus);
+  const agendaItems=Object.values(agenda.summary||{});
+  const agendaVolumes=boletimNum(agenda.total)||agendaItems.reduce((s,item)=>s+boletimNum(item&&item.volumes),0);
+  const agendaSkus=agendaItems.reduce((s,item)=>s+boletimNum(item&&item.skus),0);
+  const qrpVol=boletimNum(exact.today&&exact.today.vol);
+  const qrpSkus=boletimNum(exact.today&&exact.today.skus);
+  const recVol=Math.max(nfVolumes,agendaVolumes,qrpVol);
+  const recSkus=Math.max(nfSkus,agendaSkus,qrpSkus);
   const pendVol=boletimNum(exact.today&&exact.today.vol);
   const pendSku=boletimNum(exact.today&&exact.today.skus);
   const storedVol=Math.max(recVol-pendVol,0);
@@ -6916,7 +6937,7 @@ function boletimRecebStats(day){
   };
 }
 function boletimNightStats(day){
-  day=day||{};
+  day=boletimNightSourceDay(day)||{};
   const hd=day.hd||{};
   const med=sumActiveHoraField('Linhas Med.',hd,day.date);
   const perf=sumActiveHoraField('Linhas Perf.',hd,day.date);
