@@ -1151,6 +1151,16 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
         <div style="position:relative;height:260px"><canvas id="cProdSetoresDash" role="img" aria-label="Produtividade por colaborador"></canvas></div>
       </div>
     </div>
+    <div class="chart-grid" style="grid-template-columns:1fr">
+      <div class="chart-box" id="prodSetoresMonthBox">
+        <div class="chart-ttl">
+          <span>M&eacute;dia do m&ecirc;s por se&ccedil;&atilde;o - Correia Perfumaria</span>
+          <button type="button" onclick="exportProdSetoresMonthExcel()" style="margin-left:auto;background:#00a86b;color:#fff;border:none;border-radius:4px;padding:5px 10px;font-weight:bold;font-size:10px;cursor:pointer">Exportar Excel</button>
+        </div>
+        <div style="position:relative;height:260px"><canvas id="cProdSetoresMonthDash" role="img" aria-label="Media mensal por secao"></canvas></div>
+        <div class="tbl-wrap" id="prodSetoresMonthTbl" style="margin:8px 0 0"></div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -3950,6 +3960,89 @@ function renderProdSetoresDash(day){
     data:{labels:PROD_SETORES_SECTIONS.map(s=>'Sec. '+s),datasets:[{label:'Tempo/Acesso médio por seção',data:sectionAvg,backgroundColor:sectionAvg.map(prodMetaColor),borderRadius:4,valueLabels:sectionAvg.map(v=>v===null?'':prodFmt(v,1)+'s')}]},
     options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24,right:8,left:4}},plugins:{legend:{labels:{color:'#00385f',font:{size:10,weight:'bold'}}}},scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45},grid:{color:'rgba(6,35,61,0.08)'}},y:{beginAtZero:true,suggestedMax:prodChartMax(sectionAvg),ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'},title:{display:true,text:'Tempo/Acesso médio (s)',color:'#00385f',font:{size:9,weight:'bold'}}}}}
   });
+  renderProdSetoresMonthDash(day);
+}
+
+function prodSetoresMonthDays(day){
+  const dt=(day&&day.date)||curDate||today();
+  const month=String(dt).slice(0,7);
+  return (Array.isArray(db.days)?db.days:[]).filter(d=>d&&d.date&&String(d.date).slice(0,7)===month).sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+function prodSetoresMetricsForDay(day,sec,hourIndex){
+  const data=ensureProdSetores(day);
+  const row=data.bySection&&data.bySection[sec]?data.bySection[sec][hourIndex]:null;
+  if(!row)return null;
+  const caixa=+row.caixa||0;
+  const acesso=+row.acesso||0;
+  const tempo=+row.tempo||0;
+  const acessoCaixa=prodRatio(acesso,caixa);
+  const tempoAcesso=prodRatio(tempo,acessoCaixa);
+  if(tempoAcesso===null||!Number.isFinite(+tempoAcesso))return null;
+  return{date:day.date,sec,hour:PROD_SETORES_HOURS[hourIndex],caixa,acesso,tempo,acessoCaixa,tempoAcesso};
+}
+
+function prodSetoresMonthSummary(day){
+  const days=prodSetoresMonthDays(day);
+  const detail=[];
+  const summary=PROD_SETORES_SECTIONS.map(sec=>{
+    const vals=[];
+    const daySet=new Set();
+    days.forEach(d=>{
+      PROD_SETORES_HOURS.forEach((_,i)=>{
+        const item=prodSetoresMetricsForDay(d,sec,i);
+        if(!item)return;
+        vals.push(item.tempoAcesso);
+        daySet.add(d.date);
+        detail.push(item);
+      });
+    });
+    const avg=vals.length?vals.reduce((s,v)=>s+v,0)/vals.length:null;
+    return{sec,avg,dias:daySet.size,apontamentos:vals.length,status:avg===null?'Sem dados':(avg<=PROD_SETORES_META_SEG?'Dentro da meta':'Acima da meta')};
+  });
+  return{summary,detail,month:String(((day&&day.date)||curDate||today())).slice(0,7)};
+}
+
+function renderProdSetoresMonthDash(day){
+  const canvas=document.getElementById('cProdSetoresMonthDash');
+  const tbl=document.getElementById('prodSetoresMonthTbl');
+  if(!day)return;
+  const monthData=prodSetoresMonthSummary(day);
+  const values=monthData.summary.map(r=>r.avg);
+  if(tbl){
+    tbl.innerHTML=`<table><thead><tr><th>Se&ccedil;&atilde;o</th><th>Dias lan&ccedil;ados</th><th>Apontamentos</th><th>M&eacute;dia do m&ecirc;s</th><th>Status</th></tr></thead><tbody>${monthData.summary.map(r=>`<tr><td>Sec. ${excelText(r.sec)}</td><td>${prodFmt(r.dias,0)}</td><td>${prodFmt(r.apontamentos,0)}</td><td style="font-weight:bold;color:${r.avg!==null&&r.avg<=PROD_SETORES_META_SEG?'#1e88e5':'#e94560'}">${r.avg===null?'-':prodFmt(r.avg,1)+'s'}</td><td>${excelText(r.status)}</td></tr>`).join('')}</tbody></table>`;
+  }
+  if(!canvas||typeof Chart==='undefined')return;
+  if(CH.prodSetoresMonthDash){CH.prodSetoresMonthDash.destroy();delete CH.prodSetoresMonthDash;}
+  CH.prodSetoresMonthDash=new Chart(canvas,{type:'bar',
+    data:{labels:PROD_SETORES_SECTIONS.map(s=>'Sec. '+s),datasets:[{label:'Tempo/Acesso medio do mes por secao',data:values,backgroundColor:values.map(prodMetaColor),borderRadius:4,valueLabels:values.map(v=>v===null?'':prodFmt(v,1)+'s')}]},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24,right:8,left:4}},plugins:{legend:{labels:{color:'#00385f',font:{size:10,weight:'bold'}}}},scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45},grid:{color:'rgba(6,35,61,0.08)'}},y:{beginAtZero:true,suggestedMax:prodChartMax(values),ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'},title:{display:true,text:'Tempo/Acesso medio do mes (s)',color:'#00385f',font:{size:9,weight:'bold'}}}}}
+  });
+}
+
+function exportProdSetoresMonthExcel(){
+  const day=getDay(curDate)||emptyDay(curDate||today());
+  const monthData=prodSetoresMonthSummary(day);
+  const monthLabel=monthData.month.split('-').reverse().join('/');
+  let resumo='<tr><th colspan="5">Media do mes por secao - Correia Perfumaria</th></tr><tr><th>Mes</th><th>Secao</th><th>Dias lancados</th><th>Apontamentos</th><th>Tempo/Acesso medio (s)</th></tr>';
+  monthData.summary.forEach(r=>{
+    resumo+=`<tr><td>${excelText(monthLabel)}</td><td>Sec. ${excelText(r.sec)}</td><td>${prodFmt(r.dias,0)}</td><td>${prodFmt(r.apontamentos,0)}</td><td>${r.avg===null?'':prodFmt(r.avg,1)}</td></tr>`;
+  });
+  let detalhe='<tr><th colspan="9">Lancamentos usados no calculo</th></tr><tr><th>Data</th><th>Setor</th><th>Secao</th><th>Horario</th><th>Caixa</th><th>Acesso</th><th>Tempo (s)</th><th>Acesso/Caixa</th><th>Tempo/Acesso (s)</th></tr>';
+  monthData.detail.forEach(r=>{
+    detalhe+=`<tr><td>${excelText(fmtDateShort(r.date))}</td><td>Correia Perfumaria</td><td>${excelText(r.sec)}</td><td>${excelText(r.hour)}</td><td>${prodFmt(r.caixa,0)}</td><td>${prodFmt(r.acesso,0)}</td><td>${prodFmt(r.tempo,0)}</td><td>${prodFmt(r.acessoCaixa,2)}</td><td>${prodFmt(r.tempoAcesso,1)}</td></tr>`;
+  });
+  if(!monthData.detail.length)detalhe+='<tr><td colspan="9">Sem apontamentos no mes selecionado.</td></tr>';
+  const html=`<!doctype html><html><head><meta charset="utf-8"></head><body><table border="1">${resumo}</table><br><table border="1">${detalhe}</table></body></html>`;
+  const blob=new Blob([html],{type:'application/vnd.ms-excel;charset=utf-8'});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement('a');
+  a.href=url;
+  a.download=`media-mensal-correia-perfumaria-${monthData.month.replace('-','')}.xls`;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(url),1000);
 }
 
 // Produtividade individual diurna - Recebimento e Armazenagem
