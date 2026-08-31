@@ -5425,7 +5425,7 @@ async function importRecebArm997(ev){
     data.qrpDayReceivedItems=recebArm997MergeDayReceivedItems(sameParser?(data.qrpDayReceivedItems||[]):[],importRecord.items,day.date);
     data.qrpLastItems=importRecord.items;
     data.qrpParserVersion='emf-997-v1';
-    data.qrpImports=[...(data.qrpImports||[]),{...importRecord,items:undefined}].slice(-36);
+    data.qrpImports=[...(data.qrpImports||[]),importRecord].slice(-36);
     recebArmTouch(day);
     compareRecebArmStorage(false);
     recebArmMsg('recebArm997Msg',`${rows.length} linha(s) da 997 importadas. Leitura ${new Date(importRecord.importedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} salva no histórico.`,false);
@@ -6141,14 +6141,24 @@ function recebArm997HourlyStoredTable(imports){
   </div>`;
 }
 
-function recebArm997PartialAlertsTable(imports){
+function recebArm997PartialRowsFromImports(imports){
   const rows=[];
-  (Array.isArray(imports)?imports:[]).forEach(r=>{
+  const list=(Array.isArray(imports)?imports:[]).slice().sort((a,b)=>(+a.importedAt||0)-(+b.importedAt||0));
+  list.forEach((r,idx)=>{
     const hour=r.importedAt?new Date(r.importedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'-';
-    (Array.isArray(r.partials)?r.partials:[]).forEach(item=>{
+    let partials=Array.isArray(r.partials)?r.partials:[];
+    if(!partials.length&&idx>0&&Array.isArray(list[idx-1].items)&&Array.isArray(r.items)){
+      partials=recebArm997PartialStoredItems(list[idx-1].items,r.items,r.dayDate||list[idx-1].dayDate||curDate||today());
+    }
+    partials.forEach(item=>{
       rows.push({...item,hour,fileName:r.fileName||'997'});
     });
   });
+  return rows;
+}
+
+function recebArm997PartialAlertsTable(imports){
+  const rows=recebArm997PartialRowsFromImports(imports);
   if(!rows.length&&!(Array.isArray(imports)&&imports.length))return '';
   const body=rows.length?rows.map(r=>`<tr><td>${excelText(r.hour)}</td><td>${excelText(r.fileName)}</td><td>${excelText(fmtDateShort(r.entrada))}</td><td>${excelText(r.sku)}</td><td style="text-align:left">${excelText(r.descricao||'')}</td><td>${prodFmt(+r.qtdAntes||0,0)}</td><td>${prodFmt(+r.qtdAtual||0,0)}</td><td style="font-weight:bold;color:#00e676">${prodFmt(+r.qtdSaida||0,0)}</td><td style="font-weight:bold;color:#00e676">${prodFmt(+r.volSaida||0,0)}</td></tr>`).join(''):'<tr><td colspan="9">Sem item parcialmente armazenado nesta compara&ccedil;&atilde;o.</td></tr>';
   return `<div style="overflow-x:auto;margin-top:8px">
@@ -7094,13 +7104,8 @@ function boletimLine(label,value,detail=''){
 }
 function boletimPartialAlertRows(day){
   const data=(day&&day.recebArm)||{};
-  const imports=(Array.isArray(data.qrpImports)?data.qrpImports:[]).filter(r=>r&&r.version==='997-hora-v2').slice().sort((a,b)=>(+a.importedAt||0)-(+b.importedAt||0));
-  const rows=[];
-  imports.forEach(r=>{
-    const hour=r.importedAt?new Date(r.importedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'-';
-    (Array.isArray(r.partials)?r.partials:[]).forEach(item=>rows.push({...item,hour,fileName:r.fileName||'997'}));
-  });
-  return rows;
+  const imports=(Array.isArray(data.qrpImports)?data.qrpImports:[]).filter(r=>r&&r.version==='997-hora-v2');
+  return recebArm997PartialRowsFromImports(imports);
 }
 function boletimPartialAlerts(day){
   const rows=boletimPartialAlertRows(day);
