@@ -5228,12 +5228,25 @@ function recebArm997SnapshotItems(rows,dayDate){
 }
 
 function recebArm997PartialStoredItems(prevItems,currentItems,dayDate){
-  const currentByKey={};
-  (Array.isArray(currentItems)?currentItems:[]).forEach(item=>{currentByKey[item.key]=item;});
-  return (Array.isArray(prevItems)?prevItems:[]).map(prev=>{
+  const aggregate=items=>{
+    const map={};
+    (Array.isArray(items)?items:[]).forEach(item=>{
+      if(!item||item.category!=='today'||item.date!==dayDate)return;
+      const sku=String(item.sku||'').trim();
+      if(!sku)return;
+      const key=[item.date,sku].join('|');
+      if(!map[key])map[key]={key,date:item.date,sku,descricao:item.descricao||'',qtd:0,vol:0,linhas:0};
+      map[key].qtd+=+item.qtd||0;
+      map[key].vol+=+item.vol||0;
+      map[key].linhas+=+item.linhas||1;
+      if(!map[key].descricao&&item.descricao)map[key].descricao=item.descricao;
+    });
+    return map;
+  };
+  const currentByKey=aggregate(currentItems);
+  return Object.values(aggregate(prevItems)).map(prev=>{
     const cur=currentByKey[prev.key];
     if(!cur)return null;
-    if(prev.category!=='today'||prev.date!==dayDate)return null;
     const qtdAntes=+prev.qtd||0;
     const qtdAtual=+cur.qtd||0;
     const volAntes=+prev.vol||0;
@@ -5243,8 +5256,8 @@ function recebArm997PartialStoredItems(prevItems,currentItems,dayDate){
       sku:prev.sku||cur.sku||'',
       descricao:cur.descricao||prev.descricao||'',
       entrada:prev.date||cur.date||dayDate,
-      lote:cur.lote||prev.lote||'',
-      validade:cur.validade||prev.validade||'',
+      lote:'',
+      validade:'',
       qtdAntes,
       qtdAtual,
       qtdSaida:qtdAntes-qtdAtual,
@@ -5406,7 +5419,8 @@ async function importRecebArm997(ev){
     const day=recebArmDay();
     const data=ensureRecebArm(day);
     const sameParser=data.qrpParserVersion==='emf-997-v1';
-    const importRecord=recebArm997BuildImportRecord(rows,day.date,file.name,endereco,sameParser?(data.qrpLastItems||[]):[]);
+    const prevItems=(Array.isArray(data.qrpLastItems)&&data.qrpLastItems.length)?data.qrpLastItems:[];
+    const importRecord=recebArm997BuildImportRecord(rows,day.date,file.name,endereco,prevItems);
     data.qrpRows=rows;
     data.qrpDayReceivedItems=recebArm997MergeDayReceivedItems(sameParser?(data.qrpDayReceivedItems||[]):[],importRecord.items,day.date);
     data.qrpLastItems=importRecord.items;
