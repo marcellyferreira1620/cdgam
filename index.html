@@ -6985,6 +6985,31 @@ function boletimTextarea(label,key,value){
 function boletimLine(label,value,detail=''){
   return `<div class="boletim-line"><b>${label}</b><span><strong>${value}</strong>${detail?` <small>${detail}</small>`:''}</span></div>`;
 }
+function boletimPartialAlertRows(day){
+  const data=(day&&day.recebArm)||{};
+  const imports=(Array.isArray(data.qrpImports)?data.qrpImports:[]).filter(r=>r&&r.version==='997-hora-v2').slice().sort((a,b)=>(+a.importedAt||0)-(+b.importedAt||0));
+  const rows=[];
+  imports.forEach(r=>{
+    const hour=r.importedAt?new Date(r.importedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}):'-';
+    (Array.isArray(r.partials)?r.partials:[]).forEach(item=>rows.push({...item,hour,fileName:r.fileName||'997'}));
+  });
+  return rows;
+}
+function boletimPartialAlerts(day){
+  const rows=boletimPartialAlertRows(day);
+  if(!rows.length)return '';
+  const shown=rows.slice(-12);
+  const hidden=rows.length-shown.length;
+  const body=shown.map(r=>`<tr><td>${excelText(r.hour)}</td><td>${excelText(r.fileName)}</td><td>${excelText(fmtDateShort(r.entrada))}</td><td>${excelText(r.sku)}</td><td style="text-align:left">${excelText(r.descricao||'')}</td><td>${prodFmt(+r.qtdAntes||0,0)}</td><td>${prodFmt(+r.qtdAtual||0,0)}</td><td style="font-weight:bold;color:#00e676">${prodFmt(+r.qtdSaida||0,0)}</td><td style="font-weight:bold;color:#00e676">${prodFmt(+r.volSaida||0,0)}</td></tr>`).join('');
+  const note=hidden>0?`<div style="font-size:11px;color:#003b6f;margin-top:6px;font-weight:700">+ ${prodFmt(hidden,0)} c&oacute;digo(s) parcial(is) anterior(es) neste dia.</div>`:'';
+  return `<div class="boletim-subhead">Alerta - c&oacute;digos parcialmente armazenados</div>
+    <div style="overflow-x:auto;margin-top:8px">
+      <table class="receb-arm-tbl" style="min-width:760px">
+        <thead><tr><th>Hora</th><th>Arquivo</th><th>Data entrada</th><th>C&oacute;digo</th><th>Descri&ccedil;&atilde;o</th><th>QT. anterior</th><th>QT. atual</th><th>QT. sa&iacute;da</th><th>Volumes sa&iacute;da</th></tr></thead>
+        <tbody>${body}</tbody>
+      </table>
+    </div>${note}`;
+}
 function boletimSaveCurrent(day){
   const idx=db.days.findIndex(d=>d.date===day.date);
   if(idx>=0)db.days[idx]=mergeDayRecords(db.days[idx],day);else db.days.push(day);
@@ -7009,6 +7034,9 @@ function boletimBuildWhatsapp(day){
   const b=boletimManual(day);
   const r=boletimRecebStats(day);
   const n=boletimNightStats(day);
+  const isFinalDay=boletimIsFinalDay(day);
+  const partialRows=boletimPartialAlertRows(day);
+  const partialText=partialRows.length?`Alerta armazenagem parcial: ${prodFmt(partialRows.length,0)} codigo(s): ${partialRows.slice(-6).map(r=>String(r.sku||'').trim()).filter(Boolean).join(', ')}${partialRows.length>6?'...':''}`:null;
   return [
     `*BOLETIM INTERNO CD SJP*`,
     `${fmtDate(day.date)}`,
@@ -7020,7 +7048,8 @@ function boletimBuildWhatsapp(day){
     `Lead time emissão → recebimento: ${String(b.leadTimeEmissaoRecebimento||'-').trim()||'-'}`,
     `Lead time trânsito: ${String(b.leadTimeTransito||'-').trim()||'-'}`,
     `Lead time liberação CD → processamento da NF: ${String(b.leadTimeLiberacaoProcessamento||'-').trim()||'-'}`,
-    `Armazenagem: recebidos ${prodFmt(r.recVol,0)} vol. / ${prodFmt(r.recSkus,0)} SKUs | armazenados ${prodFmt(r.storedVol,0)} vol. (${r.storedVolPct}%) / ${prodFmt(r.storedSku,0)} SKUs (${r.storedSkuPct}%) | pendentes ${prodFmt(r.pendVol,0)} vol. (${r.pendVolPct}%) / ${prodFmt(r.pendSku,0)} SKUs (${r.pendSkuPct}%)`,
+    isFinalDay?`Armazenagem: recebidos ${prodFmt(r.recVol,0)} vol. / ${prodFmt(r.recSkus,0)} SKUs | armazenados ${prodFmt(r.storedVol,0)} vol. (${r.storedVolPct}%) / ${prodFmt(r.storedSku,0)} SKUs (${r.storedSkuPct}%) | pendentes ${prodFmt(r.pendVol,0)} vol. (${r.pendVolPct}%) / ${prodFmt(r.pendSku,0)} SKUs (${r.pendSkuPct}%)`:`Armazenagem: recebidos ${prodFmt(r.recVol,0)} vol. / ${prodFmt(r.recSkus,0)} SKUs`,
+    partialText,
     `Abastecimento 1° turno: abastecidas ${prodFmt(b.abastecidas,0)} | pendentes ${prodFmt(b.pendentes,0)} | canceladas ${prodFmt(b.canceladas,0)}`,
     `Inventário: posições ${prodFmt(b.posicoesInventariadas,0)} | reserva liberada R$ ${prodFmt(b.valorReserva,2)}`,
     b.manutencaoDiurna?`Manutenção diurna: ${String(b.manutencaoDiurna).trim()}`:`Manutenção diurna: sem apontamento.`,
@@ -7037,7 +7066,7 @@ function boletimBuildWhatsapp(day){
     `Rotas: ${n.pctNoHorario}% no horário | ${n.pctAtraso}% atrasadas`,
     `Abastecimento 3° turno: abastecidas ${prodFmt(b.abastecidas3Turno,0)} | pendentes ${prodFmt(b.pendentes3Turno,0)} | canceladas ${prodFmt(b.canceladas3Turno,0)}`,
     b.manutencaoNoturna?`Manutenção noturna: ${String(b.manutencaoNoturna).trim()}`:`Manutenção noturna: sem apontamento.`
-  ].join('\n');
+  ].filter(l=>l!==null&&l!==undefined).join('\n');
 }
 function boletimRefreshWhatsapp(){
   const el=document.getElementById('boletimWhatsappText');
@@ -7064,6 +7093,7 @@ function renderBoletim(){
             ${boletimLine('Volumes pendentes de armazenagem',prodFmt(r.pendVol,0),`${r.pendVolPct}%`)}
             ${boletimLine('SKUs armazenados',prodFmt(r.storedSku,0),`${r.storedSkuPct}%`)}
             ${boletimLine('SKUs pendentes de armazenagem',prodFmt(r.pendSku,0),`${r.pendSkuPct}%`)}`:'';
+  const armPartialAlerts=boletimPartialAlerts(day);
   wrap.innerHTML=`
     <div class="boletim-head">
       <div class="boletim-title">
@@ -7102,6 +7132,7 @@ function renderBoletim(){
             ${boletimLine('Volumes recebidos',prodFmt(r.recVol,0),'volumes')}
             ${boletimLine('SKUs recebidos',prodFmt(r.recSkus,0),'SKUs')}
             ${armFinalRows}
+            ${armPartialAlerts}
           </div>
           <div class="boletim-subhead">Setor de Abastecimento - 1° turno</div>
           <div class="boletim-fields" style="margin-top:12px">
