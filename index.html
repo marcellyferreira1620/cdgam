@@ -7013,11 +7013,12 @@ function boletimIsoAddDays(dt,days){
 function boletimNightSourceDay(day){
   const dt=(day&&day.date)||curDate||today();
   const d=new Date(String(dt)+'T12:00:00');
+  let offset=-1;
   if(!Number.isNaN(d.getTime())&&d.getDay()===1){
-    const friday=getDay(boletimIsoAddDays(dt,-3));
-    if(friday)return friday;
+    offset=-3;
   }
-  return day||{};
+  const source=getDay(boletimIsoAddDays(dt,offset));
+  return source||day||{};
 }
 function boletimRecebStats(day){
   const data=(day&&day.recebArm)||emptyRecebArm();
@@ -7081,6 +7082,7 @@ function boletimNightStats(day){
   const ini=day.cMed||day.cPer||day.ckOut||day.esp||day.exp||'';
   const fim=day.cMedFim||day.cPerFim||day.ckOutFim||day.espFim||day.expFim||'';
   return{
+    sourceDate:day.date||'',
     med,perf,checkoutVol,checkoutUn,psicoVol,psicoUn,vales,especial,expedicao,
     ini,fim,
     medHora:boletimMedia(med,day.cMed,day.cMedFim),
@@ -7149,6 +7151,8 @@ function boletimBuildWhatsapp(day){
   const r=boletimRecebStats(day);
   const n=boletimNightStats(day);
   const isFinalDay=boletimIsFinalDay(day);
+  const armManualVol=String(b.armVolumesRecebidos??'').trim()===''?0:boletimNum(b.armVolumesRecebidos);
+  const armManualSkus=String(b.armSkusRecebidos??'').trim()===''?0:boletimNum(b.armSkusRecebidos);
   const partialRows=boletimPartialAlertRows(day);
   const partialText=partialRows.length?`Alerta armazenagem parcial: ${prodFmt(partialRows.length,0)} codigo(s): ${partialRows.slice(-6).map(r=>`${String(r.sku||'').trim()||'-'} local ${prodFmt(+r.qtdAntes||0,0)} > ${prodFmt(+r.qtdAtual||0,0)}`).join('; ')}${partialRows.length>6?'...':''}`:null;
   return [
@@ -7162,13 +7166,13 @@ function boletimBuildWhatsapp(day){
     `Lead time emissão → recebimento: ${String(b.leadTimeEmissaoRecebimento||'-').trim()||'-'}`,
     `Lead time trânsito: ${String(b.leadTimeTransito||'-').trim()||'-'}`,
     `Lead time liberação CD → processamento da NF: ${String(b.leadTimeLiberacaoProcessamento||'-').trim()||'-'}`,
-    isFinalDay?`Armazenagem: recebidos ${prodFmt(r.recVol,0)} vol. / ${prodFmt(r.recSkus,0)} SKUs | armazenados ${prodFmt(r.storedVol,0)} vol. (${r.storedVolPct}%) / ${prodFmt(r.storedSku,0)} SKUs (${r.storedSkuPct}%) | pendentes ${prodFmt(r.pendVol,0)} vol. (${r.pendVolPct}%) / ${prodFmt(r.pendSku,0)} SKUs (${r.pendSkuPct}%)`:`Armazenagem: recebidos ${prodFmt(r.recVol,0)} vol. / ${prodFmt(r.recSkus,0)} SKUs`,
+    isFinalDay?`Armazenagem: recebidos ${prodFmt(armManualVol,0)} vol. / ${prodFmt(armManualSkus,0)} SKUs | armazenados ${prodFmt(r.storedVol,0)} vol. (${r.storedVolPct}%) / ${prodFmt(r.storedSku,0)} SKUs (${r.storedSkuPct}%) | pendentes ${prodFmt(r.pendVol,0)} vol. (${r.pendVolPct}%) / ${prodFmt(r.pendSku,0)} SKUs (${r.pendSkuPct}%)`:`Armazenagem: recebidos ${prodFmt(armManualVol,0)} vol. / ${prodFmt(armManualSkus,0)} SKUs`,
     partialText,
     `Abastecimento 1° turno: abastecidas ${prodFmt(b.abastecidas,0)} | pendentes ${prodFmt(b.pendentes,0)} | canceladas ${prodFmt(b.canceladas,0)}`,
     `Inventário: posições ${prodFmt(b.posicoesInventariadas,0)} | reserva liberada R$ ${prodFmt(b.valorReserva,2)}`,
     b.manutencaoDiurna?`Manutenção diurna: ${String(b.manutencaoDiurna).trim()}`:`Manutenção diurna: sem apontamento.`,
     ``,
-    `*OPERAÇÃO NOTURNA*`,
+    `*OPERAÇÃO NOTURNA - ${fmtDate(n.sourceDate||day.date)}*`,
     `Início: ${n.ini||'-'} | Finalização: ${n.fim||'-'}`,
     `Correia Medicamento: ${prodFmt(n.med,0)} linhas | média/h ${prodFmt(n.medHora,0)}`,
     `Correia Perfumaria: ${prodFmt(n.perf,0)} linhas | média/h ${prodFmt(n.perfHora,0)}`,
@@ -7243,8 +7247,12 @@ function renderBoletim(){
           </div>
           <div class="boletim-list">
             <div class="boletim-subhead">Setor Armazenagem</div>
-            ${boletimLine('Volumes recebidos',prodFmt(r.recVol,0),'volumes')}
-            ${boletimLine('SKUs recebidos',prodFmt(r.recSkus,0),'SKUs')}
+          </div>
+          <div class="boletim-fields" style="margin-top:12px">
+            ${boletimField('Volumes recebidos','armVolumesRecebidos',b.armVolumesRecebidos)}
+            ${boletimField('SKUs recebidos','armSkusRecebidos',b.armSkusRecebidos)}
+          </div>
+          <div class="boletim-list">
             ${armFinalRows}
             ${armPartialAlerts}
           </div>
@@ -7263,7 +7271,7 @@ function renderBoletim(){
         </div>
       </section>
       <section class="boletim-section">
-        <div class="boletim-section-h">Operação noturna <small>Leitura automática da produção noturna</small></div>
+        <div class="boletim-section-h">Operação noturna <small>Produção de ${fmtDate(n.sourceDate||day.date)}</small></div>
         <div class="boletim-section-b">
           <div class="boletim-list">
             ${boletimLine('Horário de início',n.ini||'-')}
