@@ -7194,7 +7194,7 @@ function boletimBuildWhatsapp(day){
     `Correia Medicamento: ${prodFmt(n.med,0)} linhas | média/h ${prodFmt(n.medHora,0)}`,
     `Correia Perfumaria: ${prodFmt(n.perf,0)} linhas | média/h ${prodFmt(n.perfHora,0)}`,
     `Checkout: ${prodFmt(n.checkoutVol,0)} vol. / ${prodFmt(n.checkoutUn,0)} un. | médias/h ${prodFmt(n.checkoutVolHora,0)} vol. e ${prodFmt(n.checkoutUnHora,0)} un.`,
-    `Checkout Psico: ${prodFmt(n.psicoVol,0)} vol. / ${prodFmt(n.psicoUn,0)} un.`,
+    `Checkout Psico: ${prodFmt(n.psicoVol,0)} vol.`,
     `Vales gerados: ${prodFmt(n.vales,0)}`,
     `Especial: ${prodFmt(n.especial,0)} vol. | média/h ${prodFmt(n.especialHora,0)}`,
     `Expedição total: ${prodFmt(n.expedicao,0)} vol. | eficiência ${n.expPct}%`,
@@ -7296,7 +7296,7 @@ function renderBoletim(){
             ${boletimLine('Correia medicamento',prodFmt(n.med,0),`média/h ${prodFmt(n.medHora,0)}`)}
             ${boletimLine('Correia perfumaria',prodFmt(n.perf,0),`média/h ${prodFmt(n.perfHora,0)}`)}
             ${boletimLine('Checkout',`${prodFmt(n.checkoutVol,0)} vol. / ${prodFmt(n.checkoutUn,0)} un.`,`média/h ${prodFmt(n.checkoutVolHora,0)} vol.`)}
-            ${boletimLine('Checkout psico',`${prodFmt(n.psicoVol,0)} vol. / ${prodFmt(n.psicoUn,0)} un.`)}
+            ${boletimLine('Checkout psico',`${prodFmt(n.psicoVol,0)} vol.`)}
             ${boletimLine('Vales gerados',prodFmt(n.vales,0))}
             ${boletimLine('Especial',prodFmt(n.especial,0),`média/h ${prodFmt(n.especialHora,0)}`)}
             ${boletimLine('Rotas no horário / atrasadas',`${n.pctNoHorario}% / ${n.pctAtraso}%`,`${prodFmt(n.routesTotal,0)} rotas apuradas`)}
