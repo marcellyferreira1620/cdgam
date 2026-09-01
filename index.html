@@ -7096,8 +7096,8 @@ function boletimNightStats(day){
   const pctNoHorario=routes.length?Math.round(noHorario/routes.length*100):0;
   const pctAtraso=routes.length?Math.round(atrasadas/routes.length*100):0;
   const range=boletimNightTimeRange(day);
-  const ini=range.start;
-  const fim=range.end;
+  const ini=day.exp||day.cMed||day.cPer||range.start;
+  const fim=day.expFim||range.end;
   return{
     sourceDate:day.date||'',
     med,perf,checkoutVol,checkoutUn,psicoVol,psicoUn,vales,especial,expedicao,
