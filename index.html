@@ -6995,6 +6995,22 @@ function boletimMedia(total,start,end){
   const hours=boletimHoursBetween(start,end);
   return hours?boletimNum(total)/hours:0;
 }
+function boletimNightSortMinutes(value){
+  const min=boletimTimeToMinutes(value);
+  if(min===null)return null;
+  return min<12*60?min+24*60:min;
+}
+function boletimNightTimeRange(day){
+  const starts=['cMed','cPer','ckOut','esp','frF','frFc','exp']
+    .map(k=>({value:day&&day[k],min:boletimNightSortMinutes(day&&day[k])}))
+    .filter(x=>x.min!==null);
+  const ends=['cMedFim','cPerFim','ckOutFim','espFim','frFFim','frFcFim','expFim']
+    .map(k=>({value:day&&day[k],min:boletimNightSortMinutes(day&&day[k])}))
+    .filter(x=>x.min!==null);
+  const start=starts.length?starts.reduce((best,x)=>x.min<best.min?x:best,starts[0]).value:'';
+  const end=ends.length?ends.reduce((best,x)=>x.min>best.min?x:best,ends[0]).value:'';
+  return{start,end};
+}
 function boletimManual(day){
   return (day&&day.boletim)||{};
 }
@@ -7079,8 +7095,9 @@ function boletimNightStats(day){
   const noHorario=routes.length-atrasadas;
   const pctNoHorario=routes.length?Math.round(noHorario/routes.length*100):0;
   const pctAtraso=routes.length?Math.round(atrasadas/routes.length*100):0;
-  const ini=day.cMed||day.cPer||day.ckOut||day.esp||day.exp||'';
-  const fim=day.cMedFim||day.cPerFim||day.ckOutFim||day.espFim||day.expFim||'';
+  const range=boletimNightTimeRange(day);
+  const ini=range.start;
+  const fim=range.end;
   return{
     sourceDate:day.date||'',
     med,perf,checkoutVol,checkoutUn,psicoVol,psicoUn,vales,especial,expedicao,
