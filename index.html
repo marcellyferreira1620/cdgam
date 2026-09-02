@@ -217,7 +217,7 @@ body.devolucao-view .day-nav{justify-content:flex-start;padding:8px 14px}
 .inventario-reserva-tables .receb-arm-tbl th{color:#6ab7ff}
 .inventario-reserva-tables .receb-arm-tbl td{color:#fff}
 .inventario-map-scroll{overflow:hidden;background:#fff;border:1px solid #aeb8c2;border-radius:4px;padding:0}
-.inventario-farol{display:block;width:100%;height:auto;background:#fff}
+.inventario-farol{display:block;width:100%;height:auto;background:#fff;user-select:none;touch-action:none}
 .inventario-farol text{font-family:Arial,Helvetica,sans-serif;letter-spacing:0}
 .inventario-farol .inv-cell{cursor:pointer}
 .inventario-farol .inv-ok{pointer-events:none;font-size:10px;font-weight:900;fill:#f00}
@@ -7051,7 +7051,8 @@ function saveInventarioField(key,value){
   renderInventarioCharts(inventarioTotals(savedDay.inventario||day.inventario||{}));
   inventarioRefreshResumo();
 }
-function toggleInventarioLocal(local){
+let inventarioFarolPaint=null;
+function inventarioFarolDayClone(){
   const dt=curDate||today();
   const base=getDay(dt)||emptyDay(dt);
   const day=JSON.parse(JSON.stringify(base));
@@ -7059,6 +7060,70 @@ function toggleInventarioLocal(local){
   day.inventario=day.inventario||{};
   day.inventario.farol=day.inventario.farol||{};
   day.inventario._fieldUpdatedAt=day.inventario._fieldUpdatedAt||{};
+  return {dt,day,ts};
+}
+function inventarioFarolApplyCell(el,state){
+  const g=el&&el.closest?el.closest('[data-inv-local]'):el;
+  if(!g)return;
+  const rect=g.querySelector('rect.inv-cell');
+  if(rect)rect.setAttribute('fill',state>=1?'#6aa84f':'#fff');
+  let ok=g.querySelector('text.inv-ok');
+  if(state>=2&&!ok){
+    const x=+g.getAttribute('data-inv-x')||0;
+    const y=+g.getAttribute('data-inv-y')||0;
+    const w=+g.getAttribute('data-inv-w')||22;
+    const h=+g.getAttribute('data-inv-h')||18;
+    ok=document.createElementNS('http://www.w3.org/2000/svg','text');
+    ok.setAttribute('class','inv-ok');
+    ok.setAttribute('x',String(x+w/2));
+    ok.setAttribute('y',String(y+h-4));
+    ok.setAttribute('text-anchor','middle');
+    ok.textContent='OK';
+    g.appendChild(ok);
+  }else if(state<2&&ok){
+    ok.remove();
+  }
+}
+function inventarioFarolPaintLocal(local,el){
+  if(!inventarioFarolPaint||!local||inventarioFarolPaint.done.has(local))return;
+  inventarioFarolPaint.day.inventario.farol[local]=inventarioFarolPaint.state;
+  inventarioFarolPaint.done.add(local);
+  inventarioFarolApplyCell(el,inventarioFarolPaint.state);
+}
+function inventarioFarolCommitPaint(){
+  if(!inventarioFarolPaint)return;
+  const paint=inventarioFarolPaint;
+  inventarioFarolPaint=null;
+  if(!paint.done.size)return;
+  paint.day.inventario._fieldUpdatedAt.farol=paint.ts;
+  paint.day.inventario._updatedAt=paint.ts;
+  paint.day._updatedAt=paint.ts;
+  inventarioSaveCurrent(paint.day);
+  renderInventario();
+}
+function inventarioFarolPointerDown(event,local){
+  if(event&&event.button!==undefined&&event.button!==0)return;
+  const ctx=inventarioFarolDayClone();
+  const current=+ctx.day.inventario.farol[local]||0;
+  inventarioFarolPaint={day:ctx.day,ts:ctx.ts,state:(current+1)%3,done:new Set()};
+  if(event){
+    event.preventDefault();
+  }
+  inventarioFarolPaintLocal(local,event&&event.currentTarget);
+}
+function inventarioFarolPointerEnter(event,local){
+  if(!inventarioFarolPaint)return;
+  if(event)event.preventDefault();
+  inventarioFarolPaintLocal(local,event&&event.currentTarget);
+}
+function inventarioFarolPointerMove(event){
+  if(!inventarioFarolPaint||!event||event.clientX===undefined)return;
+  const el=document.elementFromPoint(event.clientX,event.clientY);
+  const g=el&&el.closest?el.closest('[data-inv-local]'):null;
+  if(g)inventarioFarolPaintLocal(g.getAttribute('data-inv-local'),g);
+}
+function toggleInventarioLocal(local){
+  const {day,ts}=inventarioFarolDayClone();
   const current=+day.inventario.farol[local]||0;
   day.inventario.farol[local]=(current+1)%3;
   day.inventario._fieldUpdatedAt.farol=ts;
@@ -7067,6 +7132,9 @@ function toggleInventarioLocal(local){
   inventarioSaveCurrent(day);
   renderInventario();
 }
+window.addEventListener('pointermove',inventarioFarolPointerMove,{passive:false});
+window.addEventListener('pointerup',inventarioFarolCommitPaint);
+window.addEventListener('pointercancel',inventarioFarolCommitPaint);
 function inventarioBuildResumo(day){
   const d=inventarioManual(day);
   const t=inventarioTotals(d);
@@ -7172,7 +7240,7 @@ function inventarioSvgCells(x,y,cols,rows,w=22,h=18){
       const arg=JSON.stringify(local).replace(/"/g,'&quot;');
       const cx=x+c*w;
       const cy=y+r*h;
-      out+=`<g onclick="toggleInventarioLocal(${arg})"><title>${local}</title><rect class="inv-cell" x="${cx}" y="${cy}" width="${w}" height="${h}" fill="${fill}" stroke="#000" stroke-width="1"/>${st>=2?`<text class="inv-ok" x="${cx+w/2}" y="${cy+h-4}" text-anchor="middle">OK</text>`:''}</g>`;
+      out+=`<g data-inv-local="${attrText(local)}" data-inv-x="${cx}" data-inv-y="${cy}" data-inv-w="${w}" data-inv-h="${h}" onpointerdown="inventarioFarolPointerDown(event,${arg})" onpointerenter="inventarioFarolPointerEnter(event,${arg})"><title>${local}</title><rect class="inv-cell" x="${cx}" y="${cy}" width="${w}" height="${h}" fill="${fill}" stroke="#000" stroke-width="1"/>${st>=2?`<text class="inv-ok" x="${cx+w/2}" y="${cy+h-4}" text-anchor="middle">OK</text>`:''}</g>`;
     }
   }
   return out;
