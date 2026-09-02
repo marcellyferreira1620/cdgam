@@ -208,6 +208,14 @@ body.devolucao-view .day-nav{justify-content:flex-start;padding:8px 14px}
 .inventario-field{display:flex;flex-direction:column;gap:4px;color:#0b3b63;font-size:11px;font-weight:800}
 .inventario-field input,.inventario-field textarea{border:1px solid #9fc7e6;border-radius:5px;padding:8px;background:#fff;color:#0a2340;font-weight:700;font-size:12px;min-width:0}
 .inventario-field textarea{min-height:72px;resize:vertical;font-weight:600}
+.inventario-upload-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:10px;margin-top:12px}
+.inventario-upload-box{background:#f4f8fb;border:1px solid #c8d9e8;border-radius:6px;padding:10px;color:#0a2340}
+.inventario-upload-box label{display:block;color:#003b6f;font-size:11px;font-weight:900;text-transform:uppercase;margin-bottom:6px}
+.inventario-upload-box input{width:100%;border:1px solid #9fc7e6;border-radius:5px;background:#fff;padding:7px;font-size:11px;color:#0a2340}
+.inventario-upload-box small{display:block;margin-top:7px;color:#526676;font-size:11px;font-weight:700}
+.inventario-reserva-tables{display:grid;gap:10px;margin-top:12px}
+.inventario-reserva-tables .receb-arm-tbl th{color:#6ab7ff}
+.inventario-reserva-tables .receb-arm-tbl td{color:#fff}
 .inventario-map-scroll{overflow:hidden;background:#fff;border:1px solid #aeb8c2;border-radius:4px;padding:0}
 .inventario-farol{display:block;width:100%;height:auto;background:#fff}
 .inventario-farol text{font-family:Arial,Helvetica,sans-serif;letter-spacing:0}
@@ -6847,6 +6855,180 @@ function inventarioTextarea(label,key,value){
 function inventarioCard(label,value,small='',color=''){
   return `<div class="inventario-card"><span>${label}</span><strong${color?` style="color:${color}"`:''}>${value}</strong>${small?`<small>${small}</small>`:''}</div>`;
 }
+function inventarioMoney(v){
+  if(typeof v==='number')return Number.isFinite(v)?v:0;
+  const text=String(v??'').trim();
+  if(!text)return 0;
+  const clean=text.replace(/R\$/gi,'').replace(/\s/g,'').replace(/[^\d,.\-]/g,'');
+  if(!clean||clean==='-'||clean===','||clean==='.')return 0;
+  const dots=(clean.match(/\./g)||[]).length;
+  const normalized=clean.includes(',')
+    ?clean.replace(/\./g,'').replace(',','.')
+    :(dots>1||(dots===1&&/\.\d{3}$/.test(clean))?clean.replace(/\./g,''):clean);
+  const n=Number(normalized);
+  return Number.isFinite(n)?n:0;
+}
+function inventarioReservaNorm(v){
+  return String(v??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase();
+}
+function inventarioReservaFindCol(headers,tests,blocked){
+  const norm=headers.map(inventarioReservaNorm);
+  for(let i=0;i<norm.length;i++){
+    const h=norm[i];
+    if(!h)continue;
+    if(blocked&&blocked.some(rx=>rx.test(h)))continue;
+    if(tests.some(rx=>rx.test(h)))return i;
+  }
+  return -1;
+}
+function inventarioReservaHeaderIndex(rows){
+  let best={idx:-1,score:0};
+  const lim=Math.min(rows.length,45);
+  for(let i=0;i<lim;i++){
+    const cells=(rows[i]||[]).map(inventarioReservaNorm);
+    const joined=cells.join(' ');
+    let score=0;
+    if(/motivo|classificacao|historico|tipo reserva|grupo/.test(joined))score+=3;
+    if(/custo gerencial|valor total|valor|custo/.test(joined))score+=3;
+    if(/unid|unidade|reservad|qtde|qtd|quantidade/.test(joined))score+=2;
+    if(score>best.score)best={idx:i,score};
+  }
+  return best.score>=4?best.idx:-1;
+}
+function inventarioReservaRowsFromSheet(rows){
+  const headerIdx=inventarioReservaHeaderIndex(rows);
+  if(headerIdx<0)return [];
+  const headers=rows[headerIdx]||[];
+  const motivoCol=inventarioReservaFindCol(headers,[/motivo/,/classificacao/,/historico/,/tipo reserva/,/grupo/],[/codigo|sku|produto|ean|lote|validade/]);
+  const valorCol=inventarioReservaFindCol(headers,[/custo gerencial/,/valor total/,/^valor$/,/\bvalor\b/,/\bcusto\b/]);
+  const unidadeCol=inventarioReservaFindCol(headers,[/reservad/,/unid/,/unidade/,/qtde/,/qtd/,/quantidade/],[/valor|custo|preco|unitario|codigo|sku/]);
+  if(motivoCol<0||valorCol<0)return [];
+  return rows.slice(headerIdx+1).map(row=>{
+    const motivo=String((row||[])[motivoCol]??'').trim();
+    const norm=inventarioReservaNorm(motivo);
+    if(!motivo||/^total\b|total geral|grand total/.test(norm))return null;
+    const valor=inventarioMoney((row||[])[valorCol]);
+    const unidades=unidadeCol>=0?inventarioMoney((row||[])[unidadeCol]):0;
+    if(!valor&&!unidades)return null;
+    return {motivo,unidades,valor};
+  }).filter(Boolean);
+}
+function inventarioReservaAggregate(rows){
+  const by={};
+  rows.forEach(row=>{
+    const key=inventarioReservaNorm(row.motivo).replace(/\s+/g,' ');
+    if(!key)return;
+    if(!by[key])by[key]={key,motivo:row.motivo,items:0,unidades:0,valor:0};
+    by[key].items+=1;
+    by[key].unidades+=+row.unidades||0;
+    by[key].valor+=+row.valor||0;
+  });
+  const grupos=Object.values(by).sort((a,b)=>b.valor-a.valor);
+  const totals=grupos.reduce((acc,g)=>{
+    acc.items+=g.items;
+    acc.unidades+=g.unidades;
+    acc.valor+=g.valor;
+    return acc;
+  },{items:0,unidades:0,valor:0});
+  return {totals,grupos};
+}
+function inventarioReservaDataset(d,type){
+  const comp=(d&&d.reservaComparativo)||{};
+  return comp[type]||null;
+}
+function inventarioReservaComparison(d){
+  const inicio=inventarioReservaDataset(d,'inicio');
+  const final=inventarioReservaDataset(d,'final');
+  if(!inicio&&!final)return null;
+  const keys=new Set([...(inicio&&inicio.grupos?inicio.grupos:[]).map(g=>g.key),...(final&&final.grupos?final.grupos:[]).map(g=>g.key)]);
+  const mapA={};const mapB={};
+  (inicio&&inicio.grupos?inicio.grupos:[]).forEach(g=>mapA[g.key]=g);
+  (final&&final.grupos?final.grupos:[]).forEach(g=>mapB[g.key]=g);
+  const rows=[...keys].map(key=>{
+    const a=mapA[key]||{key,motivo:(mapB[key]&&mapB[key].motivo)||key,items:0,unidades:0,valor:0};
+    const b=mapB[key]||{key,motivo:a.motivo,items:0,unidades:0,valor:0};
+    return {key,motivo:b.motivo||a.motivo,inicio:a,final:b,deltaItems:b.items-a.items,deltaUnidades:b.unidades-a.unidades,deltaValor:b.valor-a.valor};
+  }).filter(r=>r.deltaItems||r.deltaUnidades||Math.abs(r.deltaValor)>=0.005)
+    .sort((a,b)=>Math.abs(b.deltaValor)-Math.abs(a.deltaValor));
+  return {inicio,final,rows};
+}
+function inventarioReservaFmtMoney(v){return `R$ ${prodFmt(+v||0,2)}`;}
+function inventarioReservaDelta(value,type='number'){
+  const n=+value||0;
+  const color=n>0?'#ff466a':(n<0?'#00a86b':'#dcecff');
+  const txt=type==='money'?`${n<0?'-':''}${inventarioReservaFmtMoney(Math.abs(n))}`:prodFmt(n,0);
+  return `<td style="font-weight:bold;color:${color}">${txt}</td>`;
+}
+function inventarioReservaLabel(data,fallback){
+  if(!data)return fallback;
+  return excelText(data.label||data.fileName||fallback);
+}
+function renderInventarioReservaComparativo(d){
+  const comp=inventarioReservaComparison(d);
+  if(!comp)return `<div class="inventario-reserva-tables"><table class="receb-arm-tbl"><tbody><tr><td>Anexe a reserva do in&iacute;cio e do final do dia para gerar o comparativo.</td></tr></tbody></table></div>`;
+  const inicio=comp.inicio||{totals:{items:0,unidades:0,valor:0}};
+  const final=comp.final||{totals:{items:0,unidades:0,valor:0}};
+  const labelInicio=inventarioReservaLabel(comp.inicio,'In&iacute;cio do dia');
+  const labelFinal=inventarioReservaLabel(comp.final,'Final do dia');
+  const totalRows=[
+    ['Total de Itens (linhas)',inicio.totals.items,final.totals.items,'number'],
+    ['Total de Unidades (Reservado)',inicio.totals.unidades,final.totals.unidades,'number'],
+    ['Valor Total (Custo Gerencial)',inicio.totals.valor,final.totals.valor,'money']
+  ].map(r=>`<tr><td style="text-align:left;font-weight:bold">${r[0]}</td><td>${r[3]==='money'?inventarioReservaFmtMoney(r[1]):prodFmt(r[1],0)}</td><td>${r[3]==='money'?inventarioReservaFmtMoney(r[2]):prodFmt(r[2],0)}</td>${inventarioReservaDelta((+r[2]||0)-(+r[1]||0),r[3])}</tr>`).join('');
+  const detailRows=comp.rows.length?comp.rows.slice(0,80).map(r=>`<tr>
+    <td style="text-align:left">${excelText(r.motivo)}</td>
+    <td>${inventarioReservaFmtMoney(r.inicio.valor)}</td>
+    <td>${inventarioReservaFmtMoney(r.final.valor)}</td>
+    ${inventarioReservaDelta(r.deltaItems)}
+    ${inventarioReservaDelta(r.deltaUnidades)}
+    ${inventarioReservaDelta(r.deltaValor,'money')}
+  </tr>`).join(''):'<tr><td colspan="6">Sem aumento ou diminui&ccedil;&atilde;o entre os arquivos anexados.</td></tr>';
+  const hidden=comp.rows.length>80?`<div style="font-size:11px;color:#526676;font-weight:700">Mostrando os 80 maiores movimentos por valor.</div>`:'';
+  return `<div class="inventario-reserva-tables">
+    <div style="overflow-x:auto"><table class="receb-arm-tbl"><thead><tr><th colspan="4">Comparativo de Reservas - CD SJP</th></tr><tr><th>Indicador</th><th>${labelInicio}</th><th>${labelFinal}</th><th>Varia&ccedil;&atilde;o</th></tr></thead><tbody>${totalRows}</tbody></table></div>
+    <div style="overflow-x:auto"><table class="receb-arm-tbl"><thead><tr><th>Motivo</th><th>Valor in&iacute;cio</th><th>Valor final</th><th>&Delta; Itens</th><th>&Delta; Unidades</th><th>&Delta; Valor</th></tr></thead><tbody>${detailRows}</tbody></table></div>
+    ${hidden}
+  </div>`;
+}
+async function importInventarioReserva(event,type){
+  const file=event&&event.target&&event.target.files&&event.target.files[0];
+  if(!file)return;
+  if(typeof XLSX==='undefined'){showSyncStatus('Leitor de Excel nao carregou',true);return;}
+  try{
+    let wb;
+    if(/\.csv$/i.test(file.name)){
+      wb=XLSX.read(await readFileText(file,'UTF-8'),{type:'string'});
+    }else{
+      wb=XLSX.read(await readFileBuffer(file),{type:'array'});
+    }
+    const rows=[];
+    (wb.SheetNames||[]).forEach(name=>{
+      const ws=wb.Sheets[name];
+      if(!ws)return;
+      inventarioReservaRowsFromSheet(XLSX.utils.sheet_to_json(ws,{header:1,defval:''})).forEach(r=>rows.push(r));
+    });
+    const agg=inventarioReservaAggregate(rows);
+    const dt=curDate||today();
+    const base=getDay(dt)||emptyDay(dt);
+    const day=JSON.parse(JSON.stringify(base));
+    const ts=Date.now();
+    day.inventario=day.inventario||{};
+    day.inventario.reservaComparativo=day.inventario.reservaComparativo||{};
+    day.inventario._fieldUpdatedAt=day.inventario._fieldUpdatedAt||{};
+    day.inventario.reservaComparativo[type]={fileName:file.name,label:type==='inicio'?'Inicio do dia':'Final do dia',importedAt:ts,totals:agg.totals,grupos:agg.grupos};
+    day.inventario._fieldUpdatedAt.reservaComparativo=ts;
+    day.inventario._updatedAt=ts;
+    day._updatedAt=ts;
+    inventarioSaveCurrent(day);
+    showSyncStatus(`${type==='inicio'?'Reserva inicio':'Reserva final'} importada: ${prodFmt(agg.totals.items,0)} linhas`,false);
+    renderInventario();
+  }catch(err){
+    console.error(err);
+    showSyncStatus('Nao consegui ler a planilha de reserva',true);
+  }finally{
+    if(event&&event.target)event.target.value='';
+  }
+}
 function inventarioSaveCurrent(day){
   const idx=db.days.findIndex(d=>d.date===day.date);
   if(idx>=0)db.days[idx]=mergeDayRecords(db.days[idx],day);else db.days.push(day);
@@ -6888,6 +7070,10 @@ function toggleInventarioLocal(local){
 function inventarioBuildResumo(day){
   const d=inventarioManual(day);
   const t=inventarioTotals(d);
+  const reservaComp=inventarioReservaComparison(d);
+  const reservaResumo=reservaComp&&reservaComp.inicio&&reservaComp.final?[
+    `Comparativo reserva: itens ${prodFmt(reservaComp.final.totals.items-reservaComp.inicio.totals.items,0)} | unidades ${prodFmt(reservaComp.final.totals.unidades-reservaComp.inicio.totals.unidades,0)} | valor ${inventarioReservaFmtMoney(reservaComp.final.totals.valor-reservaComp.inicio.totals.valor)}`
+  ]:[];
   return [
     `INVENTARIO CD SJP`,
     `${fmtDate(day.date)}`,
@@ -6901,6 +7087,7 @@ function inventarioBuildResumo(day){
     `Valor da reserva localizado: ${d.valorReservaLocalizado||0}`,
     `Valor reservado: ${d.valorReservado||0}`,
     `Aderencia: ${t.pctReserva}%`,
+    ...reservaResumo,
     ``,
     `MENU 24`,
     `Pallets devolvidos: ${prodFmt(t.palletMenu24,0)}`,
@@ -7127,6 +7314,20 @@ function renderInventario(){
           ${inventarioField('Valor reservado','valorReservado',d.valorReservado,'text')}
           ${inventarioField('Pallets de Menu 24 devolvidos','palletMenu24Devolvidos',d.palletMenu24Devolvidos)}
         </div>
+        <div class="inventario-subhead">Comparativo de reservas</div>
+        <div class="inventario-upload-grid">
+          <div class="inventario-upload-box">
+            <label>Reserva no in&iacute;cio do dia</label>
+            <input type="file" accept=".xls,.xlsx,.csv" onchange="importInventarioReserva(event,'inicio')">
+            <small>${d.reservaComparativo&&d.reservaComparativo.inicio?`Carregado: ${excelText(d.reservaComparativo.inicio.fileName||'arquivo')}`:'Anexe a planilha do in&iacute;cio.'}</small>
+          </div>
+          <div class="inventario-upload-box">
+            <label>Reserva no final do dia</label>
+            <input type="file" accept=".xls,.xlsx,.csv" onchange="importInventarioReserva(event,'final')">
+            <small>${d.reservaComparativo&&d.reservaComparativo.final?`Carregado: ${excelText(d.reservaComparativo.final.fileName||'arquivo')}`:'Anexe a planilha do final.'}</small>
+          </div>
+        </div>
+        ${renderInventarioReservaComparativo(d)}
       </div>
     </section>
     <section class="inventario-section">
@@ -7344,8 +7545,6 @@ function boletimBuildWhatsapp(day){
   const isFinalDay=boletimIsFinalDay(day);
   const armManualVol=String(b.armVolumesRecebidos??'').trim()===''?0:boletimNum(b.armVolumesRecebidos);
   const armManualSkus=String(b.armSkusRecebidos??'').trim()===''?0:boletimNum(b.armSkusRecebidos);
-  const partialRows=boletimPartialAlertRows(day);
-  const partialText=partialRows.length?`Alerta armazenagem parcial: ${prodFmt(partialRows.length,0)} codigo(s): ${partialRows.slice(-6).map(r=>`${String(r.sku||'').trim()||'-'} local ${prodFmt(+r.qtdAntes||0,0)} > ${prodFmt(+r.qtdAtual||0,0)}`).join('; ')}${partialRows.length>6?'...':''}`:null;
   return [
     `*BOLETIM INTERNO CD SJP*`,
     `${fmtDate(day.date)}`,
@@ -7358,7 +7557,6 @@ function boletimBuildWhatsapp(day){
     `Lead time trânsito: ${String(b.leadTimeTransito||'-').trim()||'-'}`,
     `Lead time liberação CD → processamento da NF: ${String(b.leadTimeLiberacaoProcessamento||'-').trim()||'-'}`,
     isFinalDay?`Armazenagem: recebidos ${prodFmt(armManualVol,0)} vol. / ${prodFmt(armManualSkus,0)} SKUs | armazenados ${prodFmt(r.storedVol,0)} vol. (${r.storedVolPct}%) / ${prodFmt(r.storedSku,0)} SKUs (${r.storedSkuPct}%) | pendentes ${prodFmt(r.pendVol,0)} vol. (${r.pendVolPct}%) / ${prodFmt(r.pendSku,0)} SKUs (${r.pendSkuPct}%)`:`Armazenagem: recebidos ${prodFmt(armManualVol,0)} vol. / ${prodFmt(armManualSkus,0)} SKUs`,
-    partialText,
     `Abastecimento 1° turno: abastecidas ${prodFmt(b.abastecidas,0)} | pendentes ${prodFmt(b.pendentes,0)} | canceladas ${prodFmt(b.canceladas,0)}`,
     `Inventário: posições ${prodFmt(b.posicoesInventariadas,0)} | reserva liberada R$ ${prodFmt(b.valorReserva,2)}`,
     b.manutencaoDiurna?`Manutenção diurna: ${String(b.manutencaoDiurna).trim()}`:`Manutenção diurna: sem apontamento.`,
@@ -7402,7 +7600,6 @@ function renderBoletim(){
             ${boletimLine('Volumes pendentes de armazenagem',prodFmt(r.pendVol,0),`${r.pendVolPct}%`)}
             ${boletimLine('SKUs armazenados',prodFmt(r.storedSku,0),`${r.storedSkuPct}%`)}
             ${boletimLine('SKUs pendentes de armazenagem',prodFmt(r.pendSku,0),`${r.pendSkuPct}%`)}`:'';
-  const armPartialAlerts=boletimPartialAlerts(day);
   wrap.innerHTML=`
     <div class="boletim-head">
       <div class="boletim-title">
@@ -7445,7 +7642,6 @@ function renderBoletim(){
           </div>
           <div class="boletim-list">
             ${armFinalRows}
-            ${armPartialAlerts}
           </div>
           <div class="boletim-subhead">Setor de Abastecimento - 1° turno</div>
           <div class="boletim-fields" style="margin-top:12px">
