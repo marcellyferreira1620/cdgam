@@ -5938,16 +5938,15 @@ function recebArmNota997FlowSummary(notas,data,index){
   const list=(Array.isArray(notas)?notas:[]).filter(n=>n&&Array.isArray(n.itens)&&n.itens.length);
   if(!list.length)return '-';
   const remaining=recebArm997InitialRemaining(index);
-  return list.map(n=>{
-    const total=recebArmNota997Summary(recebArmNota997Rows(n,data,index,remaining));
-    const color=total.armazenadoPct>=100?'#00e676':(total.armazenadoPct>0?'#ffd700':'#ff4c4c');
-    return `<div style="margin-bottom:6px">
-      <b style="color:#1e90ff">NF ${excelText(n.nfNumero||'sem número')}</b><br>
-      <span style="color:${color};font-weight:bold">${prodFmt(total.armazenadoPct,1)}% armazenado</span><br>
-      <span style="color:#ff9500">${prodFmt(total.pendentePct,1)}% pendente</span><br>
-      <span style="font-size:10px;color:#9cc2e5">100%: ${prodFmt(total.totalmente,0)} | Parcial: ${prodFmt(total.parcial,0)} | Nada: ${prodFmt(total.nada,0)}</span>
-    </div>`;
-  }).join('');
+  const rows=list.flatMap(n=>recebArmNota997Rows(n,data,index,remaining));
+  const total=recebArmNota997Summary(rows);
+  const color=total.armazenadoPct>=100?'#00e676':(total.armazenadoPct>0?'#ffd700':'#ff4c4c');
+  const nfList=[...new Set(list.map(n=>n.nfNumero||'sem número').filter(Boolean))].join(', ');
+  return `<div>
+    <b style="color:#1e90ff">NF ${excelText(nfList||'sem número')}</b><br>
+    <span style="color:${color};font-weight:bold">${prodFmt(total.armazenadoPct,1)}% armazenado</span><br>
+    <span style="color:#ff9500">${prodFmt(total.pendentePct,1)}% pendente</span>
+  </div>`;
 }
 
 function renderRecebArmFluxo(data){
