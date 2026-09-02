@@ -7086,9 +7086,11 @@ function inventarioFarolApplyCell(el,state){
 }
 function inventarioFarolPaintLocal(local,el){
   if(!inventarioFarolPaint||!local||inventarioFarolPaint.done.has(local))return;
-  inventarioFarolPaint.day.inventario.farol[local]=inventarioFarolPaint.state;
+  const current=+inventarioFarolPaint.day.inventario.farol[local]||0;
+  const next=Math.max(current,inventarioFarolPaint.state);
+  inventarioFarolPaint.day.inventario.farol[local]=next;
   inventarioFarolPaint.done.add(local);
-  inventarioFarolApplyCell(el,inventarioFarolPaint.state);
+  inventarioFarolApplyCell(el,next);
 }
 function inventarioFarolCommitPaint(){
   if(!inventarioFarolPaint)return;
@@ -7105,7 +7107,7 @@ function inventarioFarolPointerDown(event,local){
   if(event&&event.button!==undefined&&event.button!==0)return;
   const ctx=inventarioFarolDayClone();
   const current=+ctx.day.inventario.farol[local]||0;
-  inventarioFarolPaint={day:ctx.day,ts:ctx.ts,state:(current+1)%3,done:new Set()};
+  inventarioFarolPaint={day:ctx.day,ts:ctx.ts,state:Math.min(current+1,2),done:new Set()};
   if(event){
     event.preventDefault();
   }
@@ -7125,7 +7127,7 @@ function inventarioFarolPointerMove(event){
 function toggleInventarioLocal(local){
   const {day,ts}=inventarioFarolDayClone();
   const current=+day.inventario.farol[local]||0;
-  day.inventario.farol[local]=(current+1)%3;
+  day.inventario.farol[local]=Math.min(current+1,2);
   day.inventario._fieldUpdatedAt.farol=ts;
   day.inventario._updatedAt=ts;
   day._updatedAt=ts;
