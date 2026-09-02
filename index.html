@@ -95,6 +95,47 @@ body:not(.area-noturno-view) #prevEncPanel{display:none!important}
 .area-choice.disabled:hover{background:#f4f7fa;color:#607080}
 .area-panel .area-choice.disabled:nth-child(6),
 .area-panel .area-choice.disabled:nth-child(7){display:none}
+.flux-page{display:grid;grid-template-columns:280px minmax(0,1fr);height:calc(100vh - 132px);background:#f4f8fb;color:#0a2340}
+.flux-side{background:#0a2340;color:#dcecff;border-right:1px solid #1e4a72;padding:12px;overflow:auto}
+.flux-side h2{margin:0 0 10px;color:#ffd700;font-size:15px;text-transform:uppercase;letter-spacing:0}
+.flux-side-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px}
+.flux-btn{border:0;border-radius:5px;background:#1e88e5;color:#fff;font-size:11px;font-weight:900;padding:9px 10px;cursor:pointer}
+.flux-btn.green{background:#00a86b}.flux-btn.gray{background:#526676}.flux-btn.red{background:#e94560}.flux-btn.yellow{background:#ffd700;color:#06162b}
+.flux-folder{border:1px solid #1a3550;border-radius:6px;margin-bottom:9px;overflow:hidden;background:#102038}
+.flux-folder-h{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;background:#071525;color:#fff;font-weight:900;font-size:12px;cursor:pointer}
+.flux-folder-h.active{color:#ffd700}
+.flux-flow-list{display:grid;gap:4px;padding:7px}
+.flux-flow-item{display:flex;align-items:center;justify-content:space-between;gap:6px;border:1px solid transparent;border-radius:4px;background:transparent;color:#bfe4ff;padding:7px 8px;font-size:12px;font-weight:800;cursor:pointer;text-align:left}
+.flux-flow-item.active{background:#123d66;border-color:#1e88e5;color:#fff}
+.flux-main{display:grid;grid-template-rows:auto minmax(0,1fr);min-width:0}
+.flux-top{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border-bottom:1px solid #c8d9e8;padding:10px 12px}
+.flux-title{display:flex;flex-direction:column;gap:2px;min-width:0}
+.flux-title strong{font-size:17px;color:#003b6f;text-transform:uppercase}
+.flux-title span{font-size:11px;color:#526676;font-weight:700}
+.flux-tools{display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.flux-canvas-wrap{position:relative;overflow:auto;background:#fbfdff;background-image:radial-gradient(#cbd9e6 1px,transparent 1px);background-size:18px 18px}
+.flux-canvas{position:relative;width:2600px;height:1500px;transform-origin:0 0}
+.flux-svg{position:absolute;inset:0;width:2600px;height:1500px;overflow:visible;pointer-events:auto}
+.flux-edge{stroke:#90a9bd;stroke-width:2.5;fill:none;marker-end:url(#fluxArrow)}
+.flux-edge.active{stroke:#1e88e5;stroke-width:4}
+.flux-node{position:absolute;width:190px;min-height:74px;border:2px solid #b7cce0;border-radius:6px;background:#fff;box-shadow:0 8px 18px rgba(6,35,61,.08);display:flex;align-items:center;justify-content:center;text-align:center;padding:12px;cursor:move;color:#06162b;font-weight:900;font-size:14px;line-height:1.18;user-select:none}
+.flux-node.yellow{background:#ffdf50;border-color:#d6aa00}
+.flux-node.blue{background:#c9dcf8;border-color:#8db3e5}
+.flux-node.green{background:#baf0d3;border-color:#62c18d}
+.flux-node.red{background:#ffd0d0;border-color:#e88a8a}
+.flux-node.white{background:#fff;border-color:#b7cce0}
+.flux-node.decision{border-radius:10px;transform:rotate(45deg);width:130px;height:130px;min-height:130px}
+.flux-node.decision .flux-node-text{transform:rotate(-45deg);max-width:120px}
+.flux-node.active{outline:3px solid #1e88e5;outline-offset:2px}
+.flux-node.connecting{outline:3px solid #ffd700;outline-offset:2px}
+.flux-node-text{width:100%;outline:0;cursor:text;white-space:pre-wrap;word-break:break-word}
+.flux-empty{margin:18px;border:1px dashed #9fc7e6;border-radius:8px;padding:28px;text-align:center;color:#526676;background:rgba(255,255,255,.8);font-weight:800}
+body.fluxogramas-view #kpiBar1,
+body.fluxogramas-view #flowBar,
+body.fluxogramas-view #prevEncPanel{display:none!important}
+body.fluxogramas-view .tabs{padding-top:8px;background:#071525}
+body.fluxogramas-view .tabs .tab:not(#tabAreas):not(#tabFluxogramas){display:none!important}
+@media(max-width:900px){.flux-page{grid-template-columns:1fr;height:auto}.flux-side{max-height:260px}.flux-canvas-wrap{height:70vh}}
 body.recebarm-view #kpiBar1,
 body.recebarm-view #flowBar,
 body.recebarm-view #prevEncPanel{display:none!important}
@@ -924,6 +965,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
   <div class="tab"     id="tabDevolucao" onclick="switchTab('devolucao')" style="display:none">Devolu&ccedil;&atilde;o</div>
   <div class="tab"     id="tabInventario" onclick="switchTab('inventario')" style="display:none">Invent&aacute;rio</div>
   <div class="tab"     id="tabBoletim" onclick="switchTab('boletim')" style="display:none">Boletim Interno CD Diário</div>
+  <div class="tab"     id="tabFluxogramas" onclick="switchTab('fluxogramas')" style="display:none">Fluxogramas</div>
 </div>
 
 <!-- TAB AREAS -->
@@ -937,7 +979,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
       <button type="button" class="area-choice" onclick="selectArea('devolucao','devolucao')">DEVOLU&ccedil;&atilde;o</button>
       <button type="button" class="area-choice disabled" aria-disabled="true">INVENTÁRIO</button>
       <button type="button" class="area-choice disabled" aria-disabled="true">DEVOLUÇÃO</button>
-      <button type="button" class="area-choice disabled" aria-disabled="true">FLUXOGRAMAS</button>
+      <button type="button" class="area-choice" onclick="selectArea('fluxogramas','fluxogramas')">FLUXOGRAMAS</button>
       <button type="button" class="area-choice disabled" aria-disabled="true">PRODUTIVIDADE INDIVIDUAL</button>
       <button type="button" class="area-choice" onclick="selectArea('boletim','boletim')">BOLETIM INTERNO CD DIÁRIO</button>
     </div>
@@ -957,6 +999,11 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 <!-- TAB INVENTARIO -->
 <div class="tab-body" id="tb-inventario">
   <div class="inventario-page" id="inventarioPage"></div>
+</div>
+
+<!-- TAB FLUXOGRAMAS -->
+<div class="tab-body" id="tb-fluxogramas">
+  <div class="flux-page" id="fluxogramasPage"></div>
 </div>
 
 <!-- TAB DASHBOARD -->
@@ -1971,6 +2018,7 @@ function load(){
     console.error('Load error:',e);
     db={days:[]};
   }
+  db.fluxogramas=normalizeFluxogramas(db.fluxogramas);
   db.days=db.days.map(normalizeDay);
   db.days.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   restoreBestLocalBackupIfNeeded('load');
@@ -2756,6 +2804,76 @@ function mergeDays(remoteDays,localDays){
   return Object.values(byDate).sort((a,b)=>a.date.localeCompare(b.date));
 }
 
+function uid(){
+  return 'id-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9);
+}
+
+function normalizeFluxogramas(data){
+  const src=data&&typeof data==='object'?data:{};
+  const folders=Array.isArray(src.folders)?src.folders:[];
+  const normalizedFolders=folders.map(folder=>{
+    const id=String(folder.id||uid());
+    const flows=(Array.isArray(folder.flows)?folder.flows:[]).map(flow=>({
+      id:String(flow.id||uid()),
+      name:String(flow.name||'Novo fluxo'),
+      nodes:Array.isArray(flow.nodes)?flow.nodes:[],
+      edges:Array.isArray(flow.edges)?flow.edges:[],
+      zoom:Number.isFinite(+flow.zoom)?+flow.zoom:1,
+      updatedAt:+flow.updatedAt||0
+    }));
+    return {id,name:String(folder.name||'Nova pasta'),flows,updatedAt:+folder.updatedAt||0};
+  });
+  if(!normalizedFolders.length){
+    const flowId=uid();
+    normalizedFolders.push({id:uid(),name:'Geral',updatedAt:Date.now(),flows:[{
+      id:flowId,
+      name:'Fluxo devolucao fornecedor GAM',
+      zoom:1,
+      updatedAt:Date.now(),
+      nodes:[
+        {id:uid(),x:360,y:130,w:310,h:115,text:'FLUXO DEVOLUCAO\nFORNECEDOR GAM',color:'yellow',type:'box'},
+        {id:uid(),x:70,y:350,w:180,h:74,text:'VENCIDO NA\nEMPRESA',color:'blue',type:'box'},
+        {id:uid(),x:360,y:350,w:180,h:74,text:'RECOLHIMENTO',color:'blue',type:'box'},
+        {id:uid(),x:650,y:350,w:180,h:74,text:'ACORDO\nCOMERCIAL',color:'blue',type:'box'}
+      ],
+      edges:[]
+    }]});
+  }
+  const firstFolder=normalizedFolders[0];
+  const activeFolderId=normalizedFolders.some(f=>f.id===src.activeFolderId)?src.activeFolderId:firstFolder.id;
+  const activeFolder=normalizedFolders.find(f=>f.id===activeFolderId)||firstFolder;
+  if(!activeFolder.flows.length)activeFolder.flows.push({id:uid(),name:'Novo fluxo',nodes:[],edges:[],zoom:1,updatedAt:Date.now()});
+  const activeFlowId=activeFolder.flows.some(f=>f.id===src.activeFlowId)?src.activeFlowId:activeFolder.flows[0].id;
+  return {folders:normalizedFolders,activeFolderId,activeFlowId,_updatedAt:+src._updatedAt||0};
+}
+
+function mergeFluxogramas(current,next){
+  if(!current&&!next)return normalizeFluxogramas(null);
+  if(!current)return normalizeFluxogramas(next);
+  if(!next)return normalizeFluxogramas(current);
+  const a=normalizeFluxogramas(current);
+  const b=normalizeFluxogramas(next);
+  const folderMap={};
+  [...a.folders,...b.folders].forEach(folder=>{
+    if(!folder||!folder.id)return;
+    if(!folderMap[folder.id])folderMap[folder.id]={...folder,flows:[...(folder.flows||[])]};
+    else{
+      const existing=folderMap[folder.id];
+      if((+folder.updatedAt||0)>=(+existing.updatedAt||0))existing.name=folder.name||existing.name;
+      const flowMap={};
+      [...(existing.flows||[]),...(folder.flows||[])].forEach(flow=>{
+        if(!flow||!flow.id)return;
+        const cur=flowMap[flow.id];
+        flowMap[flow.id]=!cur||(+flow.updatedAt||0)>=(+cur.updatedAt||0)?flow:cur;
+      });
+      existing.flows=Object.values(flowMap);
+      existing.updatedAt=Math.max(+existing.updatedAt||0,+folder.updatedAt||0);
+    }
+  });
+  const out=normalizeFluxogramas({folders:Object.values(folderMap),activeFolderId:b.activeFolderId||a.activeFolderId,activeFlowId:b.activeFlowId||a.activeFlowId,_updatedAt:Math.max(+a._updatedAt||0,+b._updatedAt||0)});
+  return out;
+}
+
 function ensureFirebase(){
   if(typeof firebase==='undefined')return false;
   if(!firebase.apps.length)firebase.initializeApp(FB_CONFIG);
@@ -2764,7 +2882,7 @@ function ensureFirebase(){
 }
 
 function cloudPayloadHash(payload){
-  return simpleHash(JSON.stringify({days:(payload&&payload.days)||[],users:(payload&&payload.users)||{}}));
+  return simpleHash(JSON.stringify({days:(payload&&payload.days)||[],users:(payload&&payload.users)||{},fluxogramas:(payload&&payload.fluxogramas)||null}));
 }
 
 function decodeFirebasePayload(raw){
@@ -2782,6 +2900,7 @@ function encodeFirebasePayload(payload){
   const safePayload={
     days:Array.isArray(payload&&payload.days)?payload.days:[],
     users:(payload&&payload.users)||{},
+    fluxogramas:normalizeFluxogramas(payload&&payload.fluxogramas),
     savedAt:(payload&&payload.savedAt)||Date.now()
   };
   return {payload:JSON.stringify(safePayload),savedAt:safePayload.savedAt};
@@ -2812,9 +2931,10 @@ async function confirmFirebaseRestSave(payload){
   const remote=await fbRestReadPayload().catch(()=>null);
   if(!remote||!Array.isArray(remote.days))return payload;
   const mergedDays=mergeDays(remote.days,payload.days);
-  if(payloadDaysHash(mergedDays)!==payloadDaysHash(remote.days)){
+  const mergedFluxogramas=mergeFluxogramas(remote.fluxogramas,payload.fluxogramas);
+  if(payloadDaysHash(mergedDays)!==payloadDaysHash(remote.days)||simpleHash(JSON.stringify(mergedFluxogramas))!==simpleHash(JSON.stringify(remote.fluxogramas||null))){
     const ts=Date.now();
-    const mergedPayload={...remote,days:mergedDays,users:remote.users||payload.users||getLocalUsersCache(),savedAt:ts};
+    const mergedPayload={...remote,days:mergedDays,users:remote.users||payload.users||getLocalUsersCache(),fluxogramas:mergedFluxogramas,savedAt:ts};
     await fbRestWritePayload(mergedPayload);
     return mergedPayload;
   }
@@ -2839,15 +2959,18 @@ async function saveToFirebaseRest(replaceDays=false){
         remote={};
       }
       const daysToSave=mergeDays(remote.days,db.days);
+      const fluxogramasToSave=mergeFluxogramas(remote.fluxogramas,db.fluxogramas);
       const payload={
         ...remote,
         days:daysToSave,
         users:remote.users||getLocalUsersCache(),
+        fluxogramas:fluxogramasToSave,
         savedAt:ts
       };
       await fbRestWritePayload(payload);
       const confirmed=await confirmFirebaseRestSave(payload);
       db.days=Array.isArray(confirmed.days)?confirmed.days:daysToSave;
+      db.fluxogramas=normalizeFluxogramas(confirmed.fluxogramas||fluxogramasToSave);
       saveLocalDb(db);
       fbConnected=true;
       pendingCloudSave=false;
@@ -2886,7 +3009,7 @@ async function syncFromFirebaseRest(showOk){
       updated=!!applyRemoteData(remote);
       fbRestLastHash=remoteHash;
     }
-    if(pendingCloudSave&&db.days&&db.days.length&&!fbRestSaveRunning){
+    if(pendingCloudSave&&((db.days&&db.days.length)||db.fluxogramas)&&!fbRestSaveRunning){
       setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),50);
     }
     if(showOk)showSyncStatus(updated?'Sincronizado':'Nuvem ativa',false);
@@ -2909,7 +3032,7 @@ function startFirebaseRestPolling(pushLocal=false,replaceDays=false){
       if(!document.hidden)syncFromFirebaseRest(true);
     });
   }
-  if(pushLocal&&db.days&&db.days.length){
+  if(pushLocal&&((db.days&&db.days.length)||db.fluxogramas)){
     setTimeout(()=>saveToFirebaseRest(replaceDays).catch(()=>{}),100);
   }else{
     setTimeout(()=>syncFromFirebaseRest(true).catch(()=>{}),100);
@@ -2924,13 +3047,16 @@ async function saveToFirebase(replaceDays=false){
   const snap=await fbDb.ref(FB_PATH).once('value').catch(()=>null);
   const remote=decodeFirebasePayload(snap?snap.val():null);
   let daysToSave=mergeDays(remote&&remote.days,db.days);
+  let fluxogramasToSave=mergeFluxogramas(remote&&remote.fluxogramas,db.fluxogramas);
   db.days=daysToSave;
+  db.fluxogramas=fluxogramasToSave;
   saveLocalDb(db);
-  const payload={days:daysToSave,users:getLocalUsersCache(),savedAt:ts};
+  const payload={days:daysToSave,users:getLocalUsersCache(),fluxogramas:fluxogramasToSave,savedAt:ts};
   return fbDb.ref(FB_PATH).set(encodeFirebasePayload(payload))
     .then(async()=>{
       const confirmed=await confirmFirebaseRestSave(payload).catch(()=>payload);
       db.days=Array.isArray(confirmed.days)?confirmed.days:daysToSave;
+      db.fluxogramas=normalizeFluxogramas(confirmed.fluxogramas||fluxogramasToSave);
       saveLocalDb(db);
       fbConnected=true;
       fbRestLastHash=cloudPayloadHash(confirmed);
@@ -2951,7 +3077,7 @@ function startFirebaseFallback(reason,pushLocal=false,replaceDays=false){
   if(reason)console.warn('Supabase fallback:',reason);
   startFirebaseRestPolling(pushLocal,replaceDays);
   if(!fbConnected)initFirebase();
-  if(pushLocal&&db.days&&db.days.length){
+  if(pushLocal&&((db.days&&db.days.length)||db.fluxogramas)){
     setTimeout(()=>saveToFirebase(replaceDays).catch(()=>{}),800);
   }
 }
@@ -2975,6 +3101,15 @@ function showSyncStatus(msg,isErr){
 function applyRemoteData(remote){
   if(!remote)return false;
   let changed=false;
+  if(remote.fluxogramas){
+    const before=simpleHash(JSON.stringify(db.fluxogramas||null));
+    db.fluxogramas=mergeFluxogramas(db.fluxogramas,remote.fluxogramas);
+    if(simpleHash(JSON.stringify(db.fluxogramas||null))!==before){
+      saveLocalDb(db);
+      changed=true;
+      if(activeTab()==='fluxogramas')renderFluxogramas();
+    }
+  }
   if(remote.users&&typeof remote.users==='object'&&!Array.isArray(remote.users)){
     const localUsers=getLocalUsersCache();
     if(JSON.stringify(remote.users)!==JSON.stringify(localUsers)){
@@ -3023,6 +3158,7 @@ function save(replaceDays=false){
   restoreBestLocalBackupIfNeeded(replaceDays?'save-replace':'save');
   if(stored&&Array.isArray(stored.days)){
     db.days=mergeDays(stored.days,db.days);
+    db.fluxogramas=mergeFluxogramas(stored.fluxogramas,db.fluxogramas);
   }
   saveLocalDb(db);
   pendingCloudSave=true;
@@ -3573,7 +3709,8 @@ function updateRecebArmViewMode(id){
   document.body.classList.toggle('boletim-view',id==='boletim');
   document.body.classList.toggle('devolucao-view',id==='devolucao');
   document.body.classList.toggle('inventario-view',id==='inventario');
-  if(id==='recebarm'||id==='boletim'||id==='devolucao'||id==='inventario'){
+  document.body.classList.toggle('fluxogramas-view',id==='fluxogramas');
+  if(id==='recebarm'||id==='boletim'||id==='devolucao'||id==='inventario'||id==='fluxogramas'){
     const panel=document.getElementById('prevEncPanel');
     if(panel)panel.style.display='none';
   }
@@ -3586,7 +3723,8 @@ const AREA_TAB_IDS={
   recebimento:['tabRecebArm','tabProdDashDia','tabProdDia'],
   boletim:['tabBoletim'],
   devolucao:['tabDevolucao'],
-  inventario:['tabInventario']
+  inventario:['tabInventario'],
+  fluxogramas:['tabFluxogramas']
 };
 const TAB_ID_BY_BODY={
   areas:'tabAreas',
@@ -3603,7 +3741,8 @@ const TAB_ID_BY_BODY={
   recebarm:'tabRecebArm',
   boletim:'tabBoletim',
   devolucao:'tabDevolucao',
-  inventario:'tabInventario'
+  inventario:'tabInventario',
+  fluxogramas:'tabFluxogramas'
 };
 function captureRoleTabs(){
   document.querySelectorAll('.tab').forEach(tab=>{
@@ -3643,7 +3782,7 @@ function restoreAreaState(){
     return;
   }
   applyAreaTabs(area);
-  const fallback=area==='recebimento'?'recebarm':(area==='boletim'?'boletim':(area==='devolucao'?'devolucao':(area==='inventario'?'inventario':'dash')));
+  const fallback=area==='recebimento'?'recebarm':(area==='boletim'?'boletim':(area==='devolucao'?'devolucao':(area==='inventario'?'inventario':(area==='fluxogramas'?'fluxogramas':'dash'))));
   switchTab(canOpenStoredTab(saved&&saved.tab)?saved.tab:fallback);
 }
 function showAreaHub(){
@@ -3653,7 +3792,7 @@ function showAreaHub(){
 function selectArea(area,initialTab){
   if(!AREA_TAB_IDS[area])return;
   applyAreaTabs(area);
-  switchTab(initialTab||(area==='recebimento'?'recebarm':(area==='boletim'?'boletim':(area==='devolucao'?'devolucao':(area==='inventario'?'inventario':'dash')))));
+  switchTab(initialTab||(area==='recebimento'?'recebarm':(area==='boletim'?'boletim':(area==='devolucao'?'devolucao':(area==='inventario'?'inventario':(area==='fluxogramas'?'fluxogramas':'dash'))))));
 }
 
 function switchTab(id){
@@ -3674,6 +3813,7 @@ function switchTab(id){
   if(id==='boletim')renderBoletim();
   if(id==='devolucao')renderDevolucao();
   if(id==='inventario')renderInventario();
+  if(id==='fluxogramas')renderFluxogramas();
 }
 
 // ── DAY NAV ───────────────────────────────────────────────
@@ -7448,6 +7588,289 @@ function renderInventario(){
   renderInventarioCharts(t);
 }
 
+let fluxUi={selectedNodeId:null,selectedEdgeId:null,connectFrom:null,connectMode:false,drag:null};
+let fluxSaveTimer=null;
+function fluxData(){
+  db.fluxogramas=normalizeFluxogramas(db.fluxogramas);
+  return db.fluxogramas;
+}
+function fluxFolder(){
+  const data=fluxData();
+  return data.folders.find(f=>f.id===data.activeFolderId)||data.folders[0];
+}
+function fluxFlow(){
+  const folder=fluxFolder();
+  return (folder&&folder.flows.find(f=>f.id===db.fluxogramas.activeFlowId))||(folder&&folder.flows[0])||null;
+}
+function fluxTouch(flow){
+  const ts=Date.now();
+  if(flow)flow.updatedAt=ts;
+  const folder=fluxFolder();
+  if(folder)folder.updatedAt=ts;
+  db.fluxogramas._updatedAt=ts;
+}
+function saveFluxogramas(refresh=false){
+  db.fluxogramas=normalizeFluxogramas(db.fluxogramas);
+  saveLocalDb(db);
+  pendingCloudSave=true;
+  if(fluxSaveTimer)clearTimeout(fluxSaveTimer);
+  if(refresh)save(false);
+  else fluxSaveTimer=setTimeout(()=>save(false),700);
+  if(refresh)renderFluxogramas();
+}
+function fluxSetFolder(id){
+  const data=fluxData();
+  const folder=data.folders.find(f=>f.id===id);
+  if(!folder)return;
+  data.activeFolderId=id;
+  data.activeFlowId=(folder.flows[0]&&folder.flows[0].id)||'';
+  fluxUi={selectedNodeId:null,selectedEdgeId:null,connectFrom:null,connectMode:false,drag:null};
+  saveFluxogramas(true);
+}
+function fluxSetFlow(id){
+  const data=fluxData();
+  data.activeFlowId=id;
+  fluxUi={selectedNodeId:null,selectedEdgeId:null,connectFrom:null,connectMode:false,drag:null};
+  saveFluxogramas(true);
+}
+function fluxAddFolder(){
+  const name=prompt('Nome da pasta:','Nova pasta');
+  if(!name)return;
+  const data=fluxData();
+  const flowId=uid();
+  const folder={id:uid(),name:name.trim(),updatedAt:Date.now(),flows:[{id:flowId,name:'Novo fluxo',nodes:[],edges:[],zoom:1,updatedAt:Date.now()}]};
+  data.folders.push(folder);
+  data.activeFolderId=folder.id;
+  data.activeFlowId=flowId;
+  fluxTouch(folder.flows[0]);
+  saveFluxogramas(true);
+}
+function fluxRenameFolder(id){
+  const data=fluxData();
+  const folder=data.folders.find(f=>f.id===id);
+  if(!folder)return;
+  const name=prompt('Nome da pasta:',folder.name);
+  if(!name)return;
+  folder.name=name.trim();
+  folder.updatedAt=Date.now();
+  data._updatedAt=Date.now();
+  saveFluxogramas(true);
+}
+function fluxAddFlow(){
+  const folder=fluxFolder();
+  if(!folder)return;
+  const name=prompt('Nome do fluxo:','Novo fluxo');
+  if(!name)return;
+  const flow={id:uid(),name:name.trim(),nodes:[],edges:[],zoom:1,updatedAt:Date.now()};
+  folder.flows.push(flow);
+  db.fluxogramas.activeFlowId=flow.id;
+  fluxTouch(flow);
+  saveFluxogramas(true);
+}
+function fluxRenameFlow(id){
+  const flow=(fluxFolder().flows||[]).find(f=>f.id===id);
+  if(!flow)return;
+  const name=prompt('Nome do fluxo:',flow.name);
+  if(!name)return;
+  flow.name=name.trim();
+  fluxTouch(flow);
+  saveFluxogramas(true);
+}
+function fluxAddNode(type='box',color='white'){
+  const flow=fluxFlow();
+  if(!flow)return;
+  const n={id:uid(),x:420+(flow.nodes.length%5)*35,y:180+(flow.nodes.length%6)*28,w:type==='decision'?130:210,h:type==='decision'?130:86,text:type==='decision'?'DECISAO':'NOVO BLOCO',color,type};
+  flow.nodes.push(n);
+  fluxUi.selectedNodeId=n.id;
+  fluxUi.selectedEdgeId=null;
+  fluxTouch(flow);
+  saveFluxogramas(true);
+}
+function fluxNodeById(flow,id){return flow&&Array.isArray(flow.nodes)?flow.nodes.find(n=>n.id===id):null;}
+function fluxEdgeById(flow,id){return flow&&Array.isArray(flow.edges)?flow.edges.find(e=>e.id===id):null;}
+function fluxDeleteSelected(){
+  const flow=fluxFlow();
+  if(!flow)return;
+  if(fluxUi.selectedNodeId){
+    const id=fluxUi.selectedNodeId;
+    flow.nodes=flow.nodes.filter(n=>n.id!==id);
+    flow.edges=flow.edges.filter(e=>e.from!==id&&e.to!==id);
+  }else if(fluxUi.selectedEdgeId){
+    flow.edges=flow.edges.filter(e=>e.id!==fluxUi.selectedEdgeId);
+  }
+  fluxUi.selectedNodeId=null;
+  fluxUi.selectedEdgeId=null;
+  fluxUi.connectFrom=null;
+  fluxUi.connectMode=false;
+  fluxTouch(flow);
+  saveFluxogramas(true);
+}
+function fluxSetColor(color){
+  const flow=fluxFlow();
+  const node=fluxNodeById(flow,fluxUi.selectedNodeId);
+  if(!node)return;
+  node.color=color;
+  fluxTouch(flow);
+  saveFluxogramas(true);
+}
+function fluxZoom(delta){
+  const flow=fluxFlow();
+  if(!flow)return;
+  flow.zoom=Math.max(.5,Math.min(1.6,(+flow.zoom||1)+delta));
+  fluxTouch(flow);
+  saveFluxogramas(true);
+}
+function fluxUpdateNodeText(id,el){
+  const flow=fluxFlow();
+  const node=fluxNodeById(flow,id);
+  if(!node)return;
+  node.text=(el&&el.innerText)||'';
+  fluxTouch(flow);
+  saveFluxogramas(false);
+}
+function fluxNodePointerDown(event,id){
+  if(event&&event.target&&event.target.closest('.flux-node-text'))return;
+  const flow=fluxFlow();
+  const node=fluxNodeById(flow,id);
+  if(!node)return;
+  fluxUi.selectedNodeId=id;
+  fluxUi.selectedEdgeId=null;
+  fluxUi.drag={id,startX:event.clientX,startY:event.clientY,origX:+node.x||0,origY:+node.y||0,moved:false};
+  event.preventDefault();
+}
+function fluxPointerMove(event){
+  if(!fluxUi.drag)return;
+  const flow=fluxFlow();
+  const node=fluxNodeById(flow,fluxUi.drag.id);
+  if(!node)return;
+  const zoom=+flow.zoom||1;
+  const dx=(event.clientX-fluxUi.drag.startX)/zoom;
+  const dy=(event.clientY-fluxUi.drag.startY)/zoom;
+  if(Math.abs(dx)>2||Math.abs(dy)>2)fluxUi.drag.moved=true;
+  node.x=Math.max(0,Math.round(fluxUi.drag.origX+dx));
+  node.y=Math.max(0,Math.round(fluxUi.drag.origY+dy));
+  const el=document.querySelector(`[data-flux-node="${node.id}"]`);
+  if(el){el.style.left=node.x+'px';el.style.top=node.y+'px';}
+  fluxRenderEdges(flow);
+}
+function fluxPointerUp(){
+  if(!fluxUi.drag)return;
+  const flow=fluxFlow();
+  fluxTouch(flow);
+  fluxUi.drag=null;
+  saveFluxogramas(false);
+}
+function fluxStartConnect(){
+  fluxUi.connectFrom=null;
+  fluxUi.connectMode=true;
+  fluxUi.selectedEdgeId=null;
+  showSyncStatus('Clique no bloco de origem e depois no destino',false);
+  renderFluxogramas();
+}
+function fluxNodeClick(event,id){
+  const flow=fluxFlow();
+  if(fluxUi.drag&&fluxUi.drag.moved)return;
+  if(fluxUi.connectMode){
+    if(!fluxUi.connectFrom){
+      fluxUi.connectFrom=id;
+      fluxUi.selectedNodeId=id;
+      fluxUi.selectedEdgeId=null;
+      renderFluxogramas();
+      return;
+    }
+    if(fluxUi.connectFrom!==id){
+      flow.edges=Array.isArray(flow.edges)?flow.edges:[];
+      if(!flow.edges.some(e=>e.from===fluxUi.connectFrom&&e.to===id)){
+        flow.edges.push({id:uid(),from:fluxUi.connectFrom,to:id,updatedAt:Date.now()});
+      }
+      fluxUi.connectFrom=null;
+      fluxUi.connectMode=false;
+      fluxTouch(flow);
+      saveFluxogramas(true);
+      return;
+    }
+  }
+  if(event&&event.shiftKey){
+    fluxUi.connectFrom=id;
+    fluxUi.connectMode=true;
+    fluxUi.selectedNodeId=id;
+    fluxUi.selectedEdgeId=null;
+    renderFluxogramas();
+    return;
+  }
+  fluxUi.selectedNodeId=id;
+  fluxUi.selectedEdgeId=null;
+  fluxUi.connectMode=false;
+  renderFluxogramas();
+}
+function fluxSelectEdge(id){
+  fluxUi.selectedEdgeId=id;
+  fluxUi.selectedNodeId=null;
+  fluxUi.connectFrom=null;
+  fluxUi.connectMode=false;
+  renderFluxogramas();
+}
+function fluxCenter(n){return{x:(+n.x||0)+(+n.w||190)/2,y:(+n.y||0)+(+n.h||74)/2};}
+function fluxRenderEdges(flowArg){
+  const flow=flowArg||fluxFlow();
+  const svg=document.getElementById('fluxSvg');
+  if(!svg||!flow)return;
+  const nodes=flow.nodes||[];
+  const body=(flow.edges||[]).map(e=>{
+    const a=fluxNodeById(flow,e.from),b=fluxNodeById(flow,e.to);
+    if(!a||!b)return '';
+    const p1=fluxCenter(a),p2=fluxCenter(b);
+    const midX=(p1.x+p2.x)/2;
+    return `<path class="flux-edge ${fluxUi.selectedEdgeId===e.id?'active':''}" onclick="fluxSelectEdge('${e.id}')" style="pointer-events:stroke" d="M ${p1.x} ${p1.y} C ${midX} ${p1.y}, ${midX} ${p2.y}, ${p2.x} ${p2.y}"/>`;
+  }).join('');
+  svg.innerHTML=`<defs><marker id="fluxArrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L0,6 L9,3 z" fill="#90a9bd"/></marker></defs>${body}`;
+}
+function renderFluxogramas(){
+  const wrap=document.getElementById('fluxogramasPage');
+  if(!wrap)return;
+  const data=fluxData();
+  const folder=fluxFolder();
+  const flow=fluxFlow();
+  const folders=data.folders.map(folderItem=>{
+    const open=folderItem.id===data.activeFolderId;
+    return `<div class="flux-folder">
+      <div class="flux-folder-h ${open?'active':''}" onclick="fluxSetFolder('${folderItem.id}')"><span>${excelText(folderItem.name)}</span><button class="flux-btn gray" type="button" onclick="event.stopPropagation();fluxRenameFolder('${folderItem.id}')">Renomear</button></div>
+      ${open?`<div class="flux-flow-list">${(folderItem.flows||[]).map(f=>`<button class="flux-flow-item ${f.id===data.activeFlowId?'active':''}" type="button" onclick="fluxSetFlow('${f.id}')"><span>${excelText(f.name)}</span><b onclick="event.stopPropagation();fluxRenameFlow('${f.id}')">editar</b></button>`).join('')}</div>`:''}
+    </div>`;
+  }).join('');
+  const nodes=flow?(flow.nodes||[]).map(n=>`<div class="flux-node ${excelText(n.color||'white')} ${n.type==='decision'?'decision':''} ${fluxUi.selectedNodeId===n.id?'active':''} ${fluxUi.connectFrom===n.id?'connecting':''}" data-flux-node="${attrText(n.id)}" style="left:${+n.x||0}px;top:${+n.y||0}px;width:${+n.w||190}px;min-height:${+n.h||74}px" onpointerdown="fluxNodePointerDown(event,'${n.id}')" onclick="fluxNodeClick(event,'${n.id}')"><div class="flux-node-text" contenteditable="true" spellcheck="false" oninput="fluxUpdateNodeText('${n.id}',this)">${excelText(n.text||'')}</div></div>`).join(''):'';
+  wrap.innerHTML=`
+    <aside class="flux-side">
+      <h2>Fluxogramas</h2>
+      <div class="flux-side-actions">
+        <button class="flux-btn green" type="button" onclick="fluxAddFolder()">Nova pasta</button>
+        <button class="flux-btn" type="button" onclick="fluxAddFlow()">Novo fluxo</button>
+      </div>
+      ${folders}
+    </aside>
+    <main class="flux-main">
+      <div class="flux-top">
+        <div class="flux-title"><strong>${excelText(flow?flow.name:'Fluxograma')}</strong><span>${excelText(folder?folder.name:'Pasta')} | fundo pontilhado, blocos arrast&aacute;veis e setas</span></div>
+        <div class="flux-tools">
+          <button class="flux-btn yellow" type="button" onclick="fluxAddNode('box','yellow')">Bloco amarelo</button>
+          <button class="flux-btn" type="button" onclick="fluxAddNode('box','blue')">Bloco azul</button>
+          <button class="flux-btn green" type="button" onclick="fluxAddNode('box','green')">Bloco verde</button>
+          <button class="flux-btn gray" type="button" onclick="fluxAddNode('decision','white')">Decis&atilde;o</button>
+          <button class="flux-btn" type="button" onclick="fluxStartConnect()">Conectar</button>
+          <button class="flux-btn gray" type="button" onclick="fluxZoom(-.1)">- Zoom</button>
+          <button class="flux-btn gray" type="button" onclick="fluxZoom(.1)">+ Zoom</button>
+          <button class="flux-btn red" type="button" onclick="fluxDeleteSelected()">Excluir</button>
+        </div>
+      </div>
+      <div class="flux-canvas-wrap">
+        ${flow?`<div class="flux-canvas" style="transform:scale(${+flow.zoom||1})"><svg class="flux-svg" id="fluxSvg"></svg>${nodes}</div>`:'<div class="flux-empty">Crie uma pasta e um fluxo para come&ccedil;ar.</div>'}
+      </div>
+    </main>`;
+  if(flow)setTimeout(()=>fluxRenderEdges(flow),0);
+}
+window.addEventListener('pointermove',fluxPointerMove);
+window.addEventListener('pointerup',fluxPointerUp);
+
 function boletimNum(v){return parseSumNumber(v);}
 function boletimPct(part,total){total=boletimNum(total);return total?Math.round((boletimNum(part)/total)*100):0;}
 function boletimTimeToMinutes(value){
@@ -10438,9 +10861,10 @@ async function confirmSupabaseSave(payload){
   const remote=await sbReadPayload().catch(()=>null);
   if(!remote||!Array.isArray(remote.days))return payload;
   const mergedDays=mergeDays(remote.days,payload.days);
-  if(payloadDaysHash(mergedDays)!==payloadDaysHash(remote.days)){
+  const mergedFluxogramas=mergeFluxogramas(remote.fluxogramas,payload.fluxogramas);
+  if(payloadDaysHash(mergedDays)!==payloadDaysHash(remote.days)||simpleHash(JSON.stringify(mergedFluxogramas))!==simpleHash(JSON.stringify(remote.fluxogramas||null))){
     const ts=Date.now();
-    const mergedPayload={...remote,days:mergedDays,users:remote.users||payload.users||getLocalUsersCache(),savedAt:ts};
+    const mergedPayload={...remote,days:mergedDays,users:remote.users||payload.users||getLocalUsersCache(),fluxogramas:mergedFluxogramas,savedAt:ts};
     const r=await sbWritePayload(mergedPayload,ts);
     if(r.ok)return mergedPayload;
   }
@@ -10466,14 +10890,16 @@ async function sbSave(replaceDays=false){
           ...remote,
           days:mergeDays(remote.days,db.days),
           users:remote.users||getLocalUsersCache(),
+          fluxogramas:mergeFluxogramas(remote.fluxogramas,db.fluxogramas),
           savedAt:ts
         };
         const r=await sbWritePayload(payload,ts);
         if(r.ok){
           const confirmed=await confirmSupabaseSave(payload);
           db.days=Array.isArray(confirmed.days)?confirmed.days:payload.days;
+          db.fluxogramas=normalizeFluxogramas(confirmed.fluxogramas||payload.fluxogramas);
           saveLocalDb(db);
-          lastSyncHash=simpleHash(JSON.stringify({days:db.days,users:(confirmed.users||payload.users||{})}));
+          lastSyncHash=simpleHash(JSON.stringify({days:db.days,users:(confirmed.users||payload.users||{}),fluxogramas:db.fluxogramas||null}));
           sbConnected=true;
           pendingCloudSave=false;
           showSyncStatus('☁ Salvo na nuvem ✓',false);
@@ -10504,7 +10930,7 @@ async function sbLoad(){
     // Sempre aplicar se remoto tem dados e é diferente do que temos
     const localTs=sbLastTs||0;
     const remoteDays=Array.isArray(remote.days)?remote.days:[];
-    const remoteHash=simpleHash(JSON.stringify({days:remoteDays,users:remote.users||{}}));
+    const remoteHash=simpleHash(JSON.stringify({days:remoteDays,users:remote.users||{},fluxogramas:remote.fluxogramas||null}));
     let changed=false;
     if(remote.users&&typeof remote.users==='object'&&!Array.isArray(remote.users)){
       const localUsers=getLocalUsersCache();
@@ -10512,6 +10938,15 @@ async function sbLoad(){
         setLocalUsersCache(remote.users);
         changed=true;
         if(currentUser&&currentUser.role==='admin')setTimeout(renderUsersList,0);
+      }
+    }
+    if(remote.fluxogramas){
+      const before=simpleHash(JSON.stringify(db.fluxogramas||null));
+      db.fluxogramas=mergeFluxogramas(db.fluxogramas,remote.fluxogramas);
+      if(simpleHash(JSON.stringify(db.fluxogramas||null))!==before){
+        saveLocalDb(db);
+        changed=true;
+        if(activeTab()==='fluxogramas')setTimeout(renderFluxogramas,0);
       }
     }
     if(remoteDays.length&&!shouldRejectOlderCloud(remoteDays,'supabase')){
@@ -10533,7 +10968,7 @@ async function sbLoad(){
     }
     if(remoteTs>sbLastTs)sbLastTs=remoteTs;
     if(changed||remoteHash!==lastSyncHash)lastSyncHash=remoteHash;
-    if(pendingCloudSave&&db.days&&db.days.length&&!sbSaveRunning){
+    if(pendingCloudSave&&((db.days&&db.days.length)||db.fluxogramas)&&!sbSaveRunning){
       setTimeout(()=>sbSave(false).catch(()=>{}),50);
     }
     return changed;
