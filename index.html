@@ -4533,6 +4533,53 @@ function recebArmDescriptionScore(a,b){
   return hits/Math.max(ta.length,tb.length);
 }
 
+function recebArmNormalizeLote(value){
+  return String(value||'')
+    .toUpperCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')
+    .split(/[\/,;|]+/)
+    .map(v=>v.replace(/[^A-Z0-9]+/g,'').trim())
+    .filter(Boolean)
+    .join('/');
+}
+
+function recebArmLoteScore(a,b){
+  const la=recebArmNormalizeLote(a).split('/').filter(Boolean);
+  const lb=recebArmNormalizeLote(b).split('/').filter(Boolean);
+  if(!la.length&&!lb.length)return 0;
+  if(!la.length||!lb.length)return 0;
+  const setB=new Set(lb);
+  const hits=la.filter(v=>setB.has(v)).length;
+  return hits/Math.max(la.length,lb.length);
+}
+
+function recebArm997MatchKey(row){
+  if(!row)return'';
+  return row.key||[
+    '997',
+    row.entrada||row.date||'',
+    recebArmCleanDescription(row.descricao||row.nome||''),
+    recebArmNormalizeLote(row.lote||''),
+    recebArmNormalizeSku(row.sku||row.codigo||'')
+  ].join('|');
+}
+
+function recebArm997MatchScore(item,row){
+  if(!item||!row)return 0;
+  const descScore=Math.max(
+    recebArmDescriptionScore(item.descricao||'',row.descricao||row.nome||''),
+    recebArmDescriptionScore(item.descricaoBase||'',row.descricao||row.nome||'')
+  );
+  if(descScore<0.50)return 0;
+  const itemLote=recebArmNormalizeLote(item.lote||'');
+  const rowLote=recebArmNormalizeLote(row.lote||'');
+  const loteScore=recebArmLoteScore(itemLote,rowLote);
+  if(itemLote&&rowLote&&!loteScore)return 0;
+  if(itemLote&&!rowLote)return descScore*0.82;
+  if(!itemLote&&rowLote)return descScore*0.90;
+  return descScore+(loteScore*0.30);
+}
+
 function recebArmFindProductBase(item,data){
   const bases=recebArmProductBaseRows(data);
   const code=String(item&&item.codigo||'').replace(/^0+/,'');
@@ -5453,31 +5500,26 @@ function clearRecebArm997(){
 function compareRecebArmStorage(showMsg=true){
   const day=recebArmDay();
   const data=ensureRecebArm(day);
-  const byCode={};
   data.qrpRows=recebArmQrpCurrentSnapshot(data.qrpRows);
-  data.qrpRows.forEach(r=>{
-    const key=String(r.codigo||'').trim();
-    if(!key)return;
-    byCode[key]=(byCode[key]||0)+(+r.qtdArmazenada||0);
-  });
+  const index=recebArm997PendingIndex(data,day.date);
+  const remaining=recebArm997InitialRemaining(index);
   const autoPend=[];
   data.notas.forEach(nota=>{
-    (nota.itens||[]).forEach(item=>{
-      const codigo=String(item.codGam||item.codigo||'').trim();
+    const rows=recebArmNota997Rows(nota,data,index,remaining);
+    rows.forEach((row,idx)=>{
+      const item=(nota.itens||[])[idx]||{};
       const entrou=item.caixas!==undefined?+item.caixas:+item.qtdEntrada||0;
-      if(!codigo||!entrou)return;
-      const armazenado=byCode[codigo]||0;
-      const pend=Math.max(entrou-armazenado,0);
-      item.qtdArmazenada=armazenado;
-      if(pend>0){
+      if(!entrou)return;
+      item.qtdArmazenada=+row.armazenadoBase||0;
+      if(row.status==='Armazenado parcial'||row.status==='Nada armazenado'){
         autoPend.push({
-          id:`auto-${nota.id}-${codigo}`,
+          id:`auto-${nota.id}-${row.item}`,
           nf:nota.nfNumero||nota.chave||'',
-          item:codigo,
-          descricao:item.descricaoBase||item.descricao||'',
-          qtd:pend,
+          item:row.codGam||row.codigoNf||row.item,
+          descricao:row.descricao||item.descricaoBase||item.descricao||'',
+          qtd:+row.pendenteBase||0,
           endereco:'997',
-          origem:'automático 997',
+          origem:'automático 997 descrição+lote',
           _updatedAt:Date.now()
         });
       }
@@ -5749,47 +5791,78 @@ function recebArmNormalizeSku(value){
 }
 
 function recebArm997PendingIndex(data,dayDate){
-  const bySku={},byDescription=[];
+  const bySku={},byDescription=[],byKey={};
   const targetDate=recebArmIsoFromDate(dayDate||curDate||today(),curDate||today());
   recebArmQrpCurrentSnapshot(data&&data.qrpRows).forEach(r=>{
     const rowDate=recebArmIsoFromDate(r.entrada,targetDate);
     if(targetDate&&rowDate!==targetDate)return;
     const sku=recebArmNormalizeSku(r.codigo||'');
     if(!sku)return;
+    const key=[
+      '997',
+      rowDate,
+      recebArmCleanDescription(r.descricao||r.nome||''),
+      recebArmNormalizeLote(r.lote||''),
+      sku
+    ].join('|');
+    if(!byKey[key]){
+      byKey[key]={key,sku,codigo:r.codigo||'',descricao:r.descricao||r.nome||'',lote:r.lote||'',entrada:rowDate,qtd:0,vol:0,linhas:0};
+      byDescription.push(byKey[key]);
+    }
+    byKey[key].qtd+=+r.qtdArmazenada||0;
+    byKey[key].vol+=recebArm997VolumeFromRow(r);
+    byKey[key].linhas++;
+    if(!byKey[key].descricao)byKey[key].descricao=r.descricao||r.nome||'';
+    if(!byKey[key].lote)byKey[key].lote=r.lote||'';
     if(!bySku[sku]){
-      bySku[sku]={sku,codigo:r.codigo||'',descricao:r.descricao||r.nome||'',entrada:rowDate,qtd:0,vol:0,linhas:0};
-      byDescription.push(bySku[sku]);
+      bySku[sku]={key,sku,codigo:r.codigo||'',descricao:r.descricao||r.nome||'',lote:r.lote||'',entrada:rowDate,qtd:0,vol:0,linhas:0};
     }
     bySku[sku].qtd+=+r.qtdArmazenada||0;
     bySku[sku].vol+=recebArm997VolumeFromRow(r);
     bySku[sku].linhas++;
     if(!bySku[sku].descricao)bySku[sku].descricao=r.descricao||r.nome||'';
+    if(!bySku[sku].lote)bySku[sku].lote=r.lote||'';
   });
-  return{bySku,byDescription};
+  return{bySku,byDescription,byKey};
 }
 
 function recebArmFindNotaSku(item,data,index){
   let best=null,bestScore=0;
   (index&&index.byDescription?index.byDescription:[]).forEach(row=>{
-    const score=recebArmDescriptionScore(item&&item.descricao,row.descricao||'');
+    const score=recebArm997MatchScore(item,row);
     if(score>bestScore){bestScore=score;best=row;}
   });
-  if(best&&bestScore>=0.50)return{sku:best.sku,codigo:best.codigo,match:'Descrição + data 997'};
+  if(best&&bestScore>=0.50){
+    const loteOk=recebArmLoteScore(item&&item.lote,best.lote)>0;
+    return{key:best.key,sku:best.sku,codigo:best.codigo,match:loteOk?'Descrição + lote + data 997':'Descrição + data 997'};
+  }
   const direct=recebArmNormalizeSku(item&&item.codGam);
-  if(direct&&index&&index.bySku&&index.bySku[direct])return{sku:direct,codigo:item.codGam,match:'Base COD GAM + data 997'};
+  if(direct&&index&&index.bySku&&index.bySku[direct]){
+    const row=index.bySku[direct];
+    return{key:recebArm997MatchKey(row),sku:direct,codigo:item.codGam,match:'Base COD GAM + data 997'};
+  }
   const base=recebArmFindProductBase(item,data);
   const baseSku=recebArmNormalizeSku(base&&base.codigo);
-  if(baseSku)return{sku:baseSku,codigo:base.codigo,match:'Base COD GAM'};
+  if(baseSku)return{key:'',sku:'',codigo:base.codigo,match:'Base COD GAM sem vínculo 997'};
   return{sku:'',codigo:'',match:'Sem vínculo'};
 }
 
-function recebArmNota997Rows(nota,data,index){
-  const has997=!!recebArmQrpCurrentSnapshot(data&&data.qrpRows).length;
+function recebArm997InitialRemaining(index){
   const remaining={};
-  Object.keys((index&&index.bySku)||{}).forEach(sku=>{remaining[sku]={...index.bySku[sku]};});
+  Object.values((index&&index.byKey)||{}).forEach(row=>{remaining[row.key]={...row};});
+  Object.values((index&&index.bySku)||{}).forEach(row=>{
+    const key=recebArm997MatchKey(row);
+    if(key&&!remaining[key])remaining[key]={...row,key};
+  });
+  return remaining;
+}
+
+function recebArmNota997Rows(nota,data,index,sharedRemaining){
+  const has997=!!recebArmQrpCurrentSnapshot(data&&data.qrpRows).length;
+  const remaining=sharedRemaining||recebArm997InitialRemaining(index);
   return (Array.isArray(nota&&nota.itens)?nota.itens:[]).map((item,idx)=>{
     const found=recebArmFindNotaSku(item,data,index);
-    const pending=found.sku?(remaining[found.sku]||null):null;
+    const pending=found.key?(remaining[found.key]||null):null;
     const entradaVol=item.caixas!==undefined?+item.caixas:+item.qtdEntrada||0;
     const entradaUn=+item.unidades||0;
     const entradaBase=entradaUn>0?entradaUn:entradaVol;
@@ -5864,8 +5937,9 @@ function recebArmNota997MiniReport(nota,data,index){
 function recebArmNota997FlowSummary(notas,data,index){
   const list=(Array.isArray(notas)?notas:[]).filter(n=>n&&Array.isArray(n.itens)&&n.itens.length);
   if(!list.length)return '-';
+  const remaining=recebArm997InitialRemaining(index);
   return list.map(n=>{
-    const total=recebArmNota997Summary(recebArmNota997Rows(n,data,index));
+    const total=recebArmNota997Summary(recebArmNota997Rows(n,data,index,remaining));
     const color=total.armazenadoPct>=100?'#00e676':(total.armazenadoPct>0?'#ffd700':'#ff4c4c');
     return `<div style="margin-bottom:6px">
       <b style="color:#1e90ff">NF ${excelText(n.nfNumero||'sem número')}</b><br>
@@ -5891,6 +5965,9 @@ function renderRecebArmFluxo(data){
     const nfList=notas.map(n=>n.nfNumero||'sem NF').join(', ');
     const volNf=notas.reduce((s,n)=>s+(+n.volumes||0),0);
     const unNf=notas.reduce((s,n)=>s+(+n.unidades||0),0);
+    const nfSkus=notas.reduce((s,n)=>s+(Array.isArray(n.itens)?n.itens.length:0),0);
+    const agendadoVol=Math.max(agendaVol,volNf);
+    const agendadoSkus=Math.max(agendaSkus,nfSkus);
     const confRun=notas.filter(n=>recebArmNormalizeStatus(n.confStatus)==='andamento');
     const confOk=notas.filter(n=>recebArmNormalizeStatus(n.confStatus)==='finalizado');
     const armRun=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)==='andamento');
@@ -5914,10 +5991,10 @@ function renderRecebArmFluxo(data){
     return `<div class="receb-arm-flow-row">
       <div class="receb-arm-flow-main">
         <div class="receb-arm-flow-forn">${excelText(g.fornecedor)}</div>
-        <div class="receb-arm-flow-meta">${protocolos.length?`Protocolo: ${excelText(protocolos.join(', '))}<br>`:''}Agenda: <b style="color:#ffd700">${prodFmt(agendaVol,0)} vol.</b> / ${prodFmt(agendaSkus,0)} SKUs<br>${notas.length?`NF: <b style="color:#00e5ff">${excelText(nfList)}</b><br>XML: ${prodFmt(volNf,0)} cx / ${prodFmt(unNf,0)} un`:''}</div>
+        <div class="receb-arm-flow-meta">${protocolos.length?`Protocolo: ${excelText(protocolos.join(', '))}<br>`:''}Agenda: <b style="color:#ffd700">${prodFmt(agendadoVol,0)} vol.</b> / ${prodFmt(agendadoSkus,0)} SKUs<br>${notas.length?`NF: <b style="color:#00e5ff">${excelText(nfList)}</b><br>XML: ${prodFmt(volNf,0)} cx / ${prodFmt(unNf,0)} un`:''}</div>
         ${notaCards}
       </div>
-      ${recebArmFlowStep('Agendado',agendaVol?prodFmt(agendaVol,0)+' vol.':'Sem volume',notas.length?'ok':'wait',notas.length?'NF bipada':'Aguardando NF')}
+      ${recebArmFlowStep('Agendado',agendadoVol?prodFmt(agendadoVol,0)+' vol.':'Sem volume',notas.length?'ok':'wait',notas.length?'NF bipada':'Aguardando NF')}
       <div class="receb-arm-flow-arrow">→</div>
       ${recebArmFlowStep('Em conferência',confRun.length?confRun.map(n=>'NF '+excelText(n.nfNumero||'')).join('<br>'):'-',confRun.length?'run':'off')}
       <div class="receb-arm-flow-arrow">→</div>
