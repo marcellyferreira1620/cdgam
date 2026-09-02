@@ -101,6 +101,14 @@ body:not(.area-noturno-view) #prevEncPanel{display:none!important}
 .flux-side-actions{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:12px}
 .flux-btn{border:0;border-radius:5px;background:#1e88e5;color:#fff;font-size:11px;font-weight:900;padding:9px 10px;cursor:pointer}
 .flux-btn.green{background:#00a86b}.flux-btn.gray{background:#526676}.flux-btn.red{background:#e94560}.flux-btn.yellow{background:#ffd700;color:#06162b}
+.flux-select,.flux-input{border:1px solid #9fc7e6;border-radius:5px;background:#fff;color:#0a2340;font-size:11px;font-weight:800;padding:7px;min-width:0}
+.flux-template-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin:10px 0 12px}
+.flux-template-card{border:1px solid #284a67;border-radius:6px;background:#102038;color:#dcecff;padding:8px;cursor:pointer;text-align:left}
+.flux-template-card.active{border-color:#ffd700;background:#123d66}
+.flux-template-card strong{display:block;font-size:10px;color:#fff;margin-bottom:6px}
+.flux-template-preview{height:54px;border-radius:4px;background:#f8fbff;background-image:radial-gradient(#ccd7e2 1px,transparent 1px);background-size:8px 8px;position:relative;overflow:hidden}
+.flux-template-preview span{position:absolute;display:block;border-radius:3px;background:#8ea2ff}
+.flux-template-preview .y{background:#ffdf50}.flux-template-preview .g{background:#7fd9a5}.flux-template-preview .r{background:#ff9f9f}
 .flux-folder{border:1px solid #1a3550;border-radius:6px;margin-bottom:9px;overflow:hidden;background:#102038}
 .flux-folder-h{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;background:#071525;color:#fff;font-weight:900;font-size:12px;cursor:pointer}
 .flux-folder-h.active{color:#ffd700}
@@ -113,6 +121,10 @@ body:not(.area-noturno-view) #prevEncPanel{display:none!important}
 .flux-title strong{font-size:17px;color:#003b6f;text-transform:uppercase}
 .flux-title span{font-size:11px;color:#526676;font-weight:700}
 .flux-tools{display:flex;gap:7px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.flux-formatbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;background:#f8fbff;border-top:1px solid #d8e8f5;padding:8px 12px}
+.flux-formatbar.disabled{opacity:.55}
+.flux-swatch{width:26px;height:26px;border:2px solid #fff;border-radius:50%;box-shadow:0 0 0 1px #9fc7e6;cursor:pointer}
+.flux-mini-btn{min-width:30px;height:30px;border:1px solid #c8d9e8;border-radius:5px;background:#fff;color:#0a2340;font-weight:900;cursor:pointer}
 .flux-canvas-wrap{position:relative;overflow:auto;background:#fbfdff;background-image:radial-gradient(#cbd9e6 1px,transparent 1px);background-size:18px 18px}
 .flux-canvas{position:relative;width:2600px;height:1500px;transform-origin:0 0}
 .flux-svg{position:absolute;inset:0;width:2600px;height:1500px;overflow:visible;pointer-events:auto}
@@ -124,10 +136,14 @@ body:not(.area-noturno-view) #prevEncPanel{display:none!important}
 .flux-node.green{background:#baf0d3;border-color:#62c18d}
 .flux-node.red{background:#ffd0d0;border-color:#e88a8a}
 .flux-node.white{background:#fff;border-color:#b7cce0}
+.flux-node.pill{border-radius:999px}
+.flux-node.round{border-radius:16px}
+.flux-node.note{border-style:dashed}
 .flux-node.decision{border-radius:10px;transform:rotate(45deg);width:130px;height:130px;min-height:130px}
 .flux-node.decision .flux-node-text{transform:rotate(-45deg);max-width:120px}
 .flux-node.active{outline:3px solid #1e88e5;outline-offset:2px}
 .flux-node.connecting{outline:3px solid #ffd700;outline-offset:2px}
+.flux-node.locked{cursor:default}
 .flux-node-text{width:100%;outline:0;cursor:text;white-space:pre-wrap;word-break:break-word}
 .flux-empty{margin:18px;border:1px dashed #9fc7e6;border-radius:8px;padding:28px;text-align:center;color:#526676;background:rgba(255,255,255,.8);font-weight:800}
 body.fluxogramas-view #kpiBar1,
@@ -7590,6 +7606,59 @@ function renderInventario(){
 
 let fluxUi={selectedNodeId:null,selectedEdgeId:null,connectFrom:null,connectMode:false,drag:null};
 let fluxSaveTimer=null;
+let fluxTemplateSelected='livre';
+const FLUX_TEMPLATES=[
+  {id:'livre',name:'Livre'},
+  {id:'swimlane',name:'Swimlane'},
+  {id:'bpmn',name:'BPMN'},
+  {id:'dataflow',name:'Data Flow'},
+  {id:'mindmap',name:'Mapa mental'},
+  {id:'orgchart',name:'Organograma'}
+];
+function fluxTemplateName(id){
+  const item=FLUX_TEMPLATES.find(t=>t.id===id);
+  return item?item.name:'Livre';
+}
+function fluxDefaultNode(type='box',color='white'){
+  return {id:uid(),x:420,y:180,w:type==='decision'?130:210,h:type==='decision'?130:86,text:type==='decision'?'DECISAO':'NOVO BLOCO',color,type,fontFamily:'Arial',fontSize:14,bold:true,align:'center',textColor:'#06162b',borderColor:''};
+}
+function fluxMakeNode(props){
+  return {...fluxDefaultNode(props&&props.type||'box',props&&props.color||'white'),...(props||{}),id:uid()};
+}
+function fluxCreateFlow(name,template='livre'){
+  const flow={id:uid(),name:name||'Novo fluxo',template,nodes:[],edges:[],zoom:1,updatedAt:Date.now()};
+  const add=(props)=>{const n=fluxMakeNode(props);flow.nodes.push(n);return n.id;};
+  const edge=(from,to)=>flow.edges.push({id:uid(),from,to,updatedAt:Date.now()});
+  if(template==='swimlane'){
+    const a=add({x:150,y:110,w:230,h:78,text:'ENTRADA',color:'yellow'});
+    const b=add({x:460,y:110,w:230,h:78,text:'CONFERENCIA',color:'blue'});
+    const c=add({x:770,y:110,w:230,h:78,text:'APROVACAO',color:'green'});
+    const d=add({x:1080,y:110,w:230,h:78,text:'FINALIZADO',color:'white'});
+    edge(a,b);edge(b,c);edge(c,d);
+  }else if(template==='bpmn'){
+    const a=add({x:160,y:160,w:170,h:70,text:'INICIO',type:'pill',color:'green'});
+    const b=add({x:430,y:150,w:220,h:86,text:'PROCESSO',color:'blue'});
+    const c=add({x:750,y:125,w:135,h:135,text:'DECISAO',type:'decision',color:'white'});
+    const d=add({x:1060,y:150,w:220,h:86,text:'TAREFA FINAL',color:'yellow'});
+    edge(a,b);edge(b,c);edge(c,d);
+  }else if(template==='dataflow'){
+    const a=add({x:160,y:140,w:220,h:86,text:'ORIGEM DOS DADOS',color:'blue'});
+    const b=add({x:480,y:140,w:220,h:86,text:'VALIDACAO',color:'yellow'});
+    const c=add({x:800,y:140,w:220,h:86,text:'PLANILHA / BASE',color:'green'});
+    const d=add({x:1120,y:140,w:220,h:86,text:'DASHBOARD',color:'white'});
+    edge(a,b);edge(b,c);edge(c,d);
+  }else if(template==='mindmap'){
+    const c=add({x:560,y:240,w:260,h:96,text:'TEMA CENTRAL',color:'yellow'});
+    [add({x:190,y:95,text:'ETAPA 1',color:'blue'}),add({x:945,y:95,text:'ETAPA 2',color:'green'}),add({x:190,y:410,text:'ETAPA 3',color:'red'}),add({x:945,y:410,text:'ETAPA 4',color:'blue'})].forEach(id=>edge(c,id));
+  }else if(template==='orgchart'){
+    const a=add({x:560,y:80,w:240,h:86,text:'RESPONSAVEL',color:'yellow'});
+    const b=add({x:300,y:260,w:210,h:78,text:'AREA 1',color:'blue'});
+    const c=add({x:590,y:260,w:210,h:78,text:'AREA 2',color:'blue'});
+    const d=add({x:880,y:260,w:210,h:78,text:'AREA 3',color:'blue'});
+    edge(a,b);edge(a,c);edge(a,d);
+  }
+  return flow;
+}
 function fluxData(){
   db.fluxogramas=normalizeFluxogramas(db.fluxogramas);
   return db.fluxogramas;
@@ -7637,12 +7706,13 @@ function fluxAddFolder(){
   const name=prompt('Nome da pasta:','Nova pasta');
   if(!name)return;
   const data=fluxData();
-  const flowId=uid();
-  const folder={id:uid(),name:name.trim(),updatedAt:Date.now(),flows:[{id:flowId,name:'Novo fluxo',nodes:[],edges:[],zoom:1,updatedAt:Date.now()}]};
+  const template=fluxTemplateSelected||'livre';
+  const flow=fluxCreateFlow(`Novo fluxo - ${fluxTemplateName(template)}`,template);
+  const folder={id:uid(),name:name.trim(),updatedAt:Date.now(),flows:[flow]};
   data.folders.push(folder);
   data.activeFolderId=folder.id;
-  data.activeFlowId=flowId;
-  fluxTouch(folder.flows[0]);
+  data.activeFlowId=flow.id;
+  fluxTouch(flow);
   saveFluxogramas(true);
 }
 function fluxRenameFolder(id){
@@ -7659,9 +7729,10 @@ function fluxRenameFolder(id){
 function fluxAddFlow(){
   const folder=fluxFolder();
   if(!folder)return;
-  const name=prompt('Nome do fluxo:','Novo fluxo');
+  const template=fluxTemplateSelected||'livre';
+  const name=prompt('Nome do fluxo:',`Novo fluxo - ${fluxTemplateName(template)}`);
   if(!name)return;
-  const flow={id:uid(),name:name.trim(),nodes:[],edges:[],zoom:1,updatedAt:Date.now()};
+  const flow=fluxCreateFlow(name.trim(),template);
   folder.flows.push(flow);
   db.fluxogramas.activeFlowId=flow.id;
   fluxTouch(flow);
@@ -7679,7 +7750,7 @@ function fluxRenameFlow(id){
 function fluxAddNode(type='box',color='white'){
   const flow=fluxFlow();
   if(!flow)return;
-  const n={id:uid(),x:420+(flow.nodes.length%5)*35,y:180+(flow.nodes.length%6)*28,w:type==='decision'?130:210,h:type==='decision'?130:86,text:type==='decision'?'DECISAO':'NOVO BLOCO',color,type};
+  const n=fluxMakeNode({type,color,x:420+(flow.nodes.length%5)*35,y:180+(flow.nodes.length%6)*28});
   flow.nodes.push(n);
   fluxUi.selectedNodeId=n.id;
   fluxUi.selectedEdgeId=null;
@@ -7713,6 +7784,66 @@ function fluxSetColor(color){
   fluxTouch(flow);
   saveFluxogramas(true);
 }
+function fluxSelectedNode(){
+  return fluxNodeById(fluxFlow(),fluxUi.selectedNodeId);
+}
+function fluxSetTemplate(id){
+  fluxTemplateSelected=id||'livre';
+  renderFluxogramas();
+}
+function fluxUpdateSelectedStyle(key,value,refresh=false){
+  const flow=fluxFlow();
+  const node=fluxNodeById(flow,fluxUi.selectedNodeId);
+  if(!node)return;
+  node[key]=value;
+  fluxTouch(flow);
+  saveFluxogramas(refresh);
+  if(!refresh)renderFluxogramas();
+}
+function fluxToggleBold(){
+  const node=fluxSelectedNode();
+  fluxUpdateSelectedStyle('bold',!(node&&node.bold),true);
+}
+function fluxSetAlign(align){fluxUpdateSelectedStyle('align',align,true);}
+function fluxSetFillColor(color){fluxUpdateSelectedStyle('fillColor',color,true);}
+function fluxSetTextColor(color){fluxUpdateSelectedStyle('textColor',color,true);}
+function fluxSetBorderColor(color){fluxUpdateSelectedStyle('borderColor',color,true);}
+function fluxSetNodeType(type){fluxUpdateSelectedStyle('type',type,true);}
+function fluxResizeSelected(dw,dh){
+  const flow=fluxFlow();
+  const node=fluxNodeById(flow,fluxUi.selectedNodeId);
+  if(!node)return;
+  node.w=Math.max(80,(+node.w||190)+dw);
+  node.h=Math.max(44,(+node.h||74)+dh);
+  fluxTouch(flow);
+  saveFluxogramas(true);
+}
+function fluxDuplicateSelected(){
+  const flow=fluxFlow();
+  const node=fluxNodeById(flow,fluxUi.selectedNodeId);
+  if(!flow||!node)return;
+  const copy=JSON.parse(JSON.stringify(node));
+  copy.id=uid();copy.x=(+copy.x||0)+28;copy.y=(+copy.y||0)+28;
+  flow.nodes.push(copy);
+  fluxUi.selectedNodeId=copy.id;
+  fluxUi.selectedEdgeId=null;
+  fluxTouch(flow);
+  saveFluxogramas(true);
+}
+function fluxToggleLock(){
+  const node=fluxSelectedNode();
+  fluxUpdateSelectedStyle('locked',!(node&&node.locked),true);
+}
+function fluxExportJson(){
+  const flow=fluxFlow();
+  if(!flow)return;
+  const blob=new Blob([JSON.stringify(flow,null,2)],{type:'application/json;charset=utf-8'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob);
+  a.download=(flow.name||'fluxograma').replace(/[^\w\-]+/g,'_')+'.json';
+  document.body.appendChild(a);a.click();a.remove();
+  setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
 function fluxZoom(delta){
   const flow=fluxFlow();
   if(!flow)return;
@@ -7732,7 +7863,7 @@ function fluxNodePointerDown(event,id){
   if(event&&event.target&&event.target.closest('.flux-node-text'))return;
   const flow=fluxFlow();
   const node=fluxNodeById(flow,id);
-  if(!node)return;
+  if(!node||node.locked)return;
   fluxUi.selectedNodeId=id;
   fluxUi.selectedEdgeId=null;
   fluxUi.drag={id,startX:event.clientX,startY:event.clientY,origX:+node.x||0,origY:+node.y||0,moved:false};
@@ -7831,6 +7962,15 @@ function renderFluxogramas(){
   const data=fluxData();
   const folder=fluxFolder();
   const flow=fluxFlow();
+  const selected=fluxNodeById(flow,fluxUi.selectedNodeId);
+  const templateCards=FLUX_TEMPLATES.map((t,i)=>`<button class="flux-template-card ${fluxTemplateSelected===t.id?'active':''}" type="button" onclick="fluxSetTemplate('${t.id}')">
+    <strong>${excelText(t.name)}</strong>
+    <div class="flux-template-preview">
+      <span class="y" style="left:12px;top:12px;width:36px;height:13px"></span>
+      <span style="left:${i%2?62:58}px;top:${i%3?28:14}px;width:42px;height:13px"></span>
+      <span class="${i%2?'g':'r'}" style="left:${i%2?36:82}px;top:37px;width:28px;height:10px"></span>
+    </div>
+  </button>`).join('');
   const folders=data.folders.map(folderItem=>{
     const open=folderItem.id===data.activeFolderId;
     return `<div class="flux-folder">
@@ -7838,10 +7978,53 @@ function renderFluxogramas(){
       ${open?`<div class="flux-flow-list">${(folderItem.flows||[]).map(f=>`<button class="flux-flow-item ${f.id===data.activeFlowId?'active':''}" type="button" onclick="fluxSetFlow('${f.id}')"><span>${excelText(f.name)}</span><b onclick="event.stopPropagation();fluxRenameFlow('${f.id}')">editar</b></button>`).join('')}</div>`:''}
     </div>`;
   }).join('');
-  const nodes=flow?(flow.nodes||[]).map(n=>`<div class="flux-node ${excelText(n.color||'white')} ${n.type==='decision'?'decision':''} ${fluxUi.selectedNodeId===n.id?'active':''} ${fluxUi.connectFrom===n.id?'connecting':''}" data-flux-node="${attrText(n.id)}" style="left:${+n.x||0}px;top:${+n.y||0}px;width:${+n.w||190}px;min-height:${+n.h||74}px" onpointerdown="fluxNodePointerDown(event,'${n.id}')" onclick="fluxNodeClick(event,'${n.id}')"><div class="flux-node-text" contenteditable="true" spellcheck="false" oninput="fluxUpdateNodeText('${n.id}',this)">${excelText(n.text||'')}</div></div>`).join(''):'';
+  const nodes=flow?(flow.nodes||[]).map(n=>{
+    const shape=(n.type&&n.type!=='box')?n.type:'';
+    const boxStyle=[
+      `left:${+n.x||0}px`,`top:${+n.y||0}px`,`width:${+n.w||190}px`,`height:${+n.h||74}px`,`min-height:${+n.h||74}px`,
+      n.fillColor?`background:${n.fillColor}`:'',
+      n.borderColor?`border-color:${n.borderColor}`:'',
+      `text-align:${n.align||'center'}`
+    ].filter(Boolean).join(';');
+    const textStyle=[
+      `font-family:${n.fontFamily||'Arial'}`,
+      `font-size:${+n.fontSize||14}px`,
+      `font-weight:${n.bold===false?600:900}`,
+      `color:${n.textColor||'#06162b'}`,
+      `text-align:${n.align||'center'}`
+    ].join(';');
+    return `<div class="flux-node ${excelText(n.color||'white')} ${shape} ${n.locked?'locked':''} ${fluxUi.selectedNodeId===n.id?'active':''} ${fluxUi.connectFrom===n.id?'connecting':''}" data-flux-node="${attrText(n.id)}" style="${boxStyle}" onpointerdown="fluxNodePointerDown(event,'${n.id}')" onclick="fluxNodeClick(event,'${n.id}')"><div class="flux-node-text" contenteditable="${n.locked?'false':'true'}" spellcheck="false" style="${textStyle}" oninput="fluxUpdateNodeText('${n.id}',this)">${excelText(n.text||'')}</div></div>`;
+  }).join(''):'';
+  const formatbar=selected?`
+      <div class="flux-formatbar">
+        <select class="flux-select" onchange="fluxUpdateSelectedStyle('fontFamily',this.value,true)">
+          ${['Arial','Noto Sans','Georgia','Verdana','Tahoma','Courier New'].map(f=>`<option value="${f}" ${selected.fontFamily===f?'selected':''}>${f}</option>`).join('')}
+        </select>
+        <input class="flux-input" type="number" min="8" max="72" value="${+selected.fontSize||14}" style="width:68px" onchange="fluxUpdateSelectedStyle('fontSize',+this.value,true)">
+        <button class="flux-mini-btn" type="button" onclick="fluxToggleBold()">B</button>
+        <button class="flux-mini-btn" type="button" onclick="fluxSetAlign('left')">Esq</button>
+        <button class="flux-mini-btn" type="button" onclick="fluxSetAlign('center')">Meio</button>
+        <button class="flux-mini-btn" type="button" onclick="fluxSetAlign('right')">Dir</button>
+        <select class="flux-select" onchange="fluxSetNodeType(this.value)">
+          ${[['box','Retangulo'],['round','Arredondado'],['pill','Pilula'],['decision','Decisao'],['note','Observacao']].map(([v,l])=>`<option value="${v}" ${selected.type===v?'selected':''}>${l}</option>`).join('')}
+        </select>
+        ${['#ffffff','#c9dcf8','#ffdf50','#baf0d3','#ffd0d0','#d8c9ff'].map(c=>`<button class="flux-swatch" type="button" style="background:${c}" onclick="fluxSetFillColor('${c}')" title="Cor do bloco"></button>`).join('')}
+        <input class="flux-input" type="color" value="${selected.textColor||'#06162b'}" onchange="fluxSetTextColor(this.value)" title="Cor do texto">
+        <input class="flux-input" type="color" value="${selected.borderColor||'#b7cce0'}" onchange="fluxSetBorderColor(this.value)" title="Cor da borda">
+        <button class="flux-mini-btn" type="button" onclick="fluxResizeSelected(-20,0)">L-</button>
+        <button class="flux-mini-btn" type="button" onclick="fluxResizeSelected(20,0)">L+</button>
+        <button class="flux-mini-btn" type="button" onclick="fluxResizeSelected(0,-12)">A-</button>
+        <button class="flux-mini-btn" type="button" onclick="fluxResizeSelected(0,12)">A+</button>
+        <button class="flux-btn gray" type="button" onclick="fluxDuplicateSelected()">Duplicar</button>
+        <button class="flux-btn gray" type="button" onclick="fluxToggleLock()">${selected.locked?'Destravar':'Travar'}</button>
+      </div>`:`<div class="flux-formatbar disabled">Selecione um bloco para editar fonte, cor, formato, tamanho, duplicar ou travar.</div>`;
   wrap.innerHTML=`
     <aside class="flux-side">
       <h2>Fluxogramas</h2>
+      <select class="flux-select" id="fluxTemplateSelect" onchange="fluxSetTemplate(this.value)" style="width:100%;margin-bottom:8px">
+        ${FLUX_TEMPLATES.map(t=>`<option value="${t.id}" ${fluxTemplateSelected===t.id?'selected':''}>${excelText(t.name)}</option>`).join('')}
+      </select>
+      <div class="flux-template-grid">${templateCards}</div>
       <div class="flux-side-actions">
         <button class="flux-btn green" type="button" onclick="fluxAddFolder()">Nova pasta</button>
         <button class="flux-btn" type="button" onclick="fluxAddFlow()">Novo fluxo</button>
@@ -7859,9 +8042,11 @@ function renderFluxogramas(){
           <button class="flux-btn" type="button" onclick="fluxStartConnect()">Conectar</button>
           <button class="flux-btn gray" type="button" onclick="fluxZoom(-.1)">- Zoom</button>
           <button class="flux-btn gray" type="button" onclick="fluxZoom(.1)">+ Zoom</button>
+          <button class="flux-btn gray" type="button" onclick="fluxExportJson()">Exportar</button>
           <button class="flux-btn red" type="button" onclick="fluxDeleteSelected()">Excluir</button>
         </div>
       </div>
+      ${formatbar}
       <div class="flux-canvas-wrap">
         ${flow?`<div class="flux-canvas" style="transform:scale(${+flow.zoom||1})"><svg class="flux-svg" id="fluxSvg"></svg>${nodes}</div>`:'<div class="flux-empty">Crie uma pasta e um fluxo para come&ccedil;ar.</div>'}
       </div>
