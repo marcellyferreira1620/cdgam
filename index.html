@@ -2676,6 +2676,16 @@ function mergeInventario(current,next){
   const aft=a._fieldUpdatedAt||{};
   const bft=b._fieldUpdatedAt||{};
   const keys=new Set([...Object.keys(a),...Object.keys(b)]);
+  const mergeFarol=(av,bv)=>{
+    const aa=av&&typeof av==='object'?av:{};
+    const bb=bv&&typeof bv==='object'?bv:{};
+    const merged={};
+    new Set([...Object.keys(aa),...Object.keys(bb)]).forEach(local=>{
+      const v=Math.max(+aa[local]||0,+bb[local]||0);
+      if(v>0)merged[local]=v;
+    });
+    return merged;
+  };
   keys.forEach(key=>{
     if(key==='_fieldUpdatedAt'||key==='_updatedAt')return;
     const av=a[key],bv=b[key];
@@ -2683,6 +2693,10 @@ function mergeInventario(current,next){
     const bts=+bft[key]||0;
     const hasA=av!==undefined&&av!==null;
     const hasB=bv!==undefined&&bv!==null;
+    if(key==='farol'){
+      out[key]=mergeFarol(av,bv);
+      return;
+    }
     if(ats||bts){
       out[key]=bts>=ats&&hasB?bv:av;
       return;
@@ -7031,6 +7045,16 @@ async function importInventarioReserva(event,type){
 }
 function inventarioSaveCurrent(day){
   const idx=db.days.findIndex(d=>d.date===day.date);
+  if(idx>=0&&day&&day.inventario&&day.inventario.farol){
+    const savedFarol=(db.days[idx].inventario&&db.days[idx].inventario.farol)||{};
+    const nextFarol=day.inventario.farol||{};
+    const mergedFarol={};
+    new Set([...Object.keys(savedFarol),...Object.keys(nextFarol)]).forEach(local=>{
+      const v=Math.max(+savedFarol[local]||0,+nextFarol[local]||0);
+      if(v>0)mergedFarol[local]=v;
+    });
+    day.inventario.farol=mergedFarol;
+  }
   if(idx>=0)db.days[idx]=mergeDayRecords(db.days[idx],day);else db.days.push(day);
   db.days=mergeDays(db.days,[]);
   save();
