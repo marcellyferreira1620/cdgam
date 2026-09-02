@@ -4879,6 +4879,7 @@ function addRecebArmNota(){
     _updatedAt:Date.now()
   });
   if(!existing)data.notas.push(nota);
+  data.notas=recebArmUniqueNotas(data.notas);
   recebArmTouch(day);
   ['recebArmNfNumero','recebArmChave','recebArmFornecedor','recebArmProtocolo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   if(fileEl){fileEl.value='';fileEl._parsedNota=null;}
@@ -5504,7 +5505,7 @@ function compareRecebArmStorage(showMsg=true){
   const index=recebArm997PendingIndex(data,day.date);
   const remaining=recebArm997InitialRemaining(index);
   const autoPend=[];
-  data.notas.forEach(nota=>{
+  recebArmUniqueNotas(data.notas||[]).forEach(nota=>{
     const rows=recebArmNota997Rows(nota,data,index,remaining);
     rows.forEach((row,idx)=>{
       const item=(nota.itens||[])[idx]||{};
@@ -5525,7 +5526,7 @@ function compareRecebArmStorage(showMsg=true){
       }
     });
   });
-  const manual=(data.pendArm||[]).filter(p=>p.origem!=='automático 997');
+  const manual=(data.pendArm||[]).filter(p=>!recebArmKey(p&&p.origem).includes('automatico 997'));
   data.pendArm=[...manual,...autoPend];
   recebArmTouch(day);
   if(showMsg)recebArmMsg('recebArm997Msg','Pendências recalculadas com base na 997.',false);
@@ -5647,7 +5648,7 @@ function recebArmToggleAgendaTipo(key){
 function renderRecebArmKpis(data){
   const el=document.getElementById('recebArmKpis');
   if(!el)return;
-  const notas=data.notas||[];
+  const notas=recebArmUniqueNotas(data.notas||[]);
   const kpis=[
     ['Notas no dia',notas.length,'#ffd700'],
     ['Conferência 100%',notas.filter(n=>n.confStatus==='finalizado').length,'#00e676'],
@@ -5692,7 +5693,7 @@ function renderRecebArmPendSelectors(data){
   const itemSel=document.getElementById('recebArmPendConfItem');
   if(!nfSel||!itemSel)return null;
   const prevNf=nfSel.value;
-  const notas=data.notas||[];
+  const notas=recebArmUniqueNotas(data.notas||[]);
   nfSel.innerHTML=notas.length
     ?notas.map(n=>`<option value="${attrText(n.nfNumero||n.chave||'')}">NF ${excelText(n.nfNumero||'sem número')} - ${excelText(n.fornecedor||'')}</option>`).join('')
     :'<option value="">Sem NF lida</option>';
@@ -5753,6 +5754,45 @@ function recebArmAgendaRowsForFlow(data){
   return (data.agendaRows||[]).filter(r=>r&&r.fornecedor&&!recebArmAgendaIsTotalRow(r)&&!recebArmKey(r.fornecedor).includes('total de volumes'));
 }
 
+function recebArmNotaUniqueKey(nota){
+  const chave=String(nota&&nota.chave||'').replace(/\D/g,'');
+  if(chave)return'chave:'+chave;
+  const nf=String(nota&&nota.nfNumero||'').trim();
+  if(nf)return'nf:'+recebArmKey([nf,nota&&nota.fornecedor||''].join('|'));
+  return'id:'+(nota&&nota.id||recebArmId('nf'));
+}
+
+function recebArmPickStatus(a,b){
+  const order={finalizado:3,andamento:2,pendente:1};
+  const av=recebArmNormalizeStatus(a),bv=recebArmNormalizeStatus(b);
+  return (order[bv]||0)>(order[av]||0)?bv:av;
+}
+
+function recebArmUniqueNotas(notas){
+  const out=[],byKey={};
+  (Array.isArray(notas)?notas:[]).forEach(nota=>{
+    if(!nota)return;
+    const key=recebArmNotaUniqueKey(nota);
+    if(!byKey[key]){
+      byKey[key]={...nota};
+      out.push(byKey[key]);
+      return;
+    }
+    const base=byKey[key];
+    base.nfNumero=base.nfNumero||nota.nfNumero||'';
+    base.chave=base.chave||nota.chave||'';
+    base.fornecedor=base.fornecedor||nota.fornecedor||'';
+    base.protocolo=base.protocolo||nota.protocolo||'';
+    base.volumes=Math.max(+base.volumes||0,+nota.volumes||0);
+    base.unidades=Math.max(+base.unidades||0,+nota.unidades||0);
+    base.confStatus=recebArmPickStatus(base.confStatus,nota.confStatus);
+    base.armStatus=recebArmPickStatus(base.armStatus,nota.armStatus);
+    if((nota.itens||[]).length>(base.itens||[]).length)base.itens=nota.itens;
+    base._updatedAt=Math.max(+base._updatedAt||0,+nota._updatedAt||0);
+  });
+  return out;
+}
+
 function recebArmFlowGroups(data){
   const groups=[];
   const ensureGroup=(fornecedor,agendaRow)=>{
@@ -5772,7 +5812,7 @@ function recebArmFlowGroups(data){
     return g;
   };
   recebArmAgendaRowsForFlow(data).forEach(row=>ensureGroup(row.fornecedor,row));
-  (data.notas||[]).forEach(nota=>{
+  recebArmUniqueNotas(data.notas||[]).forEach(nota=>{
     let g=groups
       .map(group=>({group,score:recebArmFornecedorScore(group.fornecedor,nota.fornecedor)}))
       .sort((a,b)=>b.score-a.score)[0];
@@ -5960,7 +6000,7 @@ function renderRecebArmFluxo(data){
     const agendaVol=g.agendaRows.reduce((s,r)=>s+(+r.volumes||0),0);
     const agendaSkus=g.agendaRows.reduce((s,r)=>s+(+r.skus||0),0);
     const protocolos=[...new Set(g.agendaRows.map(r=>r.protocolo).filter(Boolean))];
-    const notas=g.notas;
+    const notas=recebArmUniqueNotas(g.notas);
     const nfList=notas.map(n=>n.nfNumero||'sem NF').join(', ');
     const volNf=notas.reduce((s,n)=>s+(+n.volumes||0),0);
     const unNf=notas.reduce((s,n)=>s+(+n.unidades||0),0);
@@ -6017,7 +6057,7 @@ function renderRecebArmPendTables(data){
   }
   if(arm){
     const rows=data.pendArm||[];
-    arm.innerHTML=`<table class="receb-arm-tbl"><thead><tr><th>NF</th><th>Item</th><th>Qtd</th><th>Endereço</th><th>Origem</th><th></th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td>${excelText(r.nf||'')}</td><td>${excelText(r.item||'')}</td><td>${prodFmt(+r.qtd||0,0)}</td><td>${excelText(r.endereco||'997')}</td><td>${excelText(r.origem||'manual')}</td><td>${r.origem==='automático 997'?'':`<button class="receb-arm-btn red" type="button" onclick="removeRecebArmPendencia('arm','${r.id}')">Excluir</button>`}</td></tr>`).join(''):'<tr><td colspan="6">Sem pendência de armazenagem.</td></tr>'}</tbody></table>`;
+    arm.innerHTML=`<table class="receb-arm-tbl"><thead><tr><th>NF</th><th>Item</th><th>Qtd</th><th>Endereço</th><th>Origem</th><th></th></tr></thead><tbody>${rows.length?rows.map(r=>`<tr><td>${excelText(r.nf||'')}</td><td>${excelText(r.item||'')}</td><td>${prodFmt(+r.qtd||0,0)}</td><td>${excelText(r.endereco||'997')}</td><td>${excelText(r.origem||'manual')}</td><td>${recebArmKey(r.origem).includes('automatico 997')?'':`<button class="receb-arm-btn red" type="button" onclick="removeRecebArmPendencia('arm','${r.id}')">Excluir</button>`}</td></tr>`).join(''):'<tr><td colspan="6">Sem pendência de armazenagem.</td></tr>'}</tbody></table>`;
   }
 }
 
@@ -6385,6 +6425,11 @@ function renderRecebArm(){
   if(!wrap)return;
   const day=getDay(curDate)||emptyDay(curDate||today());
   const data=ensureRecebArm(day);
+  const uniqueNotas=recebArmUniqueNotas(data.notas||[]);
+  if(uniqueNotas.length!==(data.notas||[]).length){
+    data.notas=uniqueNotas;
+    recebArmTouch(day);
+  }
   renderRecebArmKpis(data);
   renderRecebArmAgenda(data);
   renderRecebArmFluxo(data);
