@@ -145,6 +145,11 @@ body:not(.area-noturno-view) #prevEncPanel{display:none!important}
 .flux-node.connecting{outline:3px solid #ffd700;outline-offset:2px}
 .flux-node.locked{cursor:default}
 .flux-node-text{width:100%;outline:0;cursor:text;white-space:pre-wrap;word-break:break-word}
+.flux-quick{position:absolute;z-index:8;display:flex;align-items:center;gap:4px;transform:translate(-50%,-50%);pointer-events:auto}
+.flux-quick.vertical{flex-direction:column}
+.flux-quick-btn{width:28px;height:28px;border:2px solid #fff;border-radius:50%;background:#1e88e5;color:#fff;font-size:16px;font-weight:900;line-height:20px;box-shadow:0 4px 12px rgba(6,35,61,.25);cursor:pointer}
+.flux-quick-btn.green{background:#00a86b}.flux-quick-btn.yellow{background:#ffd700;color:#06162b}.flux-quick-btn.gray{background:#526676}
+.flux-tip{position:absolute;left:12px;bottom:12px;background:rgba(10,35,64,.9);color:#dcecff;border:1px solid #1e4a72;border-radius:6px;padding:8px 10px;font-size:11px;font-weight:800;z-index:3;pointer-events:none}
 .flux-empty{margin:18px;border:1px dashed #9fc7e6;border-radius:8px;padding:28px;text-align:center;color:#526676;background:rgba(255,255,255,.8);font-weight:800}
 body.fluxogramas-view #kpiBar1,
 body.fluxogramas-view #flowBar,
@@ -2083,30 +2088,71 @@ function simpleHash(str){
   return String(h);
 }
 
-function compactRecebArmForLocal(data){
-  if(!data||typeof data!=='object')return data;
-  return{
-    ...data,
-    // Bases importadas podem passar do limite do navegador; a nuvem continua sendo a fonte principal.
-    productBase:[],
-    qrpRows:[],
-    qrpLastItems:[]
-  };
-}
-
-function compactDayForLocal(day){
-  if(!day||typeof day!=='object')return day;
-  const copy=JSON.parse(JSON.stringify(day));
-  if(copy.recebArm)copy.recebArm=compactRecebArmForLocal(copy.recebArm);
+function compactRecebArmImportForStorage(item){
+  if(!item||typeof item!=='object')return item;
+  const copy={...item};
+  // Mantem apenas os resumos; a planilha 997 bruta nao fica salva no site.
+  delete copy.items;
   return copy;
 }
 
-function compactDbForLocalStorage(snapshot,limitDays){
+function compactRecebArmForStorage(data){
+  if(!data||typeof data!=='object')return data;
+  return{
+    ...data,
+    // Planilhas importadas podem passar do limite do navegador/nuvem.
+    // A tela continua atualizando e exportando na hora, mas salva so o resumo.
+    productBase:[],
+    qrpRows:[],
+    qrpLastItems:[],
+    qrpDayReceivedItems:[],
+    qrpImports:Array.isArray(data.qrpImports)?data.qrpImports.map(compactRecebArmImportForStorage):[]
+  };
+}
+
+function compactInventarioForStorage(data){
+  if(!data||typeof data!=='object')return data;
+  const copy={...data};
+  if(copy.reservaComparativo&&typeof copy.reservaComparativo==='object'){
+    const comp={...copy.reservaComparativo};
+    ['inicio','final'].forEach(key=>{
+      if(comp[key]&&typeof comp[key]==='object'){
+        comp[key]={
+          fileName:comp[key].fileName||'',
+          label:comp[key].label||'',
+          importedAt:+comp[key].importedAt||0,
+          totals:comp[key].totals||{},
+          grupos:Array.isArray(comp[key].grupos)?comp[key].grupos:[]
+        };
+      }
+    });
+    copy.reservaComparativo=comp;
+  }
+  return copy;
+}
+
+function compactDayForStorage(day){
+  if(!day||typeof day!=='object')return day;
+  const copy=JSON.parse(JSON.stringify(day));
+  if(copy.recebArm)copy.recebArm=compactRecebArmForStorage(copy.recebArm);
+  if(copy.inventario)copy.inventario=compactInventarioForStorage(copy.inventario);
+  return copy;
+}
+
+function compactDbForStorage(snapshot,limitDays){
   const src=snapshot&&Array.isArray(snapshot.days)?snapshot:{days:[]};
-  let days=src.days.map(compactDayForLocal);
-  const maxDays=limitDays||LOCAL_CACHE_DAYS;
+  let days=src.days.map(compactDayForStorage);
+  const maxDays=limitDays===undefined?LOCAL_CACHE_DAYS:limitDays;
   if(maxDays&&days.length>maxDays)days=days.sort((a,b)=>(a.date||'').localeCompare(b.date||'')).slice(-maxDays);
   return{...src,days};
+}
+
+function compactDbForLocalStorage(snapshot,limitDays){
+  return compactDbForStorage(snapshot,limitDays);
+}
+
+function compactDbForCloudStorage(snapshot){
+  return compactDbForStorage(snapshot,0);
 }
 
 function saveLocalDb(snapshot=db){
@@ -2988,7 +3034,8 @@ function ensureFirebase(){
 }
 
 function cloudPayloadHash(payload){
-  return simpleHash(JSON.stringify({days:(payload&&payload.days)||[],users:(payload&&payload.users)||{},fluxogramas:(payload&&payload.fluxogramas)||null}));
+  const safe=compactDbForCloudStorage(payload||{});
+  return simpleHash(JSON.stringify({days:(safe&&safe.days)||[],users:(safe&&safe.users)||{},fluxogramas:(safe&&safe.fluxogramas)||null}));
 }
 
 function decodeFirebasePayload(raw){
@@ -3003,11 +3050,12 @@ function decodeFirebasePayload(raw){
 }
 
 function encodeFirebasePayload(payload){
+  const compact=compactDbForCloudStorage(payload);
   const safePayload={
-    days:Array.isArray(payload&&payload.days)?payload.days:[],
-    users:(payload&&payload.users)||{},
-    fluxogramas:normalizeFluxogramas(payload&&payload.fluxogramas),
-    savedAt:(payload&&payload.savedAt)||Date.now()
+    days:Array.isArray(compact&&compact.days)?compact.days:[],
+    users:(compact&&compact.users)||{},
+    fluxogramas:normalizeFluxogramas(compact&&compact.fluxogramas),
+    savedAt:(compact&&compact.savedAt)||Date.now()
   };
   return {payload:JSON.stringify(safePayload),savedAt:safePayload.savedAt};
 }
@@ -3029,7 +3077,7 @@ async function fbRestWritePayload(payload){
 }
 
 function payloadDaysHash(days){
-  return simpleHash(JSON.stringify(Array.isArray(days)?days:[]));
+  return simpleHash(JSON.stringify(Array.isArray(days)?days.map(compactDayForStorage):[]));
 }
 
 async function confirmFirebaseRestSave(payload){
@@ -5808,8 +5856,9 @@ async function importRecebArm997(ev){
     data.qrpImports=[...(data.qrpImports||[]),importRecord].slice(-36);
     recebArmTouch(day);
     compareRecebArmStorage(false);
-    recebArmMsg('recebArm997Msg',`${rows.length} linha(s) da 997 importadas. Leitura ${new Date(importRecord.importedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} salva no histórico.`,false);
+    recebArmMsg('recebArm997Msg',`${rows.length} linha(s) da 997 importadas. Leitura ${new Date(importRecord.importedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} atualizada e exportada em Excel.`,false);
     renderRecebArm();
+    setTimeout(()=>exportRecebArmExcel(),250);
   }catch(e){
     console.error(e);
     recebArmMsg('recebArm997Msg','Não consegui importar a 997. Se puder converter para Excel, fica mais confiável.',true);
@@ -7854,6 +7903,80 @@ function fluxAddNode(type='box',color='white'){
   fluxTouch(flow);
   saveFluxogramas(true);
 }
+function fluxNodeCloneStyle(node,props){
+  const base=node||{};
+  return fluxMakeNode({
+    type:props.type||base.type||'box',
+    color:props.color||base.color||'white',
+    fillColor:base.fillColor||'',
+    borderColor:base.borderColor||'',
+    textColor:base.textColor||'#06162b',
+    fontFamily:base.fontFamily||'Arial',
+    fontSize:+base.fontSize||14,
+    bold:base.bold!==false,
+    align:base.align||'center',
+    w:+base.w||210,
+    h:+base.h||86,
+    x:props.x,
+    y:props.y,
+    text:props.text||'NOVO PASSO'
+  });
+}
+function fluxNextNodePosition(node,direction){
+  const gap=90;
+  const w=+node.w||210,h=+node.h||86,x=+node.x||0,y=+node.y||0;
+  if(direction==='left')return{x:Math.max(0,x-w-gap),y};
+  if(direction==='up')return{x,y:Math.max(0,y-h-gap)};
+  if(direction==='down')return{x,y:y+h+gap};
+  return{x:x+w+gap,y};
+}
+function fluxAddConnectedNode(direction='right',type='box',color='white'){
+  const flow=fluxFlow();
+  if(!flow)return;
+  const selected=fluxNodeById(flow,fluxUi.selectedNodeId);
+  if(!selected){
+    fluxAddNode(type,color);
+    return;
+  }
+  const pos=fluxNextNodePosition(selected,direction);
+  const node=fluxNodeCloneStyle(selected,{...pos,type,color,text:'NOVO PASSO'});
+  flow.nodes.push(node);
+  flow.edges=Array.isArray(flow.edges)?flow.edges:[];
+  const from=direction==='left'||direction==='up'?node.id:selected.id;
+  const to=direction==='left'||direction==='up'?selected.id:node.id;
+  flow.edges.push({id:uid(),from,to,updatedAt:Date.now()});
+  fluxUi.selectedNodeId=node.id;
+  fluxUi.selectedEdgeId=null;
+  fluxUi.connectFrom=null;
+  fluxUi.connectMode=false;
+  fluxTouch(flow);
+  saveFluxogramas(true);
+}
+function fluxAddSequence(count=3){
+  const flow=fluxFlow();
+  if(!flow)return;
+  if(!fluxUi.selectedNodeId)fluxAddNode('box','yellow');
+  for(let i=0;i<count;i++)fluxAddConnectedNode('right','box',i%2?'blue':'white');
+}
+function fluxCanvasDblClick(event){
+  const flow=fluxFlow();
+  if(!flow||!event||event.target.closest('.flux-node,.flux-quick,.flux-formatbar'))return;
+  const canvas=document.querySelector('.flux-canvas');
+  if(!canvas)return;
+  const rect=canvas.getBoundingClientRect();
+  const zoom=+flow.zoom||1;
+  const node=fluxMakeNode({
+    x:Math.max(0,Math.round((event.clientX-rect.left)/zoom-105)),
+    y:Math.max(0,Math.round((event.clientY-rect.top)/zoom-43)),
+    color:'yellow',
+    text:'NOVO PASSO'
+  });
+  flow.nodes.push(node);
+  fluxUi.selectedNodeId=node.id;
+  fluxUi.selectedEdgeId=null;
+  fluxTouch(flow);
+  saveFluxogramas(true);
+}
 function fluxNodeById(flow,id){return flow&&Array.isArray(flow.nodes)?flow.nodes.find(n=>n.id===id):null;}
 function fluxEdgeById(flow,id){return flow&&Array.isArray(flow.edges)?flow.edges.find(e=>e.id===id):null;}
 function fluxDeleteSelected(){
@@ -8092,6 +8215,19 @@ function renderFluxogramas(){
     ].join(';');
     return `<div class="flux-node ${excelText(n.color||'white')} ${shape} ${n.locked?'locked':''} ${fluxUi.selectedNodeId===n.id?'active':''} ${fluxUi.connectFrom===n.id?'connecting':''}" data-flux-node="${attrText(n.id)}" style="${boxStyle}" onpointerdown="fluxNodePointerDown(event,'${n.id}')" onclick="fluxNodeClick(event,'${n.id}')"><div class="flux-node-text" contenteditable="${n.locked?'false':'true'}" spellcheck="false" style="${textStyle}" oninput="fluxUpdateNodeText('${n.id}',this)">${excelText(n.text||'')}</div></div>`;
   }).join(''):'';
+  const quickTools=selected?`
+      <div class="flux-quick" style="left:${(+selected.x||0)-20}px;top:${(+selected.y||0)+(+selected.h||74)/2}px">
+        <button class="flux-quick-btn gray" type="button" onclick="event.stopPropagation();fluxAddConnectedNode('left','box','white')" title="Criar bloco conectado a esquerda">+</button>
+      </div>
+      <div class="flux-quick" style="left:${(+selected.x||0)+(+selected.w||190)+20}px;top:${(+selected.y||0)+(+selected.h||74)/2}px">
+        <button class="flux-quick-btn green" type="button" onclick="event.stopPropagation();fluxAddConnectedNode('right','box','white')" title="Criar proximo bloco conectado">+</button>
+      </div>
+      <div class="flux-quick vertical" style="left:${(+selected.x||0)+(+selected.w||190)/2}px;top:${(+selected.y||0)-20}px">
+        <button class="flux-quick-btn" type="button" onclick="event.stopPropagation();fluxAddConnectedNode('up','box','white')" title="Criar bloco acima">+</button>
+      </div>
+      <div class="flux-quick vertical" style="left:${(+selected.x||0)+(+selected.w||190)/2}px;top:${(+selected.y||0)+(+selected.h||74)+20}px">
+        <button class="flux-quick-btn yellow" type="button" onclick="event.stopPropagation();fluxAddConnectedNode('down','box','yellow')" title="Criar bloco abaixo">+</button>
+      </div>`:'';
   const formatbar=selected?`
       <div class="flux-formatbar">
         <select class="flux-select" onchange="fluxUpdateSelectedStyle('fontFamily',this.value,true)">
@@ -8132,6 +8268,8 @@ function renderFluxogramas(){
       <div class="flux-top">
         <div class="flux-title"><strong>${excelText(flow?flow.name:'Fluxograma')}</strong><span>${excelText(folder?folder.name:'Pasta')} | fundo pontilhado, blocos arrast&aacute;veis e setas</span></div>
         <div class="flux-tools">
+          <button class="flux-btn green" type="button" onclick="fluxAddConnectedNode('right','box','white')">+ Passo</button>
+          <button class="flux-btn yellow" type="button" onclick="fluxAddSequence(3)">Sequ&ecirc;ncia</button>
           <button class="flux-btn yellow" type="button" onclick="fluxAddNode('box','yellow')">Bloco amarelo</button>
           <button class="flux-btn" type="button" onclick="fluxAddNode('box','blue')">Bloco azul</button>
           <button class="flux-btn green" type="button" onclick="fluxAddNode('box','green')">Bloco verde</button>
@@ -8145,7 +8283,7 @@ function renderFluxogramas(){
       </div>
       ${formatbar}
       <div class="flux-canvas-wrap">
-        ${flow?`<div class="flux-canvas" style="transform:scale(${+flow.zoom||1})"><svg class="flux-svg" id="fluxSvg"></svg>${nodes}</div>`:'<div class="flux-empty">Crie uma pasta e um fluxo para come&ccedil;ar.</div>'}
+        ${flow?`<div class="flux-canvas" ondblclick="fluxCanvasDblClick(event)" style="transform:scale(${+flow.zoom||1})"><svg class="flux-svg" id="fluxSvg"></svg>${nodes}${quickTools}<div class="flux-tip">Clique em um bloco e use os bot&otilde;es + para puxar novos passos. Duplo clique no fundo cria um bloco.</div></div>`:'<div class="flux-empty">Crie uma pasta e um fluxo para come&ccedil;ar.</div>'}
       </div>
     </main>`;
   if(flow)setTimeout(()=>fluxRenderEdges(flow),0);
@@ -11175,10 +11313,11 @@ async function sbReadPayload(){
 }
 
 async function sbWritePayload(payload,ts){
+  const compact=compactDbForCloudStorage(payload);
   const r=await fetch(`${sbUrl}/rest/v1/${SB_TABLE}`,{
     method:'POST',
     headers:{...sbHeaders(),'Prefer':'resolution=merge-duplicates'},
-    body:JSON.stringify({id:SB_ROW_ID,payload:JSON.stringify(payload),updated_at:new Date(ts).toISOString()})
+    body:JSON.stringify({id:SB_ROW_ID,payload:JSON.stringify(compact),updated_at:new Date(ts).toISOString()})
   });
   return r;
 }
