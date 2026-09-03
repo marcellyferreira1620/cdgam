@@ -1809,6 +1809,64 @@ let liveTimer=null;
 let syncTimer=null;
 let lastSyncHash='';
 let routeDelayTimer=null;
+const CURRENT_DATE_KEY='gam_current_date_v1';
+const NIGHT_DAY_DRAFT_PREFIX='gam_night_day_draft_v1_';
+
+function rememberCurrentDate(dt){
+  if(!dt)return;
+  try{localStorage.setItem(CURRENT_DATE_KEY,String(dt));}catch(_){}
+}
+
+function readRememberedDate(){
+  try{return localStorage.getItem(CURRENT_DATE_KEY)||'';}catch(_){return '';}
+}
+
+function setCurrentDate(dt){
+  if(!dt){
+    curDate=null;
+    try{localStorage.removeItem(CURRENT_DATE_KEY);}catch(_){}
+    return curDate;
+  }
+  curDate=dt;
+  rememberCurrentDate(curDate);
+  return curDate;
+}
+
+function saveNightDayDraft(day){
+  try{
+    if(!day||!day.date)return;
+    const clean=compactDayForStorage(stripTransientDayFlags(day));
+    localStorage.setItem(NIGHT_DAY_DRAFT_PREFIX+day.date,JSON.stringify(clean));
+  }catch(e){
+    console.warn('Draft local da producao noturna nao salvo:',e.message);
+  }
+}
+
+function restoreNightDayDrafts(reason){
+  try{
+    const drafts=[];
+    for(let i=0;i<localStorage.length;i++){
+      const key=localStorage.key(i);
+      if(!key||!key.startsWith(NIGHT_DAY_DRAFT_PREFIX))continue;
+      const raw=localStorage.getItem(key);
+      const parsed=raw?JSON.parse(raw):null;
+      if(parsed&&parsed.date)drafts.push(parsed);
+    }
+    if(!drafts.length)return false;
+    const before=payloadDaysHash(db.days);
+    db.days=mergeDays(db.days,drafts);
+    const after=payloadDaysHash(db.days);
+    if(after!==before){
+      db.days.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+      saveLocalDb(db);
+      console.warn('Draft local da producao noturna restaurado:',reason,drafts.map(d=>d.date).join(', '));
+      return true;
+    }
+  }catch(e){
+    console.warn('Falha ao restaurar draft local noturno:',e.message);
+  }
+  return false;
+}
 
 const BAR_VALUE_LABEL_PLUGIN={
   id:'barValueLabels',
@@ -2042,6 +2100,7 @@ function load(){
   db.fluxogramas=normalizeFluxogramas(db.fluxogramas);
   db.days=db.days.map(normalizeDay);
   db.days.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  restoreNightDayDrafts('load');
   restoreBestLocalBackupIfNeeded('load');
 }
 
@@ -2394,13 +2453,13 @@ function mergeHourData(current,next,chosen){
       const av=a[i],bv=b[i],cv=c[i];
       const ats=hourCellUpdatedAt(current,metric,i);
       const bts=hourCellUpdatedAt(next,metric,i);
-      if(ats||bts){
-        if(bts>ats)return bv;
-        if(ats>bts)return av;
-        return cv!==undefined?cv:(bv!==undefined?bv:av);
-      }
       const hasA=hourFieldHasValue(av);
       const hasB=hourFieldHasValue(bv);
+      if(ats||bts){
+        if(bts>ats)return (next&&next._nightPartialSave&&hasA&&!hasB)?av:bv;
+        if(ats>bts)return (current&&current._nightPartialSave&&hasB&&!hasA)?bv:av;
+        return cv!==undefined?cv:(bv!==undefined?bv:av);
+      }
       if(current&&current._nightPartialSave&&hasB)return bv;
       if(next&&next._nightPartialSave&&hasA)return av;
       if(hasA&&hasB)return cv!==undefined?cv:bv;
@@ -2425,14 +2484,14 @@ function mergeDayRootFields(current,next,chosen){
     const cv=chosen&&chosen[key];
     const ats=+aft[key]||0;
     const bts=+bft[key]||0;
+    const hasA=dayFieldHasValue(av);
+    const hasB=dayFieldHasValue(bv);
     if(ats||bts){
-      if(bts>ats)out[key]=bv;
-      else if(ats>bts)out[key]=av;
+      if(bts>ats)out[key]=(next&&next._nightPartialSave&&hasA&&!hasB)?av:bv;
+      else if(ats>bts)out[key]=(current&&current._nightPartialSave&&hasB&&!hasA)?bv:av;
       else out[key]=cv!==undefined?cv:bv;
       return;
     }
-    const hasA=dayFieldHasValue(av);
-    const hasB=dayFieldHasValue(bv);
     if(current&&current._nightPartialSave&&hasB){out[key]=bv;return;}
     if(next&&next._nightPartialSave&&hasA){out[key]=av;return;}
     if(hasA&&hasB)out[key]=cv!==undefined?cv:bv;
@@ -2505,6 +2564,14 @@ function runNightOperationFormulaGuard(){
     );
     if(+partialOlderScreen.pnDoca!==700||+partialOlderScreen.hd[checkoutMetric][0]!==111){
       errors.push('tela antiga parcial nao pode apagar dado sincronizado');
+    }
+
+    const partialBlankWithNewerStamp=mergeDayRecords(
+      {date:'2099-08-27',pnDoca:700,hd:{[checkoutMetric]:[111]},_updatedAt:200,_fieldUpdatedAt:{pnDoca:200},_hdUpdatedAt:{[checkoutMetric]:{0:200}}},
+      {date:'2099-08-27',pnDoca:0,hd:{[checkoutMetric]:['']},_updatedAt:300,_fieldUpdatedAt:{pnDoca:300},_hdUpdatedAt:{[checkoutMetric]:{0:300}},_nightPartialSave:true}
+    );
+    if(+partialBlankWithNewerStamp.pnDoca!==700||+partialBlankWithNewerStamp.hd[checkoutMetric][0]!==111){
+      errors.push('campo/celula preenchidos nao podem ser apagados por branco parcial');
     }
 
     const deltas=acumToDeltas([630,2394,3398,'',4524]);
@@ -3282,13 +3349,13 @@ function applyRemoteData(remote){
   if(beforeHash===afterHash)return changed;
   db.days=mergedDays;
   db.days.sort((a,b)=>a.date.localeCompare(b.date));
-  if(shouldAutoSelectCloudDate(previousCurrent,previousLatest,remoteLatest))curDate=remoteLatest;
+  if(shouldAutoSelectCloudDate(previousCurrent,previousLatest,remoteLatest))setCurrentDate(remoteLatest);
   saveLocalDb(db);
   changed=true;
   buildDayNav();
   const day=getDay(curDate)||latestDay();
   if(day){
-    if(!curDate)curDate=day.date;
+    if(!curDate)setCurrentDate(day.date);
     const tab=activeTab();
     const editing=isEditingDataField();
     renderKPIs(day);renderFlowBar(day);renderDashCharts(day);
@@ -3308,6 +3375,7 @@ function applyRemoteData(remote){
 
 function save(replaceDays=false){
   if(!ensureNightOperationFormulaGuard('save'))return false;
+  rememberCurrentDate(curDate);
   const stored=storedDbSnapshot();
   saveLocalBackup(stored,replaceDays?'before-replace':'before-save');
   restoreBestLocalBackupIfNeeded(replaceDays?'save-replace':'save');
@@ -3993,7 +4061,7 @@ function buildDayNav(){
   sel.disabled=false;
   const latest=days[days.length-1];
   const hasCurrent=days.some(d=>d.date===curDate);
-  if(!hasCurrent)curDate=latest.date;
+  if(!hasCurrent)setCurrentDate(latest.date);
   [...days].reverse().forEach(d=>{
     const opt=document.createElement('option');
     opt.value=d.date;
@@ -4008,7 +4076,7 @@ function buildDayNav(){
 }
 function selectDay(dt){
   if(!dt)return;
-  curDate=dt;buildDayNav();
+  setCurrentDate(dt);buildDayNav();
   const day=getDay(dt);
   if(day){renderKPIs(day);renderFlowBar(day);renderDashCharts(day);renderDashTables(day);renderRotasTblFull(day);refreshOpenPrevisaoEncerramento(day);renderProdSetoresDash(day);renderProdDiurnoDash(day);}
   const tab=activeTab();
@@ -4034,7 +4102,7 @@ function isEditingDataField(){
 function refreshFromDb(){
   const latest=latestDay();
   let day=getDay(curDate);
-  if(!day&&latest){curDate=latest.date;day=latest;}
+  if(!day&&latest){setCurrentDate(latest.date);day=latest;}
   const tab=activeTab();
   const editing=isEditingDataField();
   buildDayNav();
@@ -4129,7 +4197,8 @@ function saveProdSetoresField(sec,hour,field,value){
   row[field]=value===''?'':+value||0;
   row._fieldUpdatedAt={...(row._fieldUpdatedAt||{}),[field]:ts};
   day._updatedAt=ts;
-  curDate=day.date;
+  setCurrentDate(day.date);
+  saveNightDayDraft(day);
   save();
   renderProdSetoresRowCalcs(sec,hour);
   renderProdSetoresChart();
@@ -4454,7 +4523,7 @@ function prodDiaWorkingDay(){
   if(!day){
     day=emptyDay(curDate||today());
     db.days.push(day);
-    curDate=day.date;
+    setCurrentDate(day.date);
   }
   ensureProdDiurno(day);
   return day;
@@ -4495,7 +4564,7 @@ function prodDiaTouch(day,person,field){
   const ts=Date.now();
   person._fieldUpdatedAt={...(person._fieldUpdatedAt||{}),[field]:ts};
   day._updatedAt=ts;
-  curDate=day.date;
+  setCurrentDate(day.date);
 }
 
 function saveProdDiaMatricula(metricKey,personId,value){
@@ -4723,7 +4792,7 @@ function recebArmDay(){
     const storedDay=stored&&Array.isArray(stored.days)?stored.days.find(d=>d&&d.date===dt):null;
     day=storedDay?normalizeDay(JSON.parse(JSON.stringify(storedDay))):emptyDay(dt);
     db.days.push(day);
-    curDate=day.date;
+    setCurrentDate(day.date);
   }
   ensureRecebArm(day);
   return day;
@@ -4743,7 +4812,7 @@ function persistRecebArmOnly(day){
   idx=db.days.findIndex(d=>d.date===dt);
   if(idx>=0)db.days[idx]=base;else db.days.push(base);
   db.days.sort((a,b)=>a.date.localeCompare(b.date));
-  curDate=dt;
+  setCurrentDate(dt);
   save();
 }
 
@@ -4751,7 +4820,7 @@ function recebArmTouch(day){
   const ts=Date.now();
   ensureRecebArm(day)._updatedAt=ts;
   day._updatedAt=ts;
-  curDate=day.date;
+  setCurrentDate(day.date);
   persistRecebArmOnly(day);
   buildDayNav();
 }
@@ -10790,7 +10859,8 @@ function readFormAsDay(){
 function loadFormFrom(day){
   if(!day)day=emptyDay();
   const newRules=useNewRules(day.date);
-  const s=(id,v)=>{const el=document.getElementById(id);if(el)el.value=v||'';};
+  setCurrentDate(day.date);
+  const s=(id,v)=>{const el=document.getElementById(id);if(el)el.value=(v===0?'0':(v||''));};
   s('iData',day.date);
   s('iPNVol',day.pnVol||'');s('iPNUnid',day.pnUnid||'');
   s('iPNCorreia',day.pnCorreia||'');s('iPNPsico',day.pnPsico||'');
@@ -10863,7 +10933,7 @@ function prepNewDay(){
   }
   const existingToday=getDay(dt);
   if(existingToday&&dayDataScore(existingToday)>0){
-    curDate=dt;
+    setCurrentDate(dt);
     buildDayNav();
     renderCurrentDay(existingToday);
     loadFormFrom(existingToday);
@@ -10876,7 +10946,7 @@ function prepNewDay(){
   const idx=db.days.findIndex(d=>d.date===dt);
   if(idx>=0)db.days[idx]=day;else db.days.push(day);
   db.days.sort((a,b)=>a.date.localeCompare(b.date));
-  curDate=dt;
+  setCurrentDate(dt);
   save();
   buildDayNav();
   renderCurrentDay(day);
@@ -10894,7 +10964,8 @@ function persistDayNow(){
   const merged=idx>=0?mergeDayRecords(db.days[idx],day):stripTransientDayFlags(day);
   if(idx>=0)db.days[idx]=merged;else db.days.push(merged);
   db.days.sort((a,b)=>a.date.localeCompare(b.date));
-  curDate=merged.date;
+  setCurrentDate(merged.date);
+  saveNightDayDraft(merged);
   save();
   if(wasNew)buildDayNav();
   refreshOpenPrevisaoEncerramento(merged);
@@ -10904,7 +10975,33 @@ function autoSave(){
   clearTimeout(autoSaveTimer);
   autoSaveTimer=setTimeout(()=>{
     persistDayNow();
-  },150);
+  },80);
+}
+
+let nightImmediateSaveTimer=null;
+function isNightPersistentTarget(el){
+  return !!(el&&['INPUT','TEXTAREA','SELECT'].includes(el.tagName)&&el.type!=='file'&&el.closest('#tb-adm,#tb-preench,#tb-prodsetores'));
+}
+function saveNightImmediately(){
+  clearTimeout(autoSaveTimer);
+  clearTimeout(nightImmediateSaveTimer);
+  const saved=persistDayNow();
+  return saved;
+}
+function scheduleNightImmediateSave(event){
+  const el=event&&event.target;
+  if(!isNightPersistentTarget(el))return;
+  if(el.id==='iData')rememberCurrentDate(el.value);
+  clearTimeout(nightImmediateSaveTimer);
+  nightImmediateSaveTimer=setTimeout(()=>saveNightImmediately(),30);
+}
+function installNightImmediatePersistence(){
+  if(window.__nightImmediatePersistenceReady)return;
+  window.__nightImmediatePersistenceReady=true;
+  document.addEventListener('input',scheduleNightImmediateSave,true);
+  document.addEventListener('change',scheduleNightImmediateSave,true);
+  window.addEventListener('beforeunload',()=>{try{saveNightImmediately();}catch(_){}});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){try{saveNightImmediately();}catch(_){}}});
 }
 function saveDay(){
   const day=readFormAsDay();if(!day){alert('⚠️ Informe a data!');return;}
@@ -10912,7 +11009,8 @@ function saveDay(){
   const merged=idx>=0?mergeDayRecords(db.days[idx],day):stripTransientDayFlags(day);
   if(idx>=0)db.days[idx]=merged;else db.days.push(merged);
   db.days.sort((a,b)=>a.date.localeCompare(b.date));
-  save();curDate=merged.date;buildDayNav();
+  saveNightDayDraft(merged);
+  save();setCurrentDate(merged.date);buildDayNav();
   renderKPIs(merged);renderFlowBar(merged);renderDashCharts(merged);renderDashTables(merged);renderRotasTbl(merged,'rotasTblFull');updateRotasKPIs(merged);
   renderRecebArm();
   renderInventario();
@@ -10926,7 +11024,7 @@ function delCurrentDay(){
   const dt=document.getElementById('iData').value;if(!dt)return;
   if(!confirm(`Excluir ${fmtDate(dt)}?`))return;
   db.days=db.days.filter(d=>d.date!==dt);save(true);
-  const latest=latestDay();curDate=latest?latest.date:null;buildDayNav();
+  const latest=latestDay();setCurrentDate(latest?latest.date:null);buildDayNav();
   if(latest){renderKPIs(latest);renderFlowBar(latest);renderDashCharts(latest);renderDashTables(latest);}
   prepNewDay();alert('🗑 Dia excluído.');
 }
@@ -11426,7 +11524,7 @@ async function sbLoad(){
         if(afterHash!==beforeHash){
           db.days=mergedDays;
           db.days.sort((a,b)=>a.date.localeCompare(b.date));
-          if(shouldAutoSelectCloudDate(previousCurrent,previousLatest,remoteLatest))curDate=remoteLatest;
+          if(shouldAutoSelectCloudDate(previousCurrent,previousLatest,remoteLatest))setCurrentDate(remoteLatest);
           saveLocalDb(db);
           changed=true;
         }
@@ -12020,6 +12118,7 @@ function doLogout(){
   clearSession();location.reload();
 }
 function afterLogin(opts={}){
+  installNightImmediatePersistence();
   enablePrivacyLock();
   updateUserBadge();
   applyRoleUI();
@@ -12234,6 +12333,7 @@ async function editUser(uname){
 // ══════════════════════════════════════════════════════════
 function init(){
   installPrivacyGuards();
+  installNightImmediatePersistence();
   // 1. Carregar local — instantâneo, não bloqueia
   load();
 
@@ -12241,9 +12341,11 @@ function init(){
   sbUrl=localStorage.getItem('gam_sb_url')||SB_URL_DEFAULT;
   sbKey=localStorage.getItem('gam_sb_key')||SB_KEY_DEFAULT;
   const latest=latestDay();
-  curDate=latest?latest.date:today();
+  const remembered=readRememberedDate();
+  setCurrentDate(remembered&&getDay(remembered)?remembered:(latest?latest.date:today()));
   buildDayNav();
-  if(latest){renderKPIs(latest);renderFlowBar(latest);renderDashCharts(latest);renderDashTables(latest);}
+  const startDay=getDay(curDate)||latest;
+  if(startDay){renderKPIs(startDay);renderFlowBar(startDay);renderDashCharts(startDay);renderDashTables(startDay);}
   else{document.getElementById('hdrDate').textContent='Nenhum dado — crie um dia para começar';}
 
   // 5. Verificar sessão ativa
