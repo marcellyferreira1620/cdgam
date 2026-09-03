@@ -2165,6 +2165,8 @@ function compactRecebArmForStorage(data){
     qrpRows:[],
     qrpLastItems:[],
     qrpDayReceivedItems:[],
+    qrpLastSummaryItems:Array.isArray(data.qrpLastSummaryItems)?data.qrpLastSummaryItems:[],
+    qrpOpenPartials:Array.isArray(data.qrpOpenPartials)?data.qrpOpenPartials:[],
     qrpImports:Array.isArray(data.qrpImports)?data.qrpImports.map(compactRecebArmImportForStorage):[]
   };
 }
@@ -2867,6 +2869,8 @@ function mergeRecebArm(current,next){
     qrpRows:mergeRecebArmQrpRows(a.qrpRows,b.qrpRows),
     qrpImports:mergeByIdOrIndex(a.qrpImports,b.qrpImports,'id'),
     qrpLastItems:(+b._updatedAt||0)>=(+a._updatedAt||0)?(b.qrpLastItems||a.qrpLastItems||[]):(a.qrpLastItems||b.qrpLastItems||[]),
+    qrpLastSummaryItems:(+b._updatedAt||0)>=(+a._updatedAt||0)?(b.qrpLastSummaryItems||a.qrpLastSummaryItems||[]):(a.qrpLastSummaryItems||b.qrpLastSummaryItems||[]),
+    qrpOpenPartials:(+b._updatedAt||0)>=(+a._updatedAt||0)?(b.qrpOpenPartials||a.qrpOpenPartials||[]):(a.qrpOpenPartials||b.qrpOpenPartials||[]),
     productBase:mergeByIdOrIndex(a.productBase,b.productBase,'codigo'),
     _updatedAt:Math.max(+a._updatedAt||0,+b._updatedAt||0)
   };
@@ -4774,13 +4778,13 @@ function exportProdDiurnoExcel(){
 
 // Recebimento / Armazenagem
 function emptyRecebArm(){
-  return{agendaRows:[],notas:[],pendConf:[],pendArm:[],qrpRows:[],qrpImports:[],qrpLastItems:[],productBase:[],_updatedAt:0};
+  return{agendaRows:[],notas:[],pendConf:[],pendArm:[],qrpRows:[],qrpImports:[],qrpLastItems:[],qrpLastSummaryItems:[],qrpOpenPartials:[],productBase:[],_updatedAt:0};
 }
 
 function ensureRecebArm(day){
   if(!day.recebArm||typeof day.recebArm!=='object')day.recebArm=emptyRecebArm();
   const data=day.recebArm;
-  ['agendaRows','notas','pendConf','pendArm','qrpRows','qrpImports','qrpLastItems','productBase'].forEach(k=>{if(!Array.isArray(data[k]))data[k]=[];});
+  ['agendaRows','notas','pendConf','pendArm','qrpRows','qrpImports','qrpLastItems','qrpLastSummaryItems','qrpOpenPartials','productBase'].forEach(k=>{if(!Array.isArray(data[k]))data[k]=[];});
   return data;
 }
 
@@ -5916,13 +5920,15 @@ async function importRecebArm997(ev){
     const day=recebArmDay();
     const data=ensureRecebArm(day);
     const sameParser=data.qrpParserVersion==='emf-997-v1';
-    const prevItems=(Array.isArray(data.qrpLastItems)&&data.qrpLastItems.length)?data.qrpLastItems:[];
+    const prevItems=(Array.isArray(data.qrpLastItems)&&data.qrpLastItems.length)?data.qrpLastItems:(Array.isArray(data.qrpLastSummaryItems)?data.qrpLastSummaryItems:[]);
     const importRecord=recebArm997BuildImportRecord(rows,day.date,file.name,endereco,prevItems);
     data.qrpRows=rows;
     data.qrpDayReceivedItems=recebArm997MergeDayReceivedItems(sameParser?(data.qrpDayReceivedItems||[]):[],importRecord.items,day.date);
     data.qrpLastItems=importRecord.items;
+    data.qrpLastSummaryItems=recebArm997SummaryItemsForStorage(importRecord.items);
     data.qrpParserVersion='emf-997-v1';
     data.qrpImports=[...(data.qrpImports||[]),importRecord].slice(-36);
+    recebArm997RefreshOpenPartials(data);
     recebArmTouch(day);
     compareRecebArmStorage(false);
     recebArmMsg('recebArm997Msg',`${rows.length} linha(s) da 997 importadas. Leitura ${new Date(importRecord.importedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} atualizada e exportada em Excel.`,false);
@@ -5942,6 +5948,8 @@ function clearRecebArm997(){
   const data=ensureRecebArm(day);
   data.qrpRows=[];
   data.qrpLastItems=[];
+  data.qrpLastSummaryItems=[];
+  data.qrpOpenPartials=[];
   data.qrpImports=[];
   recebArmTouch(day);
   renderRecebArm();
@@ -6724,8 +6732,80 @@ function recebArm997PartialRowsFromImports(imports){
   return rows;
 }
 
-function recebArm997PartialAlertsTable(imports){
+function recebArm997PartialSimpleKey(item){
+  const date=recebArmIsoFromDate((item&&item.entrada)||(item&&item.date)||'',curDate||today());
+  const sku=recebArmNormalizeSku((item&&item.sku)||(item&&item.codigo)||'');
+  return date&&sku?[date,sku].join('|'):'';
+}
+
+function recebArm997SummaryItemsForStorage(items){
+  const map=recebArm997LatestPendingMap(items);
+  return Object.values(map).map(item=>({
+    key:recebArm997PartialSimpleKey(item),
+    date:item.date||item.entrada||curDate||today(),
+    entrada:item.entrada||item.date||curDate||today(),
+    sku:item.sku||item.codigo||'',
+    codigo:item.codigo||item.sku||'',
+    descricao:item.descricao||'',
+    qtd:+item.qtd||0,
+    vol:+item.vol||0,
+    linhas:+item.linhas||1
+  }));
+}
+
+function recebArm997LatestPendingMap(items){
+  const map={};
+  (Array.isArray(items)?items:[]).forEach(item=>{
+    const key=recebArm997PartialSimpleKey(item);
+    if(!key)return;
+    if(!map[key])map[key]={...item,qtd:0,vol:0};
+    map[key].qtd+=+item.qtd||0;
+    map[key].vol+=+item.vol||0;
+    if(!map[key].descricao&&item.descricao)map[key].descricao=item.descricao;
+  });
+  return map;
+}
+
+function recebArm997OpenPartialRows(imports,currentItems){
   const rows=recebArm997PartialRowsFromImports(imports);
+  const currentMap=recebArm997LatestPendingMap(currentItems);
+  if(!Object.keys(currentMap).length)return [];
+  const openByKey=new Map();
+  rows.forEach(row=>{
+    const key=recebArm997PartialSimpleKey(row);
+    const cur=currentMap[key];
+    if(!key||!cur)return;
+    const qtdAntes=+row.qtdAntes||0;
+    const qtdAtual=+cur.qtd||0;
+    if(qtdAntes<=0||qtdAtual<=0||qtdAtual>=qtdAntes)return;
+    openByKey.set(key,{
+      ...row,
+      descricao:cur.descricao||row.descricao||'',
+      qtdAtual,
+      qtdSaida:Math.max(qtdAntes-qtdAtual,0),
+      volAtual:+cur.vol||0,
+      volSaida:Math.max((+row.volAntes||0)-(+cur.vol||0),0)
+    });
+  });
+  return [...openByKey.values()];
+}
+
+function recebArm997RefreshOpenPartials(data){
+  if(!data)return [];
+  const imports=(Array.isArray(data.qrpImports)?data.qrpImports:[]).filter(r=>r&&r.version==='997-hora-v2');
+  const currentItems=Array.isArray(data.qrpLastItems)?data.qrpLastItems:[];
+  data.qrpOpenPartials=recebArm997OpenPartialRows(imports,currentItems);
+  return data.qrpOpenPartials;
+}
+
+function recebArm997PartialAlertRows(dataOrImports){
+  if(dataOrImports&&!Array.isArray(dataOrImports)&&Array.isArray(dataOrImports.qrpOpenPartials))return dataOrImports.qrpOpenPartials;
+  return recebArm997PartialRowsFromImports(dataOrImports);
+}
+
+function recebArm997PartialAlertsTable(dataOrImports){
+  const rows=recebArm997PartialAlertRows(dataOrImports);
+  const imports=Array.isArray(dataOrImports)?dataOrImports:(dataOrImports&&dataOrImports.qrpImports)||[];
   if(!rows.length&&!(Array.isArray(imports)&&imports.length))return '';
   const body=rows.length?rows.map(r=>`<tr><td>${excelText(r.hour)}</td><td>${excelText(r.fileName)}</td><td>${excelText(fmtDateShort(r.entrada))}</td><td>${excelText(r.sku)}</td><td style="text-align:left">${excelText(r.descricao||'')}</td><td>${prodFmt(+r.qtdAntes||0,0)}</td><td>${prodFmt(+r.qtdAtual||0,0)}</td><td style="font-weight:bold;color:#00e676">${prodFmt(+r.qtdSaida||0,0)}</td><td style="font-weight:bold;color:#00e676">${prodFmt(+r.volSaida||0,0)}</td></tr>`).join(''):'<tr><td colspan="9">Sem item parcialmente armazenado nesta compara&ccedil;&atilde;o.</td></tr>';
   return `<div style="overflow-x:auto;margin-top:8px">
@@ -6866,7 +6946,7 @@ function renderRecebArm997Report(){
     ${recebArm997HourlyStoredTable(imports)}
     ${recebArm997FinalDayTable(data,day.date)}
     ${recebArm997PendingSplitTable(data,day.date)}
-    ${recebArm997PartialAlertsTable(imports)}`;
+    ${recebArm997PartialAlertsTable(data)}`;
 }
 
 function renderRecebArm(){
@@ -8509,6 +8589,7 @@ function boletimLine(label,value,detail=''){
 }
 function boletimPartialAlertRows(day){
   const data=(day&&day.recebArm)||{};
+  if(Array.isArray(data.qrpOpenPartials))return data.qrpOpenPartials;
   const imports=(Array.isArray(data.qrpImports)?data.qrpImports:[]).filter(r=>r&&r.version==='997-hora-v2');
   return recebArm997PartialRowsFromImports(imports);
 }
