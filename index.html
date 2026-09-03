@@ -11074,7 +11074,7 @@ function isNightPersistentTarget(el){
 function saveNightImmediately(){
   clearTimeout(autoSaveTimer);
   clearTimeout(nightImmediateSaveTimer);
-  const saved=persistDayNow();
+  const saved=activeTab()==='preench'?persistPreenchInputsNow():persistDayNow();
   return saved;
 }
 function scheduleNightImmediateSave(event){
@@ -12337,6 +12337,84 @@ function updatePreenchRouteDone(metric){
     }
   });
 }
+
+function ensureDayHdArray(day,metric){
+  if(!day.hd||typeof day.hd!=='object')day.hd={};
+  if(!Array.isArray(day.hd[metric]))day.hd[metric]=new Array(HOURS.length).fill('');
+  return day.hd[metric];
+}
+
+function setDayHdCell(day,metric,index,value,ts){
+  const arr=ensureDayHdArray(day,metric);
+  const clean=value===''||value===null||value===undefined?'':+value||0;
+  if(clean===''&&hourFieldHasValue(arr[index]))return;
+  if(syncComparableValue(arr[index])!==syncComparableValue(clean)){
+    arr[index]=clean;
+    day._hdUpdatedAt=day._hdUpdatedAt||{};
+    day._hdUpdatedAt[metric]=day._hdUpdatedAt[metric]||{};
+    day._hdUpdatedAt[metric][index]=ts;
+  }
+}
+
+function persistPreenchInputsNow(changedMetric){
+  const body=document.getElementById('preenchBody');
+  if(!body)return null;
+  const dt=currentFormDate();
+  let day=getDay(dt);
+  if(!day){
+    day=emptyDay(dt);
+    db.days.push(day);
+  }
+  const byMetric={};
+  body.querySelectorAll('input[data-m]').forEach(inp=>{
+    const m=inp.dataset.m,i=+inp.dataset.i;
+    if(!byMetric[m])byMetric[m]=new Array(HOURS.length).fill('');
+    byMetric[m][i]=inp.value!==''?+inp.value:'';
+  });
+  const ts=Date.now();
+  const metricsToSave=new Set(Object.keys(byMetric));
+  if(changedMetric){
+    const route=routeFromAnyMetric(changedMetric);
+    if(route){
+      metricsToSave.add(routeMetricKey(route));
+      metricsToSave.add(routeTotalMetricKey(route));
+    }
+  }
+  metricsToSave.forEach(metric=>{
+    const route=routeFromAnyMetric(metric);
+    if(route){
+      const baseMetric=routeMetricKey(route),totalMetric=routeTotalMetricKey(route);
+      const pending=byMetric[baseMetric]||routeDoneToPending(ensureDayHdArray(day,baseMetric),ensureDayHdArray(day,totalMetric),routeInitialTotal(day,baseMetric));
+      const totals=byMetric[totalMetric]||ensureDayHdArray(day,totalMetric);
+      const initialTotal=routeInitialTotal(day,baseMetric);
+      const done=routePendingToDone(pending,totals,initialTotal);
+      for(let i=0;i<HOURS.length;i++){
+        setDayHdCell(day,totalMetric,i,totals[i],ts);
+        setDayHdCell(day,baseMetric,i,done[i],ts);
+      }
+      const latestTotal=[...totals].reverse().find(v=>v!==''&&v!==null&&v!==undefined);
+      if(latestTotal!==undefined){
+        if(!Array.isArray(day.rotas))day.rotas=[];
+        const cod=normalizeRouteCode(route.cod);
+        let savedRoute=day.rotas.find(r=>normalizeRouteCode(r.cod)===cod);
+        if(!savedRoute){savedRoute={cod};day.rotas.push(savedRoute);}
+        savedRoute.vol=Math.max(+latestTotal||0,0);
+        savedRoute._updatedAt=ts;
+        savedRoute._fieldUpdatedAt={...(savedRoute._fieldUpdatedAt||{}),vol:ts};
+      }
+    }else if(!isRouteTotalMetric(metric)){
+      const vals=byMetric[metric]||new Array(HOURS.length).fill('');
+      const stored=isDeltaMetric(metric,dt)?acumToDeltas(vals):vals;
+      for(let i=0;i<HOURS.length;i++)setDayHdCell(day,metric,i,stored[i],ts);
+    }
+  });
+  day._updatedAt=ts;
+  setCurrentDate(day.date);
+  saveNightDayDraft(day);
+  save();
+  return day;
+}
+
 function preenchInput(inp){
   const m=inp.dataset.m,i=+inp.dataset.i;
   const main=document.querySelector(`#hTblBody input[data-m="${m}"][data-i="${i}"]`);
@@ -12345,7 +12423,7 @@ function preenchInput(inp){
   updateRealAuto();
   const st=document.getElementById('preenchStatus');
   if(st){st.textContent='⏳ Salvando...';st.style.color='#ffd700';}
-  const saved=persistDayNow();
+  const saved=persistPreenchInputsNow(m)||persistDayNow();
   if(saved&&routeFromAnyMetric(m)){renderRouteClosure(saved);renderDashTables(saved);}
   if(st&&saved){st.textContent='✅ Salvo';st.style.color='#00e676';}
   setTimeout(()=>{const s=document.getElementById('preenchStatus');if(s)s.textContent='';},3000);
