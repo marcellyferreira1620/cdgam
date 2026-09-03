@@ -1809,6 +1809,7 @@ let liveTimer=null;
 let syncTimer=null;
 let lastSyncHash='';
 let routeDelayTimer=null;
+let recebArm997ExportCache=null;
 const CURRENT_DATE_KEY='gam_current_date_v1';
 const NIGHT_DAY_DRAFT_PREFIX='gam_night_day_draft_v1_';
 
@@ -5929,11 +5930,16 @@ async function importRecebArm997(ev){
     data.qrpParserVersion='emf-997-v1';
     data.qrpImports=[...(data.qrpImports||[]),importRecord].slice(-36);
     recebArm997RefreshOpenPartials(data);
+    recebArm997ExportCache={
+      date:day.date,
+      importedAt:importRecord.importedAt,
+      fileName:file.name,
+      rows:recebArm997ConvertedRows(data)
+    };
     recebArmTouch(day);
     compareRecebArmStorage(false);
-    recebArmMsg('recebArm997Msg',`${rows.length} linha(s) da 997 importadas. Leitura ${new Date(importRecord.importedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} atualizada e exportada em Excel.`,false);
+    recebArmMsg('recebArm997Msg',`${rows.length} linha(s) da 997 importadas. Leitura ${new Date(importRecord.importedAt).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})} atualizada. Clique em "Exportar 997 convertida" para baixar esta lista.`,false);
     renderRecebArm();
-    setTimeout(()=>exportRecebArmExcel(),250);
   }catch(e){
     console.error(e);
     recebArmMsg('recebArm997Msg','Não consegui importar a 997. Se puder converter para Excel, fica mais confiável.',true);
@@ -5951,6 +5957,7 @@ function clearRecebArm997(){
   data.qrpLastSummaryItems=[];
   data.qrpOpenPartials=[];
   data.qrpImports=[];
+  recebArm997ExportCache=null;
   recebArmTouch(day);
   renderRecebArm();
 }
@@ -8819,11 +8826,12 @@ function recebArm997ConvertedRows(data){
 function exportRecebArm997Convertida(){
   const day=getDay(curDate)||emptyDay(curDate||today());
   const data=ensureRecebArm(day);
-  const rows=recebArm997ConvertedRows(data);
-  if(!rows.length){alert('Importe a 997 antes de exportar.');return;}
+  const cached=recebArm997ExportCache&&recebArm997ExportCache.date===(day.date||curDate||today())?recebArm997ExportCache:null;
+  const rows=cached&&Array.isArray(cached.rows)&&cached.rows.length?cached.rows:recebArm997ConvertedRows(data);
+  if(!rows.length){alert('Importe a 997 novamente para exportar a lista convertida. O site nao guarda a planilha pesada depois do F5.');return;}
   const imports=(data.qrpImports||[]).filter(r=>r&&r.version==='997-hora-v2').slice().sort((a,b)=>(+a.importedAt||0)-(+b.importedAt||0));
   const last=imports[imports.length-1]||null;
-  const stamp=last&&last.importedAt?new Date(last.importedAt):new Date();
+  const stamp=cached&&cached.importedAt?new Date(cached.importedAt):(last&&last.importedAt?new Date(last.importedAt):new Date());
   const hh=String(stamp.getHours()).padStart(2,'0');
   const mm=String(stamp.getMinutes()).padStart(2,'0');
   const fileName=`997-convertida-${(day.date||curDate||today()).replaceAll('-','')}-${hh}${mm}.xlsx`;
