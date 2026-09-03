@@ -2251,7 +2251,7 @@ function remoteDaysHaveBetterData(remoteDays){
   });
 }
 
-const DATA_SCORE_IGNORED_KEYS=new Set(['date','savedAt','_updatedAt','_fieldUpdatedAt','_correiaDirectHour','cod','cidade','destino','hPrev','recebArm','prodSetores','prodDiurno','productBase']);
+const DATA_SCORE_IGNORED_KEYS=new Set(['date','savedAt','_updatedAt','_fieldUpdatedAt','_hdUpdatedAt','_nightPartialSave','_correiaDirectHour','cod','cidade','destino','hPrev','recebArm','prodSetores','prodDiurno','productBase']);
 
 function dataScoreValue(v,key){
   if(DATA_SCORE_IGNORED_KEYS.has(key))return 0;
@@ -2286,6 +2286,13 @@ function dayFieldHasValue(value){
   return false;
 }
 
+function stripTransientDayFlags(day){
+  if(!day||typeof day!=='object')return day;
+  const out={...day};
+  delete out._nightPartialSave;
+  return out;
+}
+
 function hourFieldHasValue(value){
   if(value===null||value===undefined)return false;
   if(typeof value==='number')return Number.isFinite(value);
@@ -2294,6 +2301,35 @@ function hourFieldHasValue(value){
   if(typeof value==='object')return Object.keys(value).some(k=>hourFieldHasValue(value[k]));
   if(typeof value==='boolean')return value;
   return false;
+}
+
+function hourCellUpdatedAt(day,metric,index){
+  const metricTs=day&&day._hdUpdatedAt&&day._hdUpdatedAt[metric];
+  if(!metricTs)return 0;
+  if(Array.isArray(metricTs))return +metricTs[index]||0;
+  return +metricTs[index]||0;
+}
+
+function mergeHourUpdatedAt(current,next){
+  const out={};
+  const add=(src)=>{
+    const data=src&&src._hdUpdatedAt;
+    if(!data||typeof data!=='object')return;
+    Object.entries(data).forEach(([metric,values])=>{
+      if(!out[metric])out[metric]={};
+      if(Array.isArray(values)){
+        values.forEach((ts,i)=>{if(+ts>+(out[metric][i]||0))out[metric][i]=+ts;});
+      }else if(values&&typeof values==='object'){
+        Object.entries(values).forEach(([i,ts])=>{if(+ts>+(out[metric][i]||0))out[metric][i]=+ts;});
+      }
+    });
+  };
+  add(current);add(next);
+  Object.keys(out).forEach(metric=>{
+    Object.keys(out[metric]).forEach(i=>{if(!out[metric][i])delete out[metric][i];});
+    if(!Object.keys(out[metric]).length)delete out[metric];
+  });
+  return Object.keys(out).length?out:null;
 }
 
 function mergeHourData(current,next,chosen){
@@ -2310,8 +2346,17 @@ function mergeHourData(current,next,chosen){
     const len=Math.max(HOURS.length,a.length,b.length,c.length);
     out[metric]=new Array(len).fill('').map((_,i)=>{
       const av=a[i],bv=b[i],cv=c[i];
+      const ats=hourCellUpdatedAt(current,metric,i);
+      const bts=hourCellUpdatedAt(next,metric,i);
+      if(ats||bts){
+        if(bts>ats)return bv;
+        if(ats>bts)return av;
+        return cv!==undefined?cv:(bv!==undefined?bv:av);
+      }
       const hasA=hourFieldHasValue(av);
       const hasB=hourFieldHasValue(bv);
+      if(current&&current._nightPartialSave&&hasB)return bv;
+      if(next&&next._nightPartialSave&&hasA)return av;
       if(hasA&&hasB)return cv!==undefined?cv:bv;
       if(hasB)return bv;
       if(hasA)return av;
@@ -2323,15 +2368,27 @@ function mergeHourData(current,next,chosen){
 
 function mergeDayRootFields(current,next,chosen){
   const out={...chosen};
-  const skip=new Set(['date','_updatedAt','_fieldUpdatedAt','rotas','prodSetores','prodDiurno','recebArm','boletim','devolucao','inventario','hd']);
+  const skip=new Set(['date','_updatedAt','_fieldUpdatedAt','_hdUpdatedAt','_nightPartialSave','rotas','prodSetores','prodDiurno','recebArm','boletim','devolucao','inventario','hd']);
+  const aft=(current&&current._fieldUpdatedAt)||{};
+  const bft=(next&&next._fieldUpdatedAt)||{};
   const keys=new Set([...Object.keys(current||{}),...Object.keys(next||{}),...Object.keys(chosen||{})]);
   keys.forEach(key=>{
     if(skip.has(key))return;
     const av=current&&current[key];
     const bv=next&&next[key];
     const cv=chosen&&chosen[key];
+    const ats=+aft[key]||0;
+    const bts=+bft[key]||0;
+    if(ats||bts){
+      if(bts>ats)out[key]=bv;
+      else if(ats>bts)out[key]=av;
+      else out[key]=cv!==undefined?cv:bv;
+      return;
+    }
     const hasA=dayFieldHasValue(av);
     const hasB=dayFieldHasValue(bv);
+    if(current&&current._nightPartialSave&&hasB){out[key]=bv;return;}
+    if(next&&next._nightPartialSave&&hasA){out[key]=av;return;}
     if(hasA&&hasB)out[key]=cv!==undefined?cv:bv;
     else if(hasB)out[key]=bv;
     else if(hasA)out[key]=av;
@@ -2340,6 +2397,13 @@ function mergeDayRootFields(current,next,chosen){
     else if(av!==undefined)out[key]=av;
   });
   out.hd=mergeHourData(current,next,chosen);
+  const fieldUpdatedAt={...aft};
+  Object.entries(bft).forEach(([key,ts])=>{fieldUpdatedAt[key]=Math.max(+fieldUpdatedAt[key]||0,+ts||0);});
+  if(Object.keys(fieldUpdatedAt).length)out._fieldUpdatedAt=fieldUpdatedAt;
+  else delete out._fieldUpdatedAt;
+  const hdUpdatedAt=mergeHourUpdatedAt(current,next);
+  if(hdUpdatedAt)out._hdUpdatedAt=hdUpdatedAt;
+  else delete out._hdUpdatedAt;
   out.date=(chosen&&chosen.date)||(next&&next.date)||(current&&current.date);
   const ts=Math.max(+(current&&current._updatedAt)||0,+(next&&next._updatedAt)||0,+(chosen&&chosen._updatedAt)||0);
   if(ts)out._updatedAt=ts;
@@ -2369,6 +2433,32 @@ function runNightOperationFormulaGuard(){
     );
     if(+root.pnDoca!==500){
       errors.push('campos do dia precisam aceitar correcao para baixo');
+    }
+
+    const rootByFieldTs=mergeDayRootFields(
+      {date:'2099-08-27',pnDoca:1000,hd:{},_updatedAt:10,_fieldUpdatedAt:{pnDoca:100}},
+      {date:'2099-08-27',pnDoca:500,hd:{},_updatedAt:9,_fieldUpdatedAt:{pnDoca:200}},
+      {date:'2099-08-27',pnDoca:1000,hd:{},_updatedAt:10}
+    );
+    if(+rootByFieldTs.pnDoca!==500){
+      errors.push('campo mais recente de outro computador precisa vencer');
+    }
+
+    const hourByCellTs=mergeHourData(
+      {hd:{[checkoutMetric]:[700]},_hdUpdatedAt:{[checkoutMetric]:{0:100}},_updatedAt:10},
+      {hd:{[checkoutMetric]:[291]},_hdUpdatedAt:{[checkoutMetric]:{0:200}},_updatedAt:9},
+      {hd:{[checkoutMetric]:[700]},_updatedAt:10}
+    );
+    if(+hourByCellTs[checkoutMetric][0]!==291){
+      errors.push('celula hora a hora mais recente precisa vencer');
+    }
+
+    const partialOlderScreen=mergeDayRecords(
+      {date:'2099-08-27',pnDoca:700,hd:{[checkoutMetric]:[111]},_updatedAt:200,_fieldUpdatedAt:{pnDoca:200},_hdUpdatedAt:{[checkoutMetric]:{0:200}}},
+      {date:'2099-08-27',pnDoca:0,hd:{[checkoutMetric]:['']},_updatedAt:300,_nightPartialSave:true}
+    );
+    if(+partialOlderScreen.pnDoca!==700||+partialOlderScreen.hd[checkoutMetric][0]!==111){
+      errors.push('tela antiga parcial nao pode apagar dado sincronizado');
     }
 
     const deltas=acumToDeltas([630,2394,3398,'',4524]);
@@ -2783,8 +2873,8 @@ function mergeInventario(current,next){
 }
 
 function mergeDayRecords(current,next){
-  if(!current)return next;
-  if(!next)return current;
+  if(!current)return stripTransientDayFlags(next);
+  if(!next)return stripTransientDayFlags(current);
   const curTs=+current._updatedAt||0;
   const nextTs=+next._updatedAt||0;
   let chosen;
@@ -2803,7 +2893,7 @@ function mergeDayRecords(current,next){
   const devolucao=mergeDevolucao(current.devolucao,next.devolucao);
   const inventario=mergeInventario(current.inventario,next.inventario);
   const root=mergeDayRootFields(current,next,chosen);
-  return {...root,...(rotas.length?{rotas}:{}),...(prodSetores?{prodSetores}:{}),...(prodDiurno?{prodDiurno}:{}),...(recebArm?{recebArm}:{}),...(boletim?{boletim}:{}),...(devolucao?{devolucao}:{}),...(inventario?{inventario}:{})};
+  return stripTransientDayFlags({...root,...(rotas.length?{rotas}:{}),...(prodSetores?{prodSetores}:{}),...(prodDiurno?{prodDiurno}:{}),...(recebArm?{recebArm}:{}),...(boletim?{boletim}:{}),...(devolucao?{devolucao}:{}),...(inventario?{inventario}:{})});
 }
 
 function mergeDays(remoteDays,localDays){
@@ -3163,6 +3253,7 @@ function applyRemoteData(remote){
     if(tab==='proddia'&&!editing)renderProdDiurno();
     if(tab==='recebarm'&&!editing)renderRecebArm();
     if(tab==='inventario'&&!editing)renderInventario();
+    if(adminOk&&tab==='adm'&&!editing)loadFormFrom(day);
   }
   return changed;
 }
@@ -3660,8 +3751,10 @@ function liveUpdate(){
       document.getElementById('liveBadge').style.display='inline';
       renderKPIs(day);
       renderFlowBar(day);
-      renderDashCharts(day);
-      renderDashTables(day);
+      if(activeTab()==='dash'){
+        renderDashCharts(day);
+        renderDashTables(day);
+      }
       refreshOpenPrevisaoEncerramento(day);
       autoSave();
     }
@@ -3812,6 +3905,10 @@ function selectArea(area,initialTab){
 }
 
 function switchTab(id){
+  const previousTab=activeTab();
+  if((previousTab==='adm'||previousTab==='preench')&&['dash','hist','comp','rotas','proddash','prodsetores'].includes(id)){
+    persistDayNow();
+  }
   updateRecebArmViewMode(id);
   document.querySelectorAll('.tab').forEach(t=>t.classList.toggle('act',t.id===TAB_ID_BY_BODY[id]));
   document.querySelectorAll('.tab-body').forEach(t=>t.classList.remove('act'));
@@ -10390,6 +10487,49 @@ function readHoraData(){
   });
   return hd;
 }
+
+function syncComparableValue(value){
+  if(value===null||value===undefined)return '';
+  if(typeof value==='number')return Number.isFinite(value)?String(value):'';
+  if(typeof value==='string')return value.trim();
+  return JSON.stringify(value);
+}
+
+function markNightFormUpdateStamps(existing,day){
+  const ts=+day._updatedAt||Date.now();
+  day._nightPartialSave=true;
+  const skip=new Set(['date','_updatedAt','_fieldUpdatedAt','_hdUpdatedAt','_nightPartialSave','_correiaDirectHour','hd','rotas','prodSetores','prodDiurno','recebArm','boletim','devolucao','inventario']);
+  const fieldUpdatedAt={...((existing&&existing._fieldUpdatedAt)||{})};
+  Object.keys(day||{}).forEach(key=>{
+    if(skip.has(key))return;
+    const before=existing?existing[key]:undefined;
+    const after=day[key];
+    if(existing){
+      if(syncComparableValue(before)!==syncComparableValue(after))fieldUpdatedAt[key]=ts;
+    }else if(dayFieldHasValue(after)){
+      fieldUpdatedAt[key]=ts;
+    }
+  });
+  if(Object.keys(fieldUpdatedAt).length)day._fieldUpdatedAt=fieldUpdatedAt;
+  const hdUpdatedAt=mergeHourUpdatedAt(existing,null)||{};
+  const metrics=new Set([...Object.keys((existing&&existing.hd)||{}),...Object.keys(day.hd||{})]);
+  metrics.forEach(metric=>{
+    const before=Array.isArray(existing&&existing.hd&&existing.hd[metric])?existing.hd[metric]:[];
+    const after=Array.isArray(day.hd&&day.hd[metric])?day.hd[metric]:[];
+    const len=Math.max(before.length,after.length,HOURS.length);
+    for(let i=0;i<len;i++){
+      const av=before[i],bv=after[i];
+      const changed=existing?syncComparableValue(av)!==syncComparableValue(bv):hourFieldHasValue(bv);
+      if(changed){
+        if(!hdUpdatedAt[metric])hdUpdatedAt[metric]={};
+        hdUpdatedAt[metric][i]=ts;
+      }
+    }
+  });
+  if(Object.keys(hdUpdatedAt).length)day._hdUpdatedAt=hdUpdatedAt;
+  return day;
+}
+
 function readFormAsDay(){
   const dt=document.getElementById('iData').value;if(!dt)return null;
   const existing=getDay(dt);
@@ -10419,7 +10559,7 @@ function readFormAsDay(){
   const osProdPerf=simpleOp?osNaoImpPerf:calcOsProdSaldo(osProdPerfBase,osFinPerf);
   const osTotal=osTotalMed+osTotalPerf;
   const sysVal=id=>{const el=document.getElementById(id);return el&&el.value!==''?+el.value||0:'';};
-  return{
+  const day={
     date:dt,
     _updatedAt:Date.now(),
     _correiaDirectHour:useNewRules(dt),
@@ -10507,6 +10647,7 @@ function readFormAsDay(){
     ...(savedProdDiurno?{prodDiurno:savedProdDiurno}:{}),
     ...(savedRecebArm?{recebArm:savedRecebArm}:{})
   };
+  return markNightFormUpdateStamps(existing,day);
 }
 function loadFormFrom(day){
   if(!day)day=emptyDay();
@@ -10579,7 +10720,8 @@ function prepNewDay(){
   const dt=today();
   if(current&&current.date!==dt){
     const curIdx=db.days.findIndex(d=>d.date===current.date);
-    if(curIdx>=0)db.days[curIdx]=current;else db.days.push(current);
+    const cleanCurrent=stripTransientDayFlags(current);
+    if(curIdx>=0)db.days[curIdx]=cleanCurrent;else db.days.push(cleanCurrent);
   }
   const existingToday=getDay(dt);
   if(existingToday&&dayDataScore(existingToday)>0){
@@ -10611,7 +10753,7 @@ function persistDayNow(){
   if(!day)return null;
   const idx=db.days.findIndex(d=>d.date===day.date);
   const wasNew=idx<0;
-  const merged=idx>=0?mergeDayRecords(db.days[idx],day):day;
+  const merged=idx>=0?mergeDayRecords(db.days[idx],day):stripTransientDayFlags(day);
   if(idx>=0)db.days[idx]=merged;else db.days.push(merged);
   db.days.sort((a,b)=>a.date.localeCompare(b.date));
   curDate=merged.date;
@@ -10629,7 +10771,7 @@ function autoSave(){
 function saveDay(){
   const day=readFormAsDay();if(!day){alert('⚠️ Informe a data!');return;}
   const idx=db.days.findIndex(d=>d.date===day.date);
-  const merged=idx>=0?mergeDayRecords(db.days[idx],day):day;
+  const merged=idx>=0?mergeDayRecords(db.days[idx],day):stripTransientDayFlags(day);
   if(idx>=0)db.days[idx]=merged;else db.days.push(merged);
   db.days.sort((a,b)=>a.date.localeCompare(b.date));
   save();curDate=merged.date;buildDayNav();
