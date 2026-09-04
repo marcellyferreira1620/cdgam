@@ -2518,6 +2518,44 @@ function mergeDayRootFields(current,next,chosen){
   return out;
 }
 
+function ensureRootMinimum(day,key,minValue,ts){
+  const min=+minValue||0;
+  if(!day||!key||min<=0)return false;
+  const current=+day[key]||0;
+  if(current>=min)return false;
+  day[key]=min;
+  day._fieldUpdatedAt=day._fieldUpdatedAt||{};
+  day._fieldUpdatedAt[key]=Math.max(+day._fieldUpdatedAt[key]||0,ts);
+  return true;
+}
+
+function normalizeNightClosingBases(day){
+  if(!day||!day.date||!useTotalLinesOperational(day.date))return day;
+  const isClosedDay=String(day.date)<today();
+  if(!isClosedDay)return day;
+  const hd=day.hd||{};
+  const ts=Math.max(+day._updatedAt||0,Date.now());
+  let changed=false;
+  const doneMed=sumActiveHoraField('Linhas Med.',hd,day.date);
+  const donePerf=sumActiveHoraField('Linhas Perf.',hd,day.date);
+  const minMed=Math.max(doneMed,+day.osTotalMed||0,+day.osProdMedBase||0);
+  const minPerf=Math.max(donePerf,+day.osTotalPerf||0,+day.osProdPerfBase||0);
+  changed=ensureRootMinimum(day,'osTotalMed',minMed,ts)||changed;
+  changed=ensureRootMinimum(day,'osProdMedBase',minMed,ts)||changed;
+  changed=ensureRootMinimum(day,'osTotalPerf',minPerf,ts)||changed;
+  changed=ensureRootMinimum(day,'osProdPerfBase',minPerf,ts)||changed;
+  const totalLines=(+day.osTotalMed||0)+(+day.osTotalPerf||0);
+  changed=ensureRootMinimum(day,'osTotal',totalLines,ts)||changed;
+  changed=ensureRootMinimum(day,'osProdBase',totalLines,ts)||changed;
+  const doneDoca=Math.max(sumActiveHoraField('Vol. Doca',hd,day.date),+day.rDoc||0,+day.sys2130VolDoca||0);
+  changed=ensureRootMinimum(day,'pnDoca',doneDoca,ts)||changed;
+  changed=ensureRootMinimum(day,'pnVol',doneDoca,ts)||changed;
+  const doneCheckoutUnits=Math.max(sumActiveHoraField('Unid. Checkout',hd,day.date),+day.sys2130UnitCheckout||0);
+  changed=ensureRootMinimum(day,'pnUnid',doneCheckoutUnits,ts)||changed;
+  if(changed)day._updatedAt=ts;
+  return day;
+}
+
 const NIGHT_OPERATION_GUARD_VERSION='2026-08-28-prod-noturna';
 let nightOperationGuardLastError='';
 
@@ -2595,6 +2633,28 @@ function runNightOperationFormulaGuard(){
       if(+mergedRoute[routeKey][0]!==0||+mergedRoute[routeTotalKey][0]!==942){
         errors.push('rotas precisam preservar pendente menor e total atualizado');
       }
+    }
+
+    const closingBase=normalizeNightClosingBases({
+      date:'2000-01-01',
+      pnDoca:5734,
+      pnVol:5734,
+      pnUnid:7701,
+      osTotalMed:5783,
+      osTotalPerf:8751,
+      osProdMedBase:5783,
+      osProdPerfBase:8751,
+      hd:{
+        'Linhas Med.':[15644],
+        'Linhas Perf.':[17856],
+        'Vol. Doca':[10421],
+        'Unid. Checkout':[97937]
+      },
+      rDoc:10421,
+      _updatedAt:1
+    });
+    if(+closingBase.pnDoca!==10421||+closingBase.pnVol!==10421||+closingBase.pnUnid!==97937||+closingBase.osTotalMed!==15644||+closingBase.osTotalPerf!==17856){
+      errors.push('dia fechado nao pode voltar para base menor que realizado');
     }
   }catch(err){
     errors.push(err&&err.message?err.message:String(err));
@@ -3011,7 +3071,7 @@ function mergeDayRecords(current,next){
   const devolucao=mergeDevolucao(current.devolucao,next.devolucao);
   const inventario=mergeInventario(current.inventario,next.inventario);
   const root=mergeDayRootFields(current,next,chosen);
-  return stripTransientDayFlags({...root,...(rotas.length?{rotas}:{}),...(prodSetores?{prodSetores}:{}),...(prodDiurno?{prodDiurno}:{}),...(recebArm?{recebArm}:{}),...(boletim?{boletim}:{}),...(devolucao?{devolucao}:{}),...(inventario?{inventario}:{})});
+  return stripTransientDayFlags(normalizeNightClosingBases({...root,...(rotas.length?{rotas}:{}),...(prodSetores?{prodSetores}:{}),...(prodDiurno?{prodDiurno}:{}),...(recebArm?{recebArm}:{}),...(boletim?{boletim}:{}),...(devolucao?{devolucao}:{}),...(inventario?{inventario}:{})}));
 }
 
 function mergeDays(remoteDays,localDays){
