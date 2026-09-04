@@ -8728,6 +8728,7 @@ function boletimBuildWhatsapp(day){
     `Especial: ${prodFmt(n.especial,0)} vol. | média/h ${prodFmt(n.especialHora,0)}`,
     `Expedição total: ${prodFmt(n.expedicao,0)} vol. | eficiência ${n.expPct}%`,
     `Rotas: ${n.pctNoHorario}% no horário | ${n.pctAtraso}% atrasadas`,
+    String(b.eficienciaExpedicao??'').trim()?`Eficiencia de expedicao: ${String(b.eficienciaExpedicao).trim()}`:null,
     `Abastecimento 3° turno: abastecidas ${prodFmt(b.abastecidas3Turno,0)} | pendentes ${prodFmt(b.pendentes3Turno,0)} | canceladas ${prodFmt(b.canceladas3Turno,0)}`,
     b.manutencaoNoturna?`Manutenção noturna: ${String(b.manutencaoNoturna).trim()}`:`Manutenção noturna: sem apontamento.`
   ].filter(l=>l!==null&&l!==undefined).join('\n');
@@ -8829,6 +8830,9 @@ function renderBoletim(){
             ${boletimLine('Vales gerados',prodFmt(n.vales,0))}
             ${boletimLine('Especial',prodFmt(n.especial,0),`média/h ${prodFmt(n.especialHora,0)}`)}
             ${boletimLine('Rotas no horário / atrasadas',`${n.pctNoHorario}% / ${n.pctAtraso}%`,`${prodFmt(n.routesTotal,0)} rotas apuradas`)}
+            <div class="boletim-fields" style="margin-top:10px">
+              ${boletimField('Efici&ecirc;ncia de expedi&ccedil;&atilde;o','eficienciaExpedicao',b.eficienciaExpedicao,'text')}
+            </div>
           </div>
           <div class="boletim-subhead">Setor de Abastecimento - 3° turno</div>
           <div class="boletim-fields" style="margin-top:12px">
