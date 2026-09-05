@@ -1348,6 +1348,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
             <input type="file" id="recebArmBaseFile" accept=".xls,.xlsx,.csv" onchange="importRecebArmProductBase(event)">
           </label>
           <button class="receb-arm-btn gray" type="button" onclick="focusRecebArmBip()">Focar bipagem</button>
+          <button class="receb-arm-btn purple" type="button" onclick="connectRecebArmScanner()">Conectar leitor USB/Serial</button>
           <button class="receb-arm-btn" type="button" onclick="addRecebArmNota()">Adicionar NF</button>
         </div>
         <div class="receb-arm-msg" id="recebArmBipStatus"></div>
@@ -4944,6 +4945,10 @@ let recebArmPendingBipChave='';
 let recebArmGlobalBipBuffer='';
 let recebArmGlobalBipLastAt=0;
 let recebArmGlobalBipTimer=null;
+let recebArmSerialPort=null;
+let recebArmSerialReader=null;
+let recebArmHidDevice=null;
+let recebArmHidLastKeys='';
 
 function recebArmSheetRows(workbook){
   const ws=workbook.Sheets[workbook.SheetNames[0]];
@@ -5386,11 +5391,6 @@ function focusRecebArmBip(){
   input.focus();
   if(typeof input.select==='function')input.select();
   recebArmBipStatus('Aguardando bipagem. O leitor precisa digitar a chave de 44 digitos neste campo.',false);
-  setTimeout(()=>{
-    if(document.activeElement===input&&!String(input.value||'').replace(/\D/g,'')){
-      recebArmBipStatus('Nenhum digito chegou no campo. Se o leitor apitou, configure o leitor para modo teclado/USB HID.',true);
-    }
-  },2800);
 }
 
 function recebArmBipInputChanged(input){
@@ -5457,7 +5457,9 @@ function scheduleRecebArmXmlBip(input){
 
 function recebArmBipCaptureActive(){
   const tab=typeof activeTab==='function'?activeTab():'';
-  return tab==='recebarm'||currentAreaMode==='recebimento';
+  const active=document.activeElement;
+  const focused=active&&(active.id==='recebArmXmlBip'||active.id==='recebArmChave');
+  return focused||tab==='recebarm'||currentAreaMode==='recebimento';
 }
 
 function clearRecebArmBipBufferLater(){
@@ -5528,10 +5530,108 @@ function handleRecebArmGlobalBipPaste(ev){
   }
 }
 
+function handleRecebArmGlobalBipBeforeInput(ev){
+  if(!recebArmBipCaptureActive()||recebArmXmlBipBusy)return;
+  const target=ev.target||{};
+  if(target.id==='recebArmXmlBip'||target.id==='recebArmChave')return;
+  const text=ev.data||'';
+  if(/^\d+$/.test(text))recebArmPushBipText(text);
+}
+
+async function connectRecebArmScanner(){
+  recebArmBipStatus('Tentando conectar o leitor pelo navegador...',false);
+  if(navigator.serial){
+    const ok=await connectRecebArmSerialScanner();
+    if(ok)return;
+  }
+  if(navigator.hid){
+    const ok=await connectRecebArmHidScanner();
+    if(ok)return;
+  }
+  recebArmBipStatus('Nao consegui conectar direto. No Chrome/Edge, permita o leitor quando a janela aparecer; se nao aparecer, ele precisa estar em modo teclado ou serial.',true);
+}
+
+async function connectRecebArmSerialScanner(){
+  try{
+    const port=await navigator.serial.requestPort();
+    await port.open({baudRate:9600});
+    recebArmSerialPort=port;
+    recebArmBipStatus('Leitor conectado por Serial. Bipe a barra preta do DANFE.',false);
+    const decoder=new TextDecoder();
+    while(port.readable&&recebArmSerialPort===port){
+      recebArmSerialReader=port.readable.getReader();
+      try{
+        while(true){
+          const {value,done}=await recebArmSerialReader.read();
+          if(done)break;
+          if(value)recebArmPushBipText(decoder.decode(value,{stream:true}));
+        }
+      }finally{
+        recebArmSerialReader.releaseLock();
+      }
+    }
+    return true;
+  }catch(e){
+    console.warn('serial scanner unavailable',e);
+    return false;
+  }
+}
+
+function recebArmDecodeHidUsage(code){
+  if(code>=0x1e&&code<=0x26)return String(code-0x1d);
+  if(code===0x27)return '0';
+  if(code===0x28)return '\n';
+  return '';
+}
+
+function handleRecebArmHidInputReport(ev){
+  const bytes=[...new Uint8Array(ev.data.buffer)];
+  const keys=bytes.slice(2).filter(Boolean);
+  const signature=keys.join(',');
+  if(!signature){
+    recebArmHidLastKeys='';
+    return;
+  }
+  if(signature===recebArmHidLastKeys)return;
+  recebArmHidLastKeys=signature;
+  let text='';
+  keys.forEach(code=>{
+    const ch=recebArmDecodeHidUsage(code);
+    if(ch==='\n'){
+      const chave=recebArmAccessKey(recebArmGlobalBipBuffer);
+      if(chave){
+        recebArmGlobalBipBuffer='';
+        recebArmFillFromAccessKey(chave);
+        processRecebArmXmlBip(chave);
+      }
+    }else{
+      text+=ch;
+    }
+  });
+  if(text)recebArmPushBipText(text);
+}
+
+async function connectRecebArmHidScanner(){
+  try{
+    const devices=await navigator.hid.requestDevice({filters:[]});
+    const device=devices&&devices[0];
+    if(!device)return false;
+    await device.open();
+    recebArmHidDevice=device;
+    device.addEventListener('inputreport',handleRecebArmHidInputReport);
+    recebArmBipStatus('Leitor conectado por USB/HID. Bipe a barra preta do DANFE.',false);
+    return true;
+  }catch(e){
+    console.warn('hid scanner unavailable',e);
+    return false;
+  }
+}
+
 if(!window.__recebArmGlobalBipReady){
   window.__recebArmGlobalBipReady=true;
   document.addEventListener('keydown',handleRecebArmGlobalBipKeydown,true);
   document.addEventListener('paste',handleRecebArmGlobalBipPaste,true);
+  document.addEventListener('beforeinput',handleRecebArmGlobalBipBeforeInput,true);
 }
 
 async function processRecebArmXmlBip(value){
