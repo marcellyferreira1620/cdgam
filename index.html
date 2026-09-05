@@ -759,6 +759,9 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 .receb-arm-btn{background:#1e88e5;color:#fff;border:none;border-radius:4px;padding:7px 11px;font-weight:bold;font-size:11px;cursor:pointer;min-height:31px}
 .receb-arm-btn.green{background:#00a86b}.receb-arm-btn.red{background:#e94560}.receb-arm-btn.purple{background:#9b59b6}.receb-arm-btn.gray{background:#4a5a6a}
 .receb-arm-msg{font-size:10px;color:#ffd700;margin-top:7px;min-height:13px}
+.receb-arm-scan-test{display:none;margin-top:7px;background:#071525;border:1px solid #1a3550;border-radius:4px;padding:7px}
+.receb-arm-scan-test strong{display:block;color:#ffd700;font-size:10px;text-transform:uppercase;margin-bottom:4px}
+.receb-arm-scan-test textarea{width:100%;min-height:70px;background:#020b14;border:1px solid #1a3550;color:#9ee5ff;border-radius:4px;font:10px Consolas,monospace;padding:6px;resize:vertical}
 .receb-arm-agenda{overflow-x:auto}
 .receb-arm-agenda table,.receb-arm-tbl{width:100%;border-collapse:collapse;font-size:10px;min-width:900px}
 .receb-arm-agenda th,.receb-arm-agenda td,.receb-arm-tbl th,.receb-arm-tbl td{border:1px solid #1a3550;padding:5px 6px;text-align:center}
@@ -1361,11 +1364,16 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
           </label>
           <button class="receb-arm-btn gray" type="button" onclick="focusRecebArmBip()">Focar bipagem</button>
           <button class="receb-arm-btn purple" type="button" onclick="connectRecebArmScanner()">Conectar leitor USB/Serial</button>
+          <button class="receb-arm-btn gray" type="button" onclick="startRecebArmScannerTest()">Teste do leitor</button>
           <button class="receb-arm-btn" type="button" onclick="addRecebArmNota()">Adicionar NF</button>
         </div>
         <div class="receb-arm-msg" id="recebArmBipStatus"></div>
         <div class="receb-arm-msg" id="recebArmNotaMsg"></div>
         <div class="receb-arm-msg" id="recebArmBaseMsg"></div>
+        <div class="receb-arm-scan-test" id="recebArmScanTestBox">
+          <strong>Teste do leitor</strong>
+          <textarea id="recebArmScanLog" readonly placeholder="Clique em Teste do leitor e bipe. Tudo que chegar do leitor aparece aqui."></textarea>
+        </div>
         <div class="receb-arm-item-preview" id="recebArmItensPreview"></div>
       </div>
     </div>
@@ -4961,6 +4969,8 @@ let recebArmSerialPort=null;
 let recebArmSerialReader=null;
 let recebArmHidDevice=null;
 let recebArmHidLastKeys='';
+let recebArmScannerTest=false;
+let recebArmScannerTestHits=0;
 
 function recebArmSheetRows(workbook){
   const ws=workbook.Sheets[workbook.SheetNames[0]];
@@ -5397,6 +5407,36 @@ function recebArmBipStatus(msg,isErr){
   recebArmMsg('recebArmBipStatus',msg,isErr);
 }
 
+function recebArmScanLog(msg){
+  if(!recebArmScannerTest)return;
+  if(msg!=='teste iniciado')recebArmScannerTestHits++;
+  const box=document.getElementById('recebArmScanTestBox');
+  const log=document.getElementById('recebArmScanLog');
+  if(box)box.style.display='block';
+  if(!log)return;
+  const time=new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit',second:'2-digit'});
+  log.value=(log.value+`[${time}] ${msg}\n`).slice(-2500);
+  log.scrollTop=log.scrollHeight;
+}
+
+function startRecebArmScannerTest(){
+  recebArmScannerTest=true;
+  recebArmScannerTestHits=0;
+  recebArmGlobalBipBuffer='';
+  const box=document.getElementById('recebArmScanTestBox');
+  const log=document.getElementById('recebArmScanLog');
+  if(box)box.style.display='block';
+  if(log)log.value='';
+  focusRecebArmBip();
+  recebArmBipStatus('Teste ativo. Bipe agora; se o navegador receber algo, vai aparecer na caixa de teste.',false);
+  recebArmScanLog('teste iniciado');
+  setTimeout(()=>{
+    if(recebArmScannerTest&&!recebArmScannerTestHits){
+      recebArmBipStatus('Nada chegou do leitor no navegador. Use Conectar leitor USB/Serial ou configure o leitor para modo teclado.',true);
+    }
+  },5000);
+}
+
 function focusRecebArmBip(){
   const input=document.getElementById('recebArmXmlBip')||document.getElementById('recebArmChave');
   if(!input)return;
@@ -5408,6 +5448,7 @@ function focusRecebArmBip(){
 function recebArmBipInputChanged(input){
   const raw=input&&input.value||'';
   const digits=String(raw).replace(/\D/g,'');
+  recebArmScanLog(`input campo=${input&&input.id||''} valor="${String(raw).slice(0,80)}" digitos=${digits.length}`);
   if(digits.length){
     recebArmBipStatus(`Leitor enviou ${Math.min(digits.length,44)}/44 digitos${digits.length>44?' (sobrou informacao depois da chave)':''}.`,digits.length>44);
   }else{
@@ -5490,6 +5531,7 @@ function recebArmDigitFromKeyEvent(ev){
 function recebArmPushBipText(text){
   if(!recebArmBipCaptureActive()||recebArmXmlBipBusy)return false;
   const digits=String(text||'').replace(/\D/g,'');
+  recebArmScanLog(`texto recebido="${String(text).replace(/\s/g,' ').slice(0,80)}" digitos=${digits.length}`);
   if(!digits)return false;
   const now=Date.now();
   if(now-recebArmGlobalBipLastAt>300)recebArmGlobalBipBuffer='';
@@ -5515,6 +5557,7 @@ function handleRecebArmGlobalBipKeydown(ev){
   if(!recebArmBipCaptureActive()||recebArmXmlBipBusy)return;
   if(ev.ctrlKey||ev.altKey||ev.metaKey)return;
   const key=ev.key;
+  recebArmScanLog(`keydown key="${key}" code="${ev.code||''}" keyCode=${ev.keyCode||ev.which||0}`);
   if(key==='Enter'||key==='Tab'){
     const chave=recebArmAccessKey(recebArmGlobalBipBuffer);
     recebArmGlobalBipBuffer='';
@@ -5536,6 +5579,7 @@ function handleRecebArmGlobalBipKeydown(ev){
 function handleRecebArmGlobalBipPaste(ev){
   if(!recebArmBipCaptureActive()||recebArmXmlBipBusy)return;
   const text=(ev.clipboardData&&ev.clipboardData.getData('text'))||'';
+  recebArmScanLog(`paste texto="${String(text).replace(/\s/g,' ').slice(0,80)}"`);
   if(recebArmAccessKey(text)){
     ev.preventDefault();
     recebArmPushBipText(text);
@@ -5547,6 +5591,7 @@ function handleRecebArmGlobalBipBeforeInput(ev){
   const target=ev.target||{};
   if(target.id==='recebArmXmlBip'||target.id==='recebArmChave')return;
   const text=ev.data||'';
+  recebArmScanLog(`beforeinput texto="${String(text).replace(/\s/g,' ').slice(0,80)}"`);
   if(/^\d+$/.test(text))recebArmPushBipText(text);
 }
 
@@ -5571,6 +5616,7 @@ async function connectRecebArmSerialScanner(){
     await port.open({baudRate});
     recebArmSerialPort=port;
     recebArmBipStatus(`Leitor conectado por Serial (${baudRate}). Bipe a barra preta do DANFE.`,false);
+    recebArmScanLog(`serial conectado baud=${baudRate}`);
     const decoder=new TextDecoder();
     while(port.readable&&recebArmSerialPort===port){
       recebArmSerialReader=port.readable.getReader();
@@ -5578,7 +5624,11 @@ async function connectRecebArmSerialScanner(){
         while(true){
           const {value,done}=await recebArmSerialReader.read();
           if(done)break;
-          if(value)recebArmPushBipText(decoder.decode(value,{stream:true}));
+          if(value){
+            const text=decoder.decode(value,{stream:true});
+            recebArmScanLog(`serial bytes=${value.length} texto="${String(text).replace(/\s/g,' ').slice(0,80)}"`);
+            recebArmPushBipText(text);
+          }
         }
       }finally{
         recebArmSerialReader.releaseLock();
@@ -5600,6 +5650,7 @@ function recebArmDecodeHidUsage(code){
 
 function handleRecebArmHidInputReport(ev){
   const bytes=[...new Uint8Array(ev.data.buffer)];
+  recebArmScanLog(`hid inputreport bytes=${bytes.join(',').slice(0,120)}`);
   const keys=bytes.slice(2).filter(Boolean);
   const signature=keys.join(',');
   if(!signature){
@@ -5634,6 +5685,7 @@ async function connectRecebArmHidScanner(){
     recebArmHidDevice=device;
     device.addEventListener('inputreport',handleRecebArmHidInputReport);
     recebArmBipStatus('Leitor conectado por USB/HID. Bipe a barra preta do DANFE.',false);
+    recebArmScanLog(`hid conectado ${device.productName||'leitor'}`);
     return true;
   }catch(e){
     console.warn('hid scanner unavailable',e);
