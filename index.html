@@ -1338,6 +1338,12 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
           <label>Arquivo XML/PDF
             <input type="file" id="recebArmNotaFile" accept=".xml,.pdf" multiple onchange="readRecebArmNotaFile(event)">
           </label>
+          <label>Bipar XML/DANFE
+            <input id="recebArmXmlBip" placeholder="Bipe a chave de acesso" oninput="scheduleRecebArmXmlBip(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();processRecebArmXmlBip(this.value)}">
+          </label>
+          <label>XMLs para bipagem
+            <input type="file" id="recebArmXmlBipFiles" accept=".xml" multiple webkitdirectory onchange="cacheRecebArmXmlBipFiles(event)">
+          </label>
           <label>Base COD GAM / descrição
             <input type="file" id="recebArmBaseFile" accept=".xls,.xlsx,.csv" onchange="importRecebArmProductBase(event)">
           </label>
@@ -4929,6 +4935,10 @@ function readFileText(file,encoding){
   return new Promise((resolve,reject)=>{const r=new FileReader();r.onload=()=>resolve(r.result||'');r.onerror=reject;r.readAsText(file,encoding||'UTF-8');});
 }
 
+let recebArmXmlBipCache=[];
+let recebArmXmlBipTimer=null;
+let recebArmXmlBipBusy=false;
+
 function recebArmSheetRows(workbook){
   const ws=workbook.Sheets[workbook.SheetNames[0]];
   return XLSX.utils.sheet_to_json(ws,{header:1,defval:''});
@@ -5328,6 +5338,104 @@ async function readRecebArmNotaFile(ev){
     console.error(e);
     renderRecebArmNotaPreview(null);
     recebArmMsg('recebArmNotaMsg','Não consegui ler esse arquivo. Pode digitar a NF manualmente para o teste.',true);
+  }
+}
+
+function recebArmAccessKey(value){
+  const digits=String(value||'').replace(/\D/g,'');
+  const match=digits.match(/\d{44}/);
+  return match?match[0]:'';
+}
+
+function recebArmParsedXmlSources(){
+  const fileEl=document.getElementById('recebArmNotaFile');
+  const fromFile=fileEl&&Array.isArray(fileEl._parsedNotas)?fileEl._parsedNotas:[];
+  return [...recebArmXmlBipCache,...fromFile].filter(n=>n&&n.chave);
+}
+
+async function cacheRecebArmXmlBipFiles(ev){
+  const files=[...(ev.target.files||[])].filter(file=>/\.xml$/i.test(file.name));
+  if(!files.length){
+    recebArmXmlBipCache=[];
+    recebArmMsg('recebArmNotaMsg','Selecione uma pasta ou arquivos XML para usar a bipagem.',true);
+    return;
+  }
+  try{
+    const data=ensureRecebArm(recebArmDay());
+    const parsed=[];
+    const seen=new Set();
+    for(const file of files){
+      const nota=parseRecebArmXml(await readFileText(file,'UTF-8'));
+      nota.fileName=file.name;
+      nota.itens=recebArmEnrichItems(nota.itens,data);
+      const key=recebArmAccessKey(nota.chave)||String(nota.nfNumero||file.name);
+      if(seen.has(key))continue;
+      seen.add(key);
+      parsed.push(nota);
+    }
+    recebArmXmlBipCache=parsed;
+    recebArmMsg('recebArmNotaMsg',`${parsed.length} XML(s) prontos para bipagem. Agora bipe a chave do DANFE.`,false);
+    const bip=document.getElementById('recebArmXmlBip');
+    if(bip)bip.focus();
+  }catch(e){
+    console.error(e);
+    recebArmXmlBipCache=[];
+    recebArmMsg('recebArmNotaMsg','Não consegui preparar os XMLs para bipagem. Confira se a pasta tem XML de NF-e.',true);
+  }
+}
+
+function scheduleRecebArmXmlBip(input){
+  clearTimeout(recebArmXmlBipTimer);
+  const value=input&&input.value||'';
+  if(String(value).trim().startsWith('<')||recebArmAccessKey(value)){
+    recebArmXmlBipTimer=setTimeout(()=>processRecebArmXmlBip(value),120);
+  }
+}
+
+async function processRecebArmXmlBip(value){
+  clearTimeout(recebArmXmlBipTimer);
+  if(recebArmXmlBipBusy)return;
+  const raw=String(value||'').trim();
+  if(!raw)return;
+  recebArmXmlBipBusy=true;
+  try{
+    const day=recebArmDay();
+    const data=ensureRecebArm(day);
+    let parsed=null;
+    if(raw.startsWith('<')){
+      parsed=parseRecebArmXml(raw);
+      parsed.itens=recebArmEnrichItems(parsed.itens,data);
+    }else{
+      const chave=recebArmAccessKey(raw);
+      if(!chave){
+        recebArmMsg('recebArmNotaMsg','Bipe a chave de acesso com 44 dígitos.',true);
+        return;
+      }
+      parsed=recebArmParsedXmlSources().find(n=>recebArmAccessKey(n.chave)===chave)||null;
+      if(!parsed){
+        recebArmMsg('recebArmNotaMsg',`XML da chave ${chave.slice(-8)} não encontrado. Selecione a pasta dos XMLs primeiro.`,true);
+        return;
+      }
+    }
+    const result=recebArmUpsertParsedNota(day,data,parsed,{
+      protocolo:(document.getElementById('recebArmProtocolo')&&document.getElementById('recebArmProtocolo').value||'').trim()
+    });
+    if(!result.ok){
+      recebArmMsg('recebArmNotaMsg',result.reason==='sem_itens'?'XML sem itens para importar.':'Não consegui identificar NF/chave no XML.',true);
+      return;
+    }
+    data.notas=recebArmUniqueNotas(data.notas);
+    recebArmTouch(day);
+    compareRecebArmStorage(false);
+    renderRecebArm();
+    const bip=document.getElementById('recebArmXmlBip');
+    if(bip){bip.value='';setTimeout(()=>bip.focus(),80);}
+    recebArmMsg('recebArmNotaMsg',`NF ${result.nota.nfNumero||result.nota.chave||''} ${result.updated?'já existia e foi atualizada':'importada pelo bip'}.`,false);
+  }catch(e){
+    console.error(e);
+    recebArmMsg('recebArmNotaMsg','Não consegui importar pelo bip. Confira o XML/chave e tente novamente.',true);
+  }finally{
+    recebArmXmlBipBusy=false;
   }
 }
 
