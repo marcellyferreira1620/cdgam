@@ -1327,7 +1327,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
             <input id="recebArmNfNumero" placeholder="Ex.: 277398">
           </label>
           <label>Chave NF-e
-            <input id="recebArmChave" placeholder="44 dígitos da chave" oninput="scheduleRecebArmXmlBip(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();processRecebArmXmlBip(this.value)}">
+            <input id="recebArmChave" inputmode="numeric" autocomplete="off" placeholder="44 dígitos da chave" oninput="recebArmBipInputChanged(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();processRecebArmXmlBip(this.value)}">
           </label>
           <label>Fornecedor
             <input id="recebArmFornecedor" placeholder="Fornecedor da nota">
@@ -1339,7 +1339,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
             <input type="file" id="recebArmNotaFile" accept=".xml,.pdf" multiple onchange="readRecebArmNotaFile(event)">
           </label>
           <label>Bipar XML/DANFE
-            <input id="recebArmXmlBip" placeholder="Bipe a chave de acesso" oninput="scheduleRecebArmXmlBip(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();processRecebArmXmlBip(this.value)}">
+            <input id="recebArmXmlBip" inputmode="numeric" autocomplete="off" placeholder="Clique aqui e bipe a chave" onfocus="recebArmBipStatus('Aguardando bipagem. Se o leitor apitar e nada aparecer aqui, ele nao esta enviando a chave para o computador.',false)" oninput="recebArmBipInputChanged(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();processRecebArmXmlBip(this.value)}">
           </label>
           <label>XMLs para bipagem
             <input type="file" id="recebArmXmlBipFiles" accept=".xml" multiple webkitdirectory onchange="cacheRecebArmXmlBipFiles(event)">
@@ -1347,8 +1347,10 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
           <label>Base COD GAM / descrição
             <input type="file" id="recebArmBaseFile" accept=".xls,.xlsx,.csv" onchange="importRecebArmProductBase(event)">
           </label>
+          <button class="receb-arm-btn gray" type="button" onclick="focusRecebArmBip()">Focar bipagem</button>
           <button class="receb-arm-btn" type="button" onclick="addRecebArmNota()">Adicionar NF</button>
         </div>
+        <div class="receb-arm-msg" id="recebArmBipStatus"></div>
         <div class="receb-arm-msg" id="recebArmNotaMsg"></div>
         <div class="receb-arm-msg" id="recebArmBaseMsg"></div>
         <div class="receb-arm-item-preview" id="recebArmItensPreview"></div>
@@ -5350,6 +5352,29 @@ function recebArmAccessKey(value){
   return match?match[0]:'';
 }
 
+function recebArmBipStatus(msg,isErr){
+  recebArmMsg('recebArmBipStatus',msg,isErr);
+}
+
+function focusRecebArmBip(){
+  const input=document.getElementById('recebArmXmlBip')||document.getElementById('recebArmChave');
+  if(!input)return;
+  input.focus();
+  if(typeof input.select==='function')input.select();
+  recebArmBipStatus('Aguardando bipagem. O leitor precisa digitar a chave de 44 digitos neste campo.',false);
+}
+
+function recebArmBipInputChanged(input){
+  const raw=input&&input.value||'';
+  const digits=String(raw).replace(/\D/g,'');
+  if(digits.length){
+    recebArmBipStatus(`Leitor enviou ${Math.min(digits.length,44)}/44 digitos${digits.length>44?' (sobrou informacao depois da chave)':''}.`,digits.length>44);
+  }else{
+    recebArmBipStatus('Campo ativo. Bipe a barra da chave de acesso do DANFE.',false);
+  }
+  scheduleRecebArmXmlBip(input);
+}
+
 function recebArmParsedXmlSources(){
   const fileEl=document.getElementById('recebArmNotaFile');
   const fromFile=fileEl&&Array.isArray(fileEl._parsedNotas)?fileEl._parsedNotas:[];
@@ -5378,12 +5403,14 @@ async function cacheRecebArmXmlBipFiles(ev){
     }
     recebArmXmlBipCache=parsed;
     recebArmMsg('recebArmNotaMsg',`${parsed.length} XML(s) prontos para bipagem. Agora bipe a chave do DANFE.`,false);
+    recebArmBipStatus(`${parsed.length} XML(s) carregados. Clique em Focar bipagem e bipe a barra preta do DANFE.`,false);
     const bip=document.getElementById('recebArmXmlBip');
     if(bip)bip.focus();
   }catch(e){
     console.error(e);
     recebArmXmlBipCache=[];
     recebArmMsg('recebArmNotaMsg','Não consegui preparar os XMLs para bipagem. Confira se a pasta tem XML de NF-e.',true);
+    recebArmBipStatus('Nao consegui preparar os XMLs para bipagem.',true);
   }
 }
 
@@ -5414,6 +5441,7 @@ function handleRecebArmGlobalBipKeydown(ev){
     recebArmGlobalBipBuffer='';
     if(chave){
       ev.preventDefault();
+      recebArmBipStatus('Chave completa recebida: 44/44 digitos. Importando...',false);
       processRecebArmXmlBip(chave);
     }
     return;
@@ -5426,11 +5454,14 @@ function handleRecebArmGlobalBipKeydown(ev){
   if(now-recebArmGlobalBipLastAt>180)recebArmGlobalBipBuffer='';
   recebArmGlobalBipLastAt=now;
   recebArmGlobalBipBuffer=(recebArmGlobalBipBuffer+key).slice(-60);
+  const bip=document.getElementById('recebArmXmlBip');
+  if(bip&&document.activeElement!==bip)bip.value=recebArmGlobalBipBuffer;
+  recebArmBipStatus(`Recebendo leitura: ${Math.min(recebArmGlobalBipBuffer.replace(/\D/g,'').length,44)}/44 digitos.`,false);
   const chave=recebArmAccessKey(recebArmGlobalBipBuffer);
   if(chave){
     recebArmGlobalBipBuffer='';
-    const bip=document.getElementById('recebArmXmlBip');
     if(bip)bip.value=chave;
+    recebArmBipStatus('Chave completa recebida: 44/44 digitos. Importando...',false);
     clearTimeout(recebArmXmlBipTimer);
     recebArmXmlBipTimer=setTimeout(()=>processRecebArmXmlBip(chave),60);
   }else{
@@ -5460,11 +5491,13 @@ async function processRecebArmXmlBip(value){
       const chave=recebArmAccessKey(raw);
       if(!chave){
         recebArmMsg('recebArmNotaMsg','Bipe a chave de acesso com 44 dígitos.',true);
+        recebArmBipStatus(`Leitura incompleta: chegaram ${String(raw).replace(/\D/g,'').length}/44 digitos.`,true);
         return;
       }
       parsed=recebArmParsedXmlSources().find(n=>recebArmAccessKey(n.chave)===chave)||null;
       if(!parsed){
         recebArmMsg('recebArmNotaMsg',`XML da chave ${chave.slice(-8)} não encontrado. Selecione a pasta dos XMLs primeiro.`,true);
+        recebArmBipStatus(`Chave lida, mas o XML final ${chave.slice(-8)} nao esta nos arquivos selecionados.`,true);
         return;
       }
     }
@@ -5473,6 +5506,7 @@ async function processRecebArmXmlBip(value){
     });
     if(!result.ok){
       recebArmMsg('recebArmNotaMsg',result.reason==='sem_itens'?'XML sem itens para importar.':'Não consegui identificar NF/chave no XML.',true);
+      recebArmBipStatus('Chave encontrada, mas nao consegui importar os itens do XML.',true);
       return;
     }
     data.notas=recebArmUniqueNotas(data.notas);
@@ -5482,9 +5516,11 @@ async function processRecebArmXmlBip(value){
     const bip=document.getElementById('recebArmXmlBip');
     if(bip){bip.value='';setTimeout(()=>bip.focus(),80);}
     recebArmMsg('recebArmNotaMsg',`NF ${result.nota.nfNumero||result.nota.chave||''} ${result.updated?'já existia e foi atualizada':'importada pelo bip'}.`,false);
+    recebArmBipStatus(`NF ${result.nota.nfNumero||result.nota.chave||''} importada. Pode bipar a proxima.`,false);
   }catch(e){
     console.error(e);
     recebArmMsg('recebArmNotaMsg','Não consegui importar pelo bip. Confira o XML/chave e tente novamente.',true);
+    recebArmBipStatus('Erro na importacao pelo bip. Confira XML/chave e tente novamente.',true);
   }finally{
     recebArmXmlBipBusy=false;
   }
