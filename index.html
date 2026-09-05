@@ -1344,8 +1344,20 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
           <label>XMLs para bipagem
             <input type="file" id="recebArmXmlBipFiles" accept=".xml" multiple webkitdirectory onchange="cacheRecebArmXmlBipFiles(event)">
           </label>
+          <label>Velocidade serial
+            <select id="recebArmSerialBaud">
+              <option value="9600">9600</option>
+              <option value="19200">19200</option>
+              <option value="38400">38400</option>
+              <option value="57600">57600</option>
+              <option value="115200">115200</option>
+            </select>
+          </label>
           <label>Base COD GAM / descrição
             <input type="file" id="recebArmBaseFile" accept=".xls,.xlsx,.csv" onchange="importRecebArmProductBase(event)">
+          </label>
+          <label>Ler foto da barra
+            <input type="file" id="recebArmBarcodeImage" accept="image/*" capture="environment" onchange="scanRecebArmBarcodeImage(event)">
           </label>
           <button class="receb-arm-btn gray" type="button" onclick="focusRecebArmBip()">Focar bipagem</button>
           <button class="receb-arm-btn purple" type="button" onclick="connectRecebArmScanner()">Conectar leitor USB/Serial</button>
@@ -5554,9 +5566,11 @@ async function connectRecebArmScanner(){
 async function connectRecebArmSerialScanner(){
   try{
     const port=await navigator.serial.requestPort();
-    await port.open({baudRate:9600});
+    const baudInput=document.getElementById('recebArmSerialBaud');
+    const baudRate=+(baudInput&&baudInput.value)||9600;
+    await port.open({baudRate});
     recebArmSerialPort=port;
-    recebArmBipStatus('Leitor conectado por Serial. Bipe a barra preta do DANFE.',false);
+    recebArmBipStatus(`Leitor conectado por Serial (${baudRate}). Bipe a barra preta do DANFE.`,false);
     const decoder=new TextDecoder();
     while(port.readable&&recebArmSerialPort===port){
       recebArmSerialReader=port.readable.getReader();
@@ -5624,6 +5638,39 @@ async function connectRecebArmHidScanner(){
   }catch(e){
     console.warn('hid scanner unavailable',e);
     return false;
+  }
+}
+
+async function scanRecebArmBarcodeImage(ev){
+  const file=ev&&ev.target&&ev.target.files&&ev.target.files[0];
+  if(!file)return;
+  if(!('BarcodeDetector' in window)){
+    recebArmBipStatus('Este navegador nao liberou leitura por foto. Use Chrome/Edge atualizado ou bipe/digite a chave de 44 digitos.',true);
+    return;
+  }
+  try{
+    recebArmBipStatus('Lendo codigo de barras da imagem...',false);
+    const supported=BarcodeDetector.getSupportedFormats?await BarcodeDetector.getSupportedFormats():[];
+    const wanted=['code_128','code_39','qr_code','data_matrix'];
+    const formats=supported.length?wanted.filter(f=>supported.includes(f)):wanted;
+    const detector=formats.length?new BarcodeDetector({formats}):new BarcodeDetector();
+    const bitmap=await createImageBitmap(file);
+    const codes=await detector.detect(bitmap);
+    if(typeof bitmap.close==='function')bitmap.close();
+    const raw=codes.map(c=>c.rawValue||'').join(' ');
+    const chave=recebArmAccessKey(raw);
+    if(!chave){
+      recebArmBipStatus('Nao encontrei uma chave de 44 digitos nessa imagem. Tire a foto mais perto da barra preta, sem cortar as pontas.',true);
+      return;
+    }
+    recebArmFillFromAccessKey(chave);
+    recebArmBipStatus('Chave lida pela foto: 44/44 digitos. Procurando XML da nota...',false);
+    recebArmPushBipText(chave);
+  }catch(e){
+    console.error(e);
+    recebArmBipStatus('Nao consegui ler a barra pela foto. Tente uma imagem mais reta e nítida, ou digite a chave abaixo da barra.',true);
+  }finally{
+    if(ev&&ev.target)ev.target.value='';
   }
 }
 
