@@ -10,6 +10,7 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://unpkg.com/@zxing/browser@0.2.1/umd/index.min.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 <style>
@@ -112,9 +113,13 @@ body:not(.area-noturno-view) #prevEncPanel{display:none!important}
 .flux-folder{border:1px solid #1a3550;border-radius:6px;margin-bottom:9px;overflow:hidden;background:#102038}
 .flux-folder-h{display:flex;align-items:center;justify-content:space-between;gap:8px;padding:9px 10px;background:#071525;color:#fff;font-weight:900;font-size:12px;cursor:pointer}
 .flux-folder-h.active{color:#ffd700}
+.flux-folder-actions{display:flex;gap:4px;align-items:center}
 .flux-flow-list{display:grid;gap:4px;padding:7px}
 .flux-flow-item{display:flex;align-items:center;justify-content:space-between;gap:6px;border:1px solid transparent;border-radius:4px;background:transparent;color:#bfe4ff;padding:7px 8px;font-size:12px;font-weight:800;cursor:pointer;text-align:left}
 .flux-flow-item.active{background:#123d66;border-color:#1e88e5;color:#fff}
+.flux-flow-actions{display:flex;gap:7px;align-items:center;font-size:10px;text-transform:uppercase}
+.flux-flow-actions b{color:#9fc7e6;cursor:pointer}
+.flux-flow-actions b.danger{color:#ff8fa3}
 .flux-main{display:grid;grid-template-rows:auto minmax(0,1fr);min-width:0}
 .flux-top{display:flex;align-items:center;justify-content:space-between;gap:10px;background:#fff;border-bottom:1px solid #c8d9e8;padding:10px 12px}
 .flux-title{display:flex;flex-direction:column;gap:2px;min-width:0}
@@ -762,6 +767,8 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 .receb-arm-scan-test{display:none;margin-top:7px;background:#071525;border:1px solid #1a3550;border-radius:4px;padding:7px}
 .receb-arm-scan-test strong{display:block;color:#ffd700;font-size:10px;text-transform:uppercase;margin-bottom:4px}
 .receb-arm-scan-test textarea{width:100%;min-height:70px;background:#020b14;border:1px solid #1a3550;color:#9ee5ff;border-radius:4px;font:10px Consolas,monospace;padding:6px;resize:vertical}
+.receb-arm-camera{display:none;margin-top:8px;background:#071525;border:1px solid #1a3550;border-radius:5px;padding:8px}
+.receb-arm-camera video{width:min(520px,100%);height:260px;background:#000;border-radius:4px;object-fit:cover;display:block}
 .receb-arm-agenda{overflow-x:auto}
 .receb-arm-agenda table,.receb-arm-tbl{width:100%;border-collapse:collapse;font-size:10px;min-width:900px}
 .receb-arm-agenda th,.receb-arm-agenda td,.receb-arm-tbl th,.receb-arm-tbl td{border:1px solid #1a3550;padding:5px 6px;text-align:center}
@@ -1365,6 +1372,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
           <button class="receb-arm-btn gray" type="button" onclick="focusRecebArmBip()">Focar bipagem</button>
           <button class="receb-arm-btn purple" type="button" onclick="connectRecebArmScanner()">Conectar leitor USB/Serial</button>
           <button class="receb-arm-btn gray" type="button" onclick="startRecebArmScannerTest()">Teste do leitor</button>
+          <button class="receb-arm-btn green" type="button" onclick="startRecebArmCameraScanner()">Abrir camera da barra</button>
           <button class="receb-arm-btn" type="button" onclick="addRecebArmNota()">Adicionar NF</button>
         </div>
         <div class="receb-arm-msg" id="recebArmBipStatus"></div>
@@ -1373,6 +1381,10 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
         <div class="receb-arm-scan-test" id="recebArmScanTestBox">
           <strong>Teste do leitor</strong>
           <textarea id="recebArmScanLog" readonly placeholder="Clique em Teste do leitor e bipe. Tudo que chegar do leitor aparece aqui."></textarea>
+        </div>
+        <div class="receb-arm-camera" id="recebArmCameraBox">
+          <video id="recebArmCameraVideo" muted playsinline></video>
+          <button class="receb-arm-btn red" type="button" onclick="stopRecebArmCameraScanner()" style="margin-top:7px">Fechar camera</button>
         </div>
         <div class="receb-arm-item-preview" id="recebArmItensPreview"></div>
       </div>
@@ -3124,9 +3136,11 @@ function uid(){
 function normalizeFluxogramas(data){
   const src=data&&typeof data==='object'?data:{};
   const folders=Array.isArray(src.folders)?src.folders:[];
-  const normalizedFolders=folders.map(folder=>{
+  const deletedFolders=[...new Set(Array.isArray(src.deletedFolders)?src.deletedFolders.map(String):[])];
+  const deletedFlows=[...new Set(Array.isArray(src.deletedFlows)?src.deletedFlows.map(String):[])];
+  const normalizedFolders=folders.filter(folder=>folder&&!deletedFolders.includes(String(folder.id||''))).map(folder=>{
     const id=String(folder.id||uid());
-    const flows=(Array.isArray(folder.flows)?folder.flows:[]).map(flow=>({
+    const flows=(Array.isArray(folder.flows)?folder.flows:[]).filter(flow=>flow&&!deletedFlows.includes(String(flow.id||''))).map(flow=>({
       id:String(flow.id||uid()),
       name:String(flow.name||'Novo fluxo'),
       nodes:Array.isArray(flow.nodes)?flow.nodes:[],
@@ -3157,7 +3171,7 @@ function normalizeFluxogramas(data){
   const activeFolder=normalizedFolders.find(f=>f.id===activeFolderId)||firstFolder;
   if(!activeFolder.flows.length)activeFolder.flows.push({id:uid(),name:'Novo fluxo',nodes:[],edges:[],zoom:1,updatedAt:Date.now()});
   const activeFlowId=activeFolder.flows.some(f=>f.id===src.activeFlowId)?src.activeFlowId:activeFolder.flows[0].id;
-  return {folders:normalizedFolders,activeFolderId,activeFlowId,_updatedAt:+src._updatedAt||0};
+  return {folders:normalizedFolders,activeFolderId,activeFlowId,deletedFolders,deletedFlows,_updatedAt:+src._updatedAt||0};
 }
 
 function mergeFluxogramas(current,next){
@@ -3166,16 +3180,20 @@ function mergeFluxogramas(current,next){
   if(!next)return normalizeFluxogramas(current);
   const a=normalizeFluxogramas(current);
   const b=normalizeFluxogramas(next);
+  const deletedFolders=[...new Set([...(a.deletedFolders||[]),...(b.deletedFolders||[])].map(String))];
+  const deletedFlows=[...new Set([...(a.deletedFlows||[]),...(b.deletedFlows||[])].map(String))];
   const folderMap={};
   [...a.folders,...b.folders].forEach(folder=>{
     if(!folder||!folder.id)return;
-    if(!folderMap[folder.id])folderMap[folder.id]={...folder,flows:[...(folder.flows||[])]};
+    if(deletedFolders.includes(String(folder.id)))return;
+    if(!folderMap[folder.id])folderMap[folder.id]={...folder,flows:[...(folder.flows||[]).filter(flow=>flow&&!deletedFlows.includes(String(flow.id)))]};
     else{
       const existing=folderMap[folder.id];
       if((+folder.updatedAt||0)>=(+existing.updatedAt||0))existing.name=folder.name||existing.name;
       const flowMap={};
       [...(existing.flows||[]),...(folder.flows||[])].forEach(flow=>{
         if(!flow||!flow.id)return;
+        if(deletedFlows.includes(String(flow.id)))return;
         const cur=flowMap[flow.id];
         flowMap[flow.id]=!cur||(+flow.updatedAt||0)>=(+cur.updatedAt||0)?flow:cur;
       });
@@ -3183,7 +3201,7 @@ function mergeFluxogramas(current,next){
       existing.updatedAt=Math.max(+existing.updatedAt||0,+folder.updatedAt||0);
     }
   });
-  const out=normalizeFluxogramas({folders:Object.values(folderMap),activeFolderId:b.activeFolderId||a.activeFolderId,activeFlowId:b.activeFlowId||a.activeFlowId,_updatedAt:Math.max(+a._updatedAt||0,+b._updatedAt||0)});
+  const out=normalizeFluxogramas({folders:Object.values(folderMap),activeFolderId:b.activeFolderId||a.activeFolderId,activeFlowId:b.activeFlowId||a.activeFlowId,deletedFolders,deletedFlows,_updatedAt:Math.max(+a._updatedAt||0,+b._updatedAt||0)});
   return out;
 }
 
@@ -4971,6 +4989,8 @@ let recebArmHidDevice=null;
 let recebArmHidLastKeys='';
 let recebArmScannerTest=false;
 let recebArmScannerTestHits=0;
+let recebArmZxingReader=null;
+let recebArmZxingControls=null;
 
 function recebArmSheetRows(workbook){
   const ws=workbook.Sheets[workbook.SheetNames[0]];
@@ -5693,37 +5713,99 @@ async function connectRecebArmHidScanner(){
   }
 }
 
+function recebArmHandleBarcodeText(raw,source){
+  const text=String(raw||'').trim();
+  const chave=recebArmAccessKey(text);
+  recebArmScanLog(`${source||'barcode'}="${text.replace(/\s/g,' ').slice(0,100)}"`);
+  if(!chave){
+    recebArmBipStatus('Li a barra, mas nao encontrei uma chave NF-e de 44 digitos.',true);
+    return false;
+  }
+  recebArmFillFromAccessKey(chave);
+  recebArmBipStatus(`Chave lida por ${source||'barcode'}: 44/44 digitos. Procurando XML da nota...`,false);
+  recebArmPushBipText(chave);
+  return true;
+}
+
+function recebArmZxingReady(){
+  return !!(window.ZXingBrowser&&window.ZXingBrowser.BrowserMultiFormatReader);
+}
+
+async function recebArmDecodeBarcodeImageWithZxing(file){
+  if(!recebArmZxingReady())throw new Error('ZXing indisponivel');
+  const url=URL.createObjectURL(file);
+  try{
+    const reader=new ZXingBrowser.BrowserMultiFormatReader();
+    const result=await reader.decodeFromImageUrl(url);
+    return result&&(result.getText?result.getText():result.text||String(result));
+  }finally{
+    URL.revokeObjectURL(url);
+  }
+}
+
 async function scanRecebArmBarcodeImage(ev){
   const file=ev&&ev.target&&ev.target.files&&ev.target.files[0];
   if(!file)return;
-  if(!('BarcodeDetector' in window)){
-    recebArmBipStatus('Este navegador nao liberou leitura por foto. Use Chrome/Edge atualizado ou bipe/digite a chave de 44 digitos.',true);
-    return;
-  }
   try{
     recebArmBipStatus('Lendo codigo de barras da imagem...',false);
-    const supported=BarcodeDetector.getSupportedFormats?await BarcodeDetector.getSupportedFormats():[];
-    const wanted=['code_128','code_39','qr_code','data_matrix'];
-    const formats=supported.length?wanted.filter(f=>supported.includes(f)):wanted;
-    const detector=formats.length?new BarcodeDetector({formats}):new BarcodeDetector();
-    const bitmap=await createImageBitmap(file);
-    const codes=await detector.detect(bitmap);
-    if(typeof bitmap.close==='function')bitmap.close();
-    const raw=codes.map(c=>c.rawValue||'').join(' ');
-    const chave=recebArmAccessKey(raw);
-    if(!chave){
-      recebArmBipStatus('Nao encontrei uma chave de 44 digitos nessa imagem. Tire a foto mais perto da barra preta, sem cortar as pontas.',true);
-      return;
+    let raw='';
+    if('BarcodeDetector' in window){
+      const supported=BarcodeDetector.getSupportedFormats?await BarcodeDetector.getSupportedFormats():[];
+      const wanted=['code_128','code_39','qr_code','data_matrix'];
+      const formats=supported.length?wanted.filter(f=>supported.includes(f)):wanted;
+      const detector=formats.length?new BarcodeDetector({formats}):new BarcodeDetector();
+      const bitmap=await createImageBitmap(file);
+      const codes=await detector.detect(bitmap);
+      if(typeof bitmap.close==='function')bitmap.close();
+      raw=codes.map(c=>c.rawValue||'').join(' ');
     }
-    recebArmFillFromAccessKey(chave);
-    recebArmBipStatus('Chave lida pela foto: 44/44 digitos. Procurando XML da nota...',false);
-    recebArmPushBipText(chave);
+    if(!recebArmAccessKey(raw))raw=await recebArmDecodeBarcodeImageWithZxing(file);
+    if(!recebArmHandleBarcodeText(raw,'foto')){
+      recebArmBipStatus('Nao encontrei uma chave de 44 digitos nessa imagem. Tire a foto mais perto da barra preta, sem cortar as pontas.',true);
+    }
   }catch(e){
     console.error(e);
     recebArmBipStatus('Nao consegui ler a barra pela foto. Tente uma imagem mais reta e nítida, ou digite a chave abaixo da barra.',true);
   }finally{
     if(ev&&ev.target)ev.target.value='';
   }
+}
+
+async function startRecebArmCameraScanner(){
+  const box=document.getElementById('recebArmCameraBox');
+  const video=document.getElementById('recebArmCameraVideo');
+  if(!box||!video)return;
+  if(!recebArmZxingReady()){
+    recebArmBipStatus('Leitor por camera indisponivel. Atualize a pagina e use Chrome/Edge com internet para carregar a biblioteca.',true);
+    return;
+  }
+  try{
+    stopRecebArmCameraScanner();
+    box.style.display='block';
+    recebArmBipStatus('Camera aberta. Aponte para a barra preta ate aparecer 44/44 digitos.',false);
+    recebArmZxingReader=new ZXingBrowser.BrowserMultiFormatReader();
+    recebArmZxingControls=await recebArmZxingReader.decodeFromConstraints(
+      {video:{facingMode:{ideal:'environment'}}},
+      video,
+      (result)=>{
+        if(!result)return;
+        const text=result.getText?result.getText():result.text||String(result);
+        if(recebArmHandleBarcodeText(text,'camera'))stopRecebArmCameraScanner();
+      }
+    );
+  }catch(e){
+    console.error(e);
+    recebArmBipStatus('Nao consegui abrir a camera para ler a barra. Confira permissao da camera no navegador.',true);
+    stopRecebArmCameraScanner();
+  }
+}
+
+function stopRecebArmCameraScanner(){
+  if(recebArmZxingControls&&typeof recebArmZxingControls.stop==='function')recebArmZxingControls.stop();
+  recebArmZxingControls=null;
+  recebArmZxingReader=null;
+  const box=document.getElementById('recebArmCameraBox');
+  if(box)box.style.display='none';
 }
 
 if(!window.__recebArmGlobalBipReady){
@@ -8521,6 +8603,34 @@ function fluxSetFlow(id){
   fluxUi={selectedNodeId:null,selectedEdgeId:null,connectFrom:null,connectMode:false,drag:null};
   saveFluxogramas(true);
 }
+function fluxMarkNodeForEdit(id){
+  fluxUi.editNodeId=id;
+}
+function fluxFocusPendingNode(){
+  const id=fluxUi.editNodeId;
+  if(!id)return;
+  fluxUi.editNodeId=null;
+  const el=document.querySelector(`[data-flux-node="${id}"] .flux-node-text`);
+  if(!el)return;
+  el.focus();
+  const range=document.createRange();
+  range.selectNodeContents(el);
+  const sel=window.getSelection();
+  if(sel){
+    sel.removeAllRanges();
+    sel.addRange(range);
+  }
+}
+function fluxNodeTextClick(event,id){
+  if(event)event.stopPropagation();
+  fluxUi.selectedNodeId=id;
+  fluxUi.selectedEdgeId=null;
+  fluxUi.connectFrom=null;
+  fluxUi.connectMode=false;
+  document.querySelectorAll('.flux-node.active').forEach(el=>el.classList.remove('active'));
+  const node=document.querySelector(`[data-flux-node="${id}"]`);
+  if(node)node.classList.add('active');
+}
 function fluxAddFolder(){
   const name=prompt('Nome da pasta:','Nova pasta');
   if(!name)return;
@@ -8545,6 +8655,23 @@ function fluxRenameFolder(id){
   data._updatedAt=Date.now();
   saveFluxogramas(true);
 }
+function fluxDeleteFolder(id){
+  const data=fluxData();
+  const folder=data.folders.find(f=>f.id===id);
+  if(!folder)return;
+  if(!confirm(`Excluir a pasta "${folder.name}" e todos os fluxos dela?`))return;
+  data.deletedFolders=[...new Set([...(data.deletedFolders||[]),String(id)])];
+  data.folders=data.folders.filter(f=>f.id!==id);
+  if(!data.folders.length){
+    const flow=fluxCreateFlow('Novo fluxo','livre');
+    data.folders.push({id:uid(),name:'Nova pasta',updatedAt:Date.now(),flows:[flow]});
+  }
+  data.activeFolderId=data.folders[0].id;
+  data.activeFlowId=(data.folders[0].flows[0]&&data.folders[0].flows[0].id)||'';
+  fluxUi={selectedNodeId:null,selectedEdgeId:null,connectFrom:null,connectMode:false,drag:null};
+  data._updatedAt=Date.now();
+  saveFluxogramas(true);
+}
 function fluxAddFlow(){
   const folder=fluxFolder();
   if(!folder)return;
@@ -8555,6 +8682,21 @@ function fluxAddFlow(){
   folder.flows.push(flow);
   db.fluxogramas.activeFlowId=flow.id;
   fluxTouch(flow);
+  saveFluxogramas(true);
+}
+function fluxDeleteFlow(id){
+  const data=fluxData();
+  const folder=fluxFolder();
+  if(!folder)return;
+  const flow=(folder.flows||[]).find(f=>f.id===id);
+  if(!flow)return;
+  if(!confirm(`Excluir o fluxo "${flow.name}"?`))return;
+  data.deletedFlows=[...new Set([...(data.deletedFlows||[]),String(id)])];
+  folder.flows=(folder.flows||[]).filter(f=>f.id!==id);
+  if(!folder.flows.length)folder.flows.push(fluxCreateFlow('Novo fluxo','livre'));
+  data.activeFlowId=folder.flows[0].id;
+  fluxUi={selectedNodeId:null,selectedEdgeId:null,connectFrom:null,connectMode:false,drag:null};
+  fluxTouch(folder.flows[0]);
   saveFluxogramas(true);
 }
 function fluxRenameFlow(id){
@@ -8573,6 +8715,7 @@ function fluxAddNode(type='box',color='white'){
   flow.nodes.push(n);
   fluxUi.selectedNodeId=n.id;
   fluxUi.selectedEdgeId=null;
+  fluxMarkNodeForEdit(n.id);
   fluxTouch(flow);
   saveFluxogramas(true);
 }
@@ -8622,6 +8765,7 @@ function fluxAddConnectedNode(direction='right',type='box',color='white'){
   fluxUi.selectedEdgeId=null;
   fluxUi.connectFrom=null;
   fluxUi.connectMode=false;
+  fluxMarkNodeForEdit(node.id);
   fluxTouch(flow);
   saveFluxogramas(true);
 }
@@ -8647,6 +8791,7 @@ function fluxCanvasDblClick(event){
   flow.nodes.push(node);
   fluxUi.selectedNodeId=node.id;
   fluxUi.selectedEdgeId=null;
+  fluxMarkNodeForEdit(node.id);
   fluxTouch(flow);
   saveFluxogramas(true);
 }
@@ -8867,8 +9012,8 @@ function renderFluxogramas(){
   const folders=data.folders.map(folderItem=>{
     const open=folderItem.id===data.activeFolderId;
     return `<div class="flux-folder">
-      <div class="flux-folder-h ${open?'active':''}" onclick="fluxSetFolder('${folderItem.id}')"><span>${excelText(folderItem.name)}</span><button class="flux-btn gray" type="button" onclick="event.stopPropagation();fluxRenameFolder('${folderItem.id}')">Renomear</button></div>
-      ${open?`<div class="flux-flow-list">${(folderItem.flows||[]).map(f=>`<button class="flux-flow-item ${f.id===data.activeFlowId?'active':''}" type="button" onclick="fluxSetFlow('${f.id}')"><span>${excelText(f.name)}</span><b onclick="event.stopPropagation();fluxRenameFlow('${f.id}')">editar</b></button>`).join('')}</div>`:''}
+      <div class="flux-folder-h ${open?'active':''}" onclick="fluxSetFolder('${folderItem.id}')"><span>${excelText(folderItem.name)}</span><div class="flux-folder-actions"><button class="flux-btn gray" type="button" onclick="event.stopPropagation();fluxRenameFolder('${folderItem.id}')">Renomear</button><button class="flux-btn red" type="button" onclick="event.stopPropagation();fluxDeleteFolder('${folderItem.id}')">Excluir</button></div></div>
+      ${open?`<div class="flux-flow-list">${(folderItem.flows||[]).map(f=>`<button class="flux-flow-item ${f.id===data.activeFlowId?'active':''}" type="button" onclick="fluxSetFlow('${f.id}')"><span>${excelText(f.name)}</span><span class="flux-flow-actions"><b onclick="event.stopPropagation();fluxRenameFlow('${f.id}')">editar</b><b class="danger" onclick="event.stopPropagation();fluxDeleteFlow('${f.id}')">excluir</b></span></button>`).join('')}</div>`:''}
     </div>`;
   }).join('');
   const nodes=flow?(flow.nodes||[]).map(n=>{
@@ -8886,7 +9031,7 @@ function renderFluxogramas(){
       `color:${n.textColor||'#06162b'}`,
       `text-align:${n.align||'center'}`
     ].join(';');
-    return `<div class="flux-node ${excelText(n.color||'white')} ${shape} ${n.locked?'locked':''} ${fluxUi.selectedNodeId===n.id?'active':''} ${fluxUi.connectFrom===n.id?'connecting':''}" data-flux-node="${attrText(n.id)}" style="${boxStyle}" onpointerdown="fluxNodePointerDown(event,'${n.id}')" onclick="fluxNodeClick(event,'${n.id}')"><div class="flux-node-text" contenteditable="${n.locked?'false':'true'}" spellcheck="false" style="${textStyle}" oninput="fluxUpdateNodeText('${n.id}',this)">${excelText(n.text||'')}</div></div>`;
+    return `<div class="flux-node ${excelText(n.color||'white')} ${shape} ${n.locked?'locked':''} ${fluxUi.selectedNodeId===n.id?'active':''} ${fluxUi.connectFrom===n.id?'connecting':''}" data-flux-node="${attrText(n.id)}" style="${boxStyle}" onpointerdown="fluxNodePointerDown(event,'${n.id}')" onclick="fluxNodeClick(event,'${n.id}')"><div class="flux-node-text" contenteditable="${n.locked?'false':'true'}" spellcheck="false" style="${textStyle}" onpointerdown="event.stopPropagation()" onclick="fluxNodeTextClick(event,'${n.id}')" onfocus="fluxNodeTextClick(event,'${n.id}')" oninput="fluxUpdateNodeText('${n.id}',this)">${excelText(n.text||'')}</div></div>`;
   }).join(''):'';
   const quickTools=selected?`
       <div class="flux-quick" style="left:${(+selected.x||0)-20}px;top:${(+selected.y||0)+(+selected.h||74)/2}px">
@@ -8959,7 +9104,7 @@ function renderFluxogramas(){
         ${flow?`<div class="flux-canvas" ondblclick="fluxCanvasDblClick(event)" style="transform:scale(${+flow.zoom||1})"><svg class="flux-svg" id="fluxSvg"></svg>${nodes}${quickTools}<div class="flux-tip">Clique em um bloco e use os bot&otilde;es + para puxar novos passos. Duplo clique no fundo cria um bloco.</div></div>`:'<div class="flux-empty">Crie uma pasta e um fluxo para come&ccedil;ar.</div>'}
       </div>
     </main>`;
-  if(flow)setTimeout(()=>fluxRenderEdges(flow),0);
+  if(flow)setTimeout(()=>{fluxRenderEdges(flow);fluxFocusPendingNode();},0);
 }
 window.addEventListener('pointermove',fluxPointerMove);
 window.addEventListener('pointerup',fluxPointerUp);
