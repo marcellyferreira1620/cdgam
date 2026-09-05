@@ -4940,6 +4940,7 @@ function readFileText(file,encoding){
 let recebArmXmlBipCache=[];
 let recebArmXmlBipTimer=null;
 let recebArmXmlBipBusy=false;
+let recebArmPendingBipChave='';
 let recebArmGlobalBipBuffer='';
 let recebArmGlobalBipLastAt=0;
 let recebArmGlobalBipTimer=null;
@@ -5338,6 +5339,10 @@ async function readRecebArmNotaFile(ev){
         const totalItens=parsedList.reduce((s,n)=>s+((n.itens||[]).length),0);
         recebArmMsg('recebArmNotaMsg',`${parsedList.length} XML(s) lidos | ${totalItens} item(ns) | ${prodFmt(totalVol,0)} caixa(s) | ${prodFmt(totalUn,0)} unidade(s). Bipe a chave para importar automático ou clique em Adicionar NF.`,false);
       }
+      if(recebArmPendingBipChave&&parsedList.some(n=>recebArmAccessKey(n.chave)===recebArmPendingBipChave)){
+        recebArmBipStatus('XML da chave bipada encontrado. Importando a nota automaticamente...',false);
+        setTimeout(()=>processRecebArmXmlBip(recebArmPendingBipChave),80);
+      }
     }
   }catch(e){
     console.error(e);
@@ -5352,6 +5357,25 @@ function recebArmAccessKey(value){
   return match?match[0]:'';
 }
 
+function recebArmNotaNumberFromAccessKey(chave){
+  const key=recebArmAccessKey(chave);
+  if(!key)return '';
+  const nf=key.slice(25,34).replace(/^0+/,'');
+  return nf||key.slice(25,34);
+}
+
+function recebArmFillFromAccessKey(chave){
+  const key=recebArmAccessKey(chave);
+  if(!key)return;
+  const nf=recebArmNotaNumberFromAccessKey(key);
+  const nfInput=document.getElementById('recebArmNfNumero');
+  const chaveInput=document.getElementById('recebArmChave');
+  const bipInput=document.getElementById('recebArmXmlBip');
+  if(nfInput&&nf)nfInput.value=nf;
+  if(chaveInput)chaveInput.value=key;
+  if(bipInput)bipInput.value=key;
+}
+
 function recebArmBipStatus(msg,isErr){
   recebArmMsg('recebArmBipStatus',msg,isErr);
 }
@@ -5362,6 +5386,11 @@ function focusRecebArmBip(){
   input.focus();
   if(typeof input.select==='function')input.select();
   recebArmBipStatus('Aguardando bipagem. O leitor precisa digitar a chave de 44 digitos neste campo.',false);
+  setTimeout(()=>{
+    if(document.activeElement===input&&!String(input.value||'').replace(/\D/g,'')){
+      recebArmBipStatus('Nenhum digito chegou no campo. Se o leitor apitou, configure o leitor para modo teclado/USB HID.',true);
+    }
+  },2800);
 }
 
 function recebArmBipInputChanged(input){
@@ -5406,6 +5435,10 @@ async function cacheRecebArmXmlBipFiles(ev){
     recebArmBipStatus(`${parsed.length} XML(s) carregados. Clique em Focar bipagem e bipe a barra preta do DANFE.`,false);
     const bip=document.getElementById('recebArmXmlBip');
     if(bip)bip.focus();
+    if(recebArmPendingBipChave&&parsed.some(n=>recebArmAccessKey(n.chave)===recebArmPendingBipChave)){
+      recebArmBipStatus('XML da chave bipada encontrado. Importando a nota automaticamente...',false);
+      setTimeout(()=>processRecebArmXmlBip(recebArmPendingBipChave),80);
+    }
   }catch(e){
     console.error(e);
     recebArmXmlBipCache=[];
@@ -5432,6 +5465,38 @@ function clearRecebArmBipBufferLater(){
   recebArmGlobalBipTimer=setTimeout(()=>{recebArmGlobalBipBuffer='';},450);
 }
 
+function recebArmDigitFromKeyEvent(ev){
+  if(/^\d$/.test(ev.key||''))return ev.key;
+  const code=ev.keyCode||ev.which||0;
+  if(code>=48&&code<=57)return String.fromCharCode(code);
+  if(code>=96&&code<=105)return String(code-96);
+  return '';
+}
+
+function recebArmPushBipText(text){
+  if(!recebArmBipCaptureActive()||recebArmXmlBipBusy)return false;
+  const digits=String(text||'').replace(/\D/g,'');
+  if(!digits)return false;
+  const now=Date.now();
+  if(now-recebArmGlobalBipLastAt>300)recebArmGlobalBipBuffer='';
+  recebArmGlobalBipLastAt=now;
+  recebArmGlobalBipBuffer=(recebArmGlobalBipBuffer+digits).slice(-80);
+  const bip=document.getElementById('recebArmXmlBip');
+  if(bip&&document.activeElement!==bip)bip.value=recebArmGlobalBipBuffer;
+  recebArmBipStatus(`Recebendo leitura: ${Math.min(recebArmGlobalBipBuffer.replace(/\D/g,'').length,44)}/44 digitos.`,false);
+  const chave=recebArmAccessKey(recebArmGlobalBipBuffer);
+  if(chave){
+    recebArmGlobalBipBuffer='';
+    if(bip)bip.value=chave;
+    recebArmBipStatus('Chave completa recebida: 44/44 digitos. Importando...',false);
+    clearTimeout(recebArmXmlBipTimer);
+    recebArmXmlBipTimer=setTimeout(()=>processRecebArmXmlBip(chave),60);
+  }else{
+    clearRecebArmBipBufferLater();
+  }
+  return true;
+}
+
 function handleRecebArmGlobalBipKeydown(ev){
   if(!recebArmBipCaptureActive()||recebArmXmlBipBusy)return;
   if(ev.ctrlKey||ev.altKey||ev.metaKey)return;
@@ -5446,32 +5511,27 @@ function handleRecebArmGlobalBipKeydown(ev){
     }
     return;
   }
-  if(!/^\d$/.test(key)){
+  const digit=recebArmDigitFromKeyEvent(ev);
+  if(!digit){
     if(key.length===1)recebArmGlobalBipBuffer='';
     return;
   }
-  const now=Date.now();
-  if(now-recebArmGlobalBipLastAt>180)recebArmGlobalBipBuffer='';
-  recebArmGlobalBipLastAt=now;
-  recebArmGlobalBipBuffer=(recebArmGlobalBipBuffer+key).slice(-60);
-  const bip=document.getElementById('recebArmXmlBip');
-  if(bip&&document.activeElement!==bip)bip.value=recebArmGlobalBipBuffer;
-  recebArmBipStatus(`Recebendo leitura: ${Math.min(recebArmGlobalBipBuffer.replace(/\D/g,'').length,44)}/44 digitos.`,false);
-  const chave=recebArmAccessKey(recebArmGlobalBipBuffer);
-  if(chave){
-    recebArmGlobalBipBuffer='';
-    if(bip)bip.value=chave;
-    recebArmBipStatus('Chave completa recebida: 44/44 digitos. Importando...',false);
-    clearTimeout(recebArmXmlBipTimer);
-    recebArmXmlBipTimer=setTimeout(()=>processRecebArmXmlBip(chave),60);
-  }else{
-    clearRecebArmBipBufferLater();
+  recebArmPushBipText(digit);
+}
+
+function handleRecebArmGlobalBipPaste(ev){
+  if(!recebArmBipCaptureActive()||recebArmXmlBipBusy)return;
+  const text=(ev.clipboardData&&ev.clipboardData.getData('text'))||'';
+  if(recebArmAccessKey(text)){
+    ev.preventDefault();
+    recebArmPushBipText(text);
   }
 }
 
 if(!window.__recebArmGlobalBipReady){
   window.__recebArmGlobalBipReady=true;
   document.addEventListener('keydown',handleRecebArmGlobalBipKeydown,true);
+  document.addEventListener('paste',handleRecebArmGlobalBipPaste,true);
 }
 
 async function processRecebArmXmlBip(value){
@@ -5496,8 +5556,10 @@ async function processRecebArmXmlBip(value){
       }
       parsed=recebArmParsedXmlSources().find(n=>recebArmAccessKey(n.chave)===chave)||null;
       if(!parsed){
+        recebArmPendingBipChave=chave;
+        recebArmFillFromAccessKey(chave);
         recebArmMsg('recebArmNotaMsg',`XML da chave ${chave.slice(-8)} não encontrado. Selecione a pasta dos XMLs primeiro.`,true);
-        recebArmBipStatus(`Chave lida, mas o XML final ${chave.slice(-8)} nao esta nos arquivos selecionados.`,true);
+        recebArmBipStatus(`Chave lida e NF ${recebArmNotaNumberFromAccessKey(chave)} preenchida. Para carregar itens/caixas/unidades, selecione os XMLs dessa nota.`,true);
         return;
       }
     }
@@ -5510,6 +5572,7 @@ async function processRecebArmXmlBip(value){
       return;
     }
     data.notas=recebArmUniqueNotas(data.notas);
+    recebArmPendingBipChave='';
     recebArmTouch(day);
     compareRecebArmStorage(false);
     renderRecebArm();
