@@ -6778,6 +6778,12 @@ function recebArmPendArmTotal(data){
   return total>0?total:rows.length;
 }
 
+function recebArm997AtualPendenteResumo(data){
+  const rows=recebArmQrpCurrentSnapshot(data&&data.qrpRows);
+  const summary=recebArm997SummaryFromRows(rows,curDate||today());
+  return{skus:+summary.total.linhas||rows.length,volumes:+summary.total.vol||0};
+}
+
 function renderRecebArmKpis(data){
   const el=document.getElementById('recebArmKpis');
   if(!el)return;
@@ -6786,16 +6792,15 @@ function renderRecebArmKpis(data){
   const armFinal=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)==='finalizado').length;
   const confRun=notas.filter(n=>recebArmNormalizeStatus(n.confStatus)!=='finalizado').length;
   const armRun=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)!=='finalizado').length;
-  const pendArmRows=(data.pendArm||[]).length;
-  const pendArmTotal=recebArmPendArmTotal(data);
+  const pend997=recebArm997AtualPendenteResumo(data);
   const kpis=[
-    ['Notas no dia',notas.length,'#ffd700'],
-    ['Conferência 100%',confFinal,'#00e676'],
-    ['Em conferência',confRun,'#1e88e5'],
-    ['Em armazenagem',armRun,'#1e88e5'],
-    ['Armazenagem 100%',armFinal,'#00e676'],
-    ['Pend. conferência',(data.pendConf||[]).length,'#ff4c4c'],
-    ['Pend. armazenagem',prodFmt(pendArmTotal,0),'#ff9500',pendArmRows?`${prodFmt(pendArmRows,0)} item(ns) 997/manual`:'']
+    ['Notas fiscais recebidas no dia',notas.length,'#ffd700'],
+    ['Notas fiscais 100% conferidas',confFinal,'#00e676'],
+    ['Notas fiscais em conferência',confRun,'#1e88e5'],
+    ['Notas fiscais em armazenagem',armRun,'#1e88e5'],
+    ['Notas fiscais 100% armazenadas',armFinal,'#00e676'],
+    ['Notas fiscais com pendência de conferência',(data.pendConf||[]).length,'#ff4c4c'],
+    ['Pendência de armazenagem',`SKUs: ${prodFmt(pend997.skus,0)}`,'#ff9500',`Volumes: ${prodFmt(pend997.volumes,0)}`]
   ];
   el.innerHTML=kpis.map(([label,value,color,sub])=>`<div class="receb-arm-kpi"><div class="lbl">${label}</div><div class="val" style="color:${color}">${value}</div>${sub?`<small style="color:#89b4d4;font-weight:bold">${excelText(sub)}</small>`:''}</div>`).join('');
 }
