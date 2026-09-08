@@ -208,6 +208,17 @@ body.recebarm-view .receb-arm-form{grid-template-columns:repeat(auto-fit,minmax(
 .boletim-line{display:flex;align-items:center;justify-content:space-between;gap:10px;border-bottom:1px solid #dbe8f3;padding:6px 0;font-size:12px}
 .boletim-line:last-child{border-bottom:0}
 .boletim-line b{color:#003b6f}.boletim-line strong{color:#004b8d}
+.boletim-kpi-week{background:#fff;border:1px solid #9fb9d2;border-radius:3px;margin:-4px 0 12px;overflow:hidden}
+.boletim-kpi-week-title{background:#eef2f6;color:#34465a;border-bottom:1px solid #9fb9d2;padding:4px 8px;font-size:12px;font-weight:900;text-transform:uppercase}
+.boletim-kpi-table-wrap{overflow-x:auto}
+.boletim-kpi-table{width:100%;min-width:760px;border-collapse:collapse;table-layout:fixed;font-size:12px}
+.boletim-kpi-table th,.boletim-kpi-table td{border:1px solid #cfd8e2;padding:0;height:32px;background:#f9fbfd}
+.boletim-kpi-table th{background:#356cad;color:#fff;font-weight:900;text-align:center;height:28px}
+.boletim-kpi-table th:first-child{width:24%}
+.boletim-kpi-table th:nth-child(2){width:8%}
+.boletim-kpi-label{padding:7px 8px!important;background:#fff!important;color:#1b2734;font-weight:900;text-align:left}
+.boletim-kpi-input{width:100%;height:100%;border:0;background:transparent;color:#0a2340;font-size:12px;font-weight:800;text-align:center;padding:5px 6px;outline:0}
+.boletim-kpi-input:focus{background:#fffde7;box-shadow:inset 0 0 0 2px #1e88e5}
 .boletim-whatsapp{width:100%;min-height:230px;border:1px solid #9fc7e6;border-radius:6px;padding:12px;font-size:12px;line-height:1.45;color:#0a2340;background:#fff;resize:vertical}
 body.boletim-view #kpiBar1,
 body.boletim-view #flowBar,
@@ -9359,6 +9370,36 @@ function boletimTextarea(label,key,value){
 function boletimLine(label,value,detail=''){
   return `<div class="boletim-line"><b>${label}</b><span><strong>${value}</strong>${detail?` <small>${detail}</small>`:''}</span></div>`;
 }
+function boletimKpiWeekTable(b){
+  const rows=[
+    ['Lead Time','leadTime'],
+    ['Pend&ecirc;ncia 997','pendencia997'],
+    ['Reservas','reservas'],
+    ['Vales','vales'],
+    ['Efici&ecirc;ncia de Expedi&ccedil;&atilde;o','eficienciaExpedicaoSemana'],
+    ['Devolu&ccedil;&otilde;es de Clientes','devolucoesClientes']
+  ];
+  const cols=[
+    ['Meta','meta'],
+    ['Segunda','segunda'],
+    ['Ter&ccedil;a','terca'],
+    ['Quarta','quarta'],
+    ['Quinta','quinta'],
+    ['Sexta','sexta']
+  ];
+  const input=(rowKey,colKey)=>`<input class="boletim-kpi-input" type="text" value="${attrText(b[`kpi_${rowKey}_${colKey}`]||'')}" oninput="saveBoletimField('kpi_${rowKey}_${colKey}',this.value)">`;
+  return `<section class="boletim-kpi-week">
+    <div class="boletim-kpi-week-title">Acompanhamento di&aacute;rio de indicadores (KPIs)</div>
+    <div class="boletim-kpi-table-wrap">
+      <table class="boletim-kpi-table">
+        <thead><tr><th>Indicador Log&iacute;stico / Operacional</th>${cols.map(([label])=>`<th>${label}</th>`).join('')}</tr></thead>
+        <tbody>
+          ${rows.map(([label,rowKey])=>`<tr><td class="boletim-kpi-label">${label}</td>${cols.map(([,colKey])=>`<td>${input(rowKey,colKey)}</td>`).join('')}</tr>`).join('')}
+        </tbody>
+      </table>
+    </div>
+  </section>`;
+}
 function boletimPartialAlertRows(day){
   const data=(day&&day.recebArm)||{};
   if(Array.isArray(data.qrpOpenPartials))return data.qrpOpenPartials;
@@ -9476,6 +9517,7 @@ function renderBoletim(){
         <button class="boletim-btn gray" type="button" onclick="showAreaHub()">Trocar área</button>
       </div>
     </div>
+    ${boletimKpiWeekTable(b)}
     <div class="boletim-grid">
       <div class="boletim-card"><span>Notas no dia</span><strong>${prodFmt(r.notas,0)}</strong><small>Recebimento/armazenagem</small></div>
       <div class="boletim-card"><span>Conferência 100%</span><strong style="color:#00e676">${prodFmt(r.confFinal,0)}</strong><small>NF(s) finalizadas</small></div>
