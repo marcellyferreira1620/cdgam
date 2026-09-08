@@ -1374,6 +1374,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
           <button class="receb-arm-btn gray" type="button" onclick="startRecebArmScannerTest()">Teste do leitor</button>
           <button class="receb-arm-btn green" type="button" onclick="startRecebArmCameraScanner()">Abrir camera da barra</button>
           <button class="receb-arm-btn" type="button" onclick="addRecebArmNota()">Adicionar NF</button>
+          <button class="receb-arm-btn green" type="button" onclick="saveRecebArmDay()">Salvar Dia</button>
         </div>
         <div class="receb-arm-msg" id="recebArmBipStatus"></div>
         <div class="receb-arm-msg" id="recebArmNotaMsg"></div>
@@ -5963,6 +5964,17 @@ function addRecebArmNota(){
   recebArmMsg('recebArmNotaMsg',`${added} NF(s) adicionada(s)${updated?` | ${updated} repetida(s) atualizada(s)`:''}${protectedCount?` | ${protectedCount} ja bipada(s) mantida(s), sem alterar status`:''}${skipped?` | ${skipped} ignorada(s)`:''}.`,false);
   if(added||updated)compareRecebArmStorage(false);
   renderRecebArm();
+}
+
+function saveRecebArmDay(){
+  const day=recebArmDay();
+  const ts=Date.now();
+  ensureRecebArm(day)._updatedAt=ts;
+  day._updatedAt=ts;
+  persistRecebArmOnly(day);
+  buildDayNav();
+  showSyncStatus('☁ Salvo!',false);
+  recebArmMsg('recebArmNotaMsg',`Dia ${fmtDateShort(day.date||curDate||today())} salvo.`,false);
 }
 
 function setRecebArmNotaStatus(notaId,field,value){
