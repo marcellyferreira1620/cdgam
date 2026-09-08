@@ -5512,6 +5512,16 @@ function recebArmParsedXmlSources(){
   return [...recebArmXmlBipCache,...fromFile].filter(n=>n&&n.chave);
 }
 
+function recebArmFindParsedXmlForInput(nfNumero,chave){
+  const key=recebArmAccessKey(chave);
+  const nf=String(nfNumero||'').replace(/\D/g,'').replace(/^0+/,'');
+  return recebArmParsedXmlSources().find(n=>{
+    const nKey=recebArmAccessKey(n.chave);
+    const nNf=String(n.nfNumero||'').replace(/\D/g,'').replace(/^0+/,'');
+    return (key&&nKey===key)||(nf&&nNf===nf);
+  })||null;
+}
+
 async function cacheRecebArmXmlBipFiles(ev){
   const files=[...(ev.target.files||[])].filter(file=>/\.xml$/i.test(file.name));
   if(!files.length){
@@ -5868,8 +5878,8 @@ async function processRecebArmXmlBip(value){
       if(!parsed){
         recebArmPendingBipChave=chave;
         recebArmFillFromAccessKey(chave);
-        recebArmMsg('recebArmNotaMsg',`XML da chave ${chave.slice(-8)} não encontrado. Selecione a pasta dos XMLs primeiro.`,true);
-        recebArmBipStatus(`Chave lida e NF ${recebArmNotaNumberFromAccessKey(chave)} preenchida. Para carregar itens/caixas/unidades, selecione os XMLs dessa nota.`,true);
+        recebArmMsg('recebArmNotaMsg',`Chave lida. Para importar itens/caixas/unidades, selecione o XML dessa NF em Arquivo XML/PDF ou XMLs para bipagem.`,false);
+        recebArmBipStatus(`Chave lida e NF ${recebArmNotaNumberFromAccessKey(chave)} preenchida. Falta selecionar o XML dessa nota para carregar os itens.`,false);
         return;
       }
     }
@@ -5938,13 +5948,14 @@ function addRecebArmNota(){
   const day=recebArmDay();
   const data=ensureRecebArm(day);
   const fileEl=document.getElementById('recebArmNotaFile');
-  const parsedList=fileEl&&Array.isArray(fileEl._parsedNotas)&&fileEl._parsedNotas.length?fileEl._parsedNotas:[fileEl&&fileEl._parsedNota?fileEl._parsedNota:{}];
   const manualOverrides={
     nfNumero:(document.getElementById('recebArmNfNumero').value||'').trim(),
     chave:(document.getElementById('recebArmChave').value||'').replace(/\D/g,''),
     fornecedor:(document.getElementById('recebArmFornecedor').value||'').trim(),
     protocolo:(document.getElementById('recebArmProtocolo').value||'').trim()
   };
+  const matchedParsed=recebArmFindParsedXmlForInput(manualOverrides.nfNumero,manualOverrides.chave);
+  const parsedList=matchedParsed?[matchedParsed]:(fileEl&&Array.isArray(fileEl._parsedNotas)&&fileEl._parsedNotas.length?fileEl._parsedNotas:[fileEl&&fileEl._parsedNota?fileEl._parsedNota:{}]);
   if(parsedList.length===1&&!manualOverrides.nfNumero&&!manualOverrides.chave&&!(parsedList[0]&&parsedList[0].nfNumero)&&!(parsedList[0]&&parsedList[0].chave)){
     recebArmMsg('recebArmNotaMsg','Informe o número da NF ou a chave.',true);
     return;
@@ -5962,7 +5973,7 @@ function addRecebArmNota(){
     }
   });
   if(!added&&!updated&&!protectedCount){
-    recebArmMsg('recebArmNotaMsg',missingItems?'Anexe XML da NF para carregar itens, caixas/volumes e unidades antes de adicionar.':'Nenhuma NF válida encontrada nos arquivos.',true);
+    recebArmMsg('recebArmNotaMsg',missingItems?'A chave/NF foi lida, mas falta selecionar o XML correspondente em Arquivo XML/PDF ou XMLs para bipagem.':'Nenhuma NF válida encontrada nos arquivos.',true);
     return;
   }
   if(added||updated){
