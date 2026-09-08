@@ -5103,8 +5103,8 @@ function recebArm997MatchScore(item,row){
   const rowLote=recebArmNormalizeLote(row.lote||'');
   const loteScore=recebArmLoteScore(itemLote,rowLote);
   if(itemLote&&rowLote&&!loteScore)return 0;
-  if(itemLote&&!rowLote)return descScore*0.82;
-  if(!itemLote&&rowLote)return descScore*0.90;
+  if(itemLote&&!rowLote)return descScore;
+  if(!itemLote&&rowLote)return descScore;
   return descScore+(loteScore*0.30);
 }
 
