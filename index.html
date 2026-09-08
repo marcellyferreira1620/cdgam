@@ -1348,7 +1348,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
             <input id="recebArmNfNumero" placeholder="Ex.: 277398">
           </label>
           <label>Chave NF-e
-            <input id="recebArmChave" inputmode="numeric" autocomplete="off" placeholder="44 dígitos da chave" oninput="recebArmBipInputChanged(this)" onkeydown="if(event.key==='Enter'){event.preventDefault();processRecebArmXmlBip(this.value)}">
+            <input id="recebArmChave" inputmode="numeric" autocomplete="off" placeholder="Bipe aqui a chave NF-e" onfocus="recebArmBipStatus('Campo Chave NF-e pronto. Bipe a barra preta do DANFE aqui.',false)" oninput="recebArmBipInputChanged(this)" onpaste="setTimeout(()=>processRecebArmXmlBip(this.value),40)" onchange="processRecebArmXmlBip(this.value)" onkeydown="if(event.key==='Enter'){event.preventDefault();processRecebArmXmlBip(this.value)}">
           </label>
           <label>Fornecedor
             <input id="recebArmFornecedor" placeholder="Fornecedor da nota">
@@ -1383,7 +1383,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
           <button class="receb-arm-btn gray" type="button" onclick="focusRecebArmBip()">Focar bipagem</button>
           <button class="receb-arm-btn purple" type="button" onclick="connectRecebArmScanner()">Conectar leitor USB/Serial</button>
           <button class="receb-arm-btn gray" type="button" onclick="startRecebArmScannerTest()">Teste do leitor</button>
-          <button class="receb-arm-btn purple" type="button" onclick="selectRecebArmXmlAutoFolder()">Ativar pasta XML automatica</button>
+          <button class="receb-arm-btn purple" type="button" onclick="configureRecebArmOnlineXmlApi()">Configurar API NF-e</button>
           <button class="receb-arm-btn green" type="button" onclick="startRecebArmCameraScanner()">Abrir camera da barra</button>
           <button class="receb-arm-btn" type="button" onclick="addRecebArmNota()">Adicionar NF</button>
           <button class="receb-arm-btn green" type="button" onclick="saveRecebArmDay()">Salvar Dia</button>
@@ -4899,13 +4899,14 @@ function exportProdDiurnoExcel(){
 
 // Recebimento / Armazenagem
 function emptyRecebArm(){
-  return{agendaRows:[],notas:[],pendConf:[],pendArm:[],qrpRows:[],qrpImports:[],qrpLastItems:[],qrpLastSummaryItems:[],qrpOpenPartials:[],productBase:[],_updatedAt:0};
+  return{agendaRows:[],notas:[],pendConf:[],pendArm:[],qrpRows:[],qrpImports:[],qrpLastItems:[],qrpLastSummaryItems:[],qrpLastPendingSummary:null,qrpOpenPartials:[],productBase:[],_updatedAt:0};
 }
 
 function ensureRecebArm(day){
   if(!day.recebArm||typeof day.recebArm!=='object')day.recebArm=emptyRecebArm();
   const data=day.recebArm;
   ['agendaRows','notas','pendConf','pendArm','qrpRows','qrpImports','qrpLastItems','qrpLastSummaryItems','qrpOpenPartials','productBase'].forEach(k=>{if(!Array.isArray(data[k]))data[k]=[];});
+  if(data.qrpLastPendingSummary&&typeof data.qrpLastPendingSummary!=='object')data.qrpLastPendingSummary=null;
   return data;
 }
 
@@ -5009,6 +5010,8 @@ let recebArmScannerTest=false;
 let recebArmScannerTestHits=0;
 let recebArmZxingReader=null;
 let recebArmZxingControls=null;
+const RECEB_ARM_XML_API_URL_KEY='receb_arm_xml_api_url';
+const RECEB_ARM_XML_API_TOKEN_KEY='receb_arm_xml_api_token';
 
 function recebArmSheetRows(workbook){
   const ws=workbook.Sheets[workbook.SheetNames[0]];
@@ -5415,7 +5418,7 @@ async function readRecebArmNotaFile(ev){
         const totalVol=parsedList.reduce((s,n)=>s+(+n.volumes||0),0);
         const totalUn=parsedList.reduce((s,n)=>s+(+n.unidades||0),0);
         const totalItens=parsedList.reduce((s,n)=>s+((n.itens||[]).length),0);
-        recebArmMsg('recebArmNotaMsg',`${parsedList.length} XML(s) lidos | ${totalItens} item(ns) | ${prodFmt(totalVol,0)} caixa(s) | ${prodFmt(totalUn,0)} unidade(s). Bipe a chave para importar automático ou clique em Adicionar NF.`,false);
+        recebArmMsg('recebArmNotaMsg',`${parsedList.length} XML(s) lidos | ${totalItens} item(ns) | ${prodFmt(totalVol,0)} caixa(s) | ${prodFmt(totalUn,0)} unidade(s). Bipe no campo Chave NF-e para importar automático ou clique em Adicionar NF.`,false);
       }
       if(recebArmPendingBipChave&&parsedList.some(n=>recebArmAccessKey(n.chave)===recebArmPendingBipChave)){
         recebArmBipStatus('XML da chave bipada encontrado. Importando a nota automaticamente...',false);
@@ -5489,11 +5492,11 @@ function startRecebArmScannerTest(){
 }
 
 function focusRecebArmBip(){
-  const input=document.getElementById('recebArmXmlBip')||document.getElementById('recebArmChave');
+  const input=document.getElementById('recebArmChave')||document.getElementById('recebArmXmlBip');
   if(!input)return;
   input.focus();
   if(typeof input.select==='function')input.select();
-  recebArmBipStatus('Aguardando bipagem. O leitor precisa digitar a chave de 44 digitos neste campo.',false);
+  recebArmBipStatus('Aguardando bipagem no campo Chave NF-e. O leitor precisa digitar a chave de 44 digitos ali.',false);
 }
 
 function recebArmBipInputChanged(input){
@@ -5538,6 +5541,119 @@ function recebArmRememberBipXml(nota){
     nota,
     ...recebArmXmlBipCache.filter(n=>recebArmAccessKey(n.chave)!==key)
   ].slice(0,800);
+}
+
+function recebArmOnlineXmlApiConfig(){
+  try{
+    return{
+      url:localStorage.getItem(RECEB_ARM_XML_API_URL_KEY)||'',
+      token:localStorage.getItem(RECEB_ARM_XML_API_TOKEN_KEY)||''
+    };
+  }catch(_){
+    return{url:'',token:''};
+  }
+}
+
+function configureRecebArmOnlineXmlApi(){
+  const current=recebArmOnlineXmlApiConfig();
+  const url=prompt('Cole a URL da API que devolve o XML pela chave NF-e. Use {chave} onde entra a chave de 44 digitos.',current.url||'');
+  if(url===null)return;
+  const cleanUrl=String(url||'').trim();
+  if(!cleanUrl){
+    try{
+      localStorage.removeItem(RECEB_ARM_XML_API_URL_KEY);
+      localStorage.removeItem(RECEB_ARM_XML_API_TOKEN_KEY);
+    }catch(_){}
+    recebArmBipStatus('API NF-e removida. Sem API, o site precisa de XML anexado para importar itens.',false);
+    recebArmMsg('recebArmNotaMsg','API NF-e removida.',false);
+    return;
+  }
+  const token=prompt('Se a API usar token, cole aqui. Se nao usar, deixe em branco.',current.token||'');
+  try{
+    localStorage.setItem(RECEB_ARM_XML_API_URL_KEY,cleanUrl);
+    localStorage.setItem(RECEB_ARM_XML_API_TOKEN_KEY,String(token||'').trim());
+  }catch(_){}
+  recebArmBipStatus('API NF-e configurada. Agora bipe direto no campo Chave NF-e.',false);
+  recebArmMsg('recebArmNotaMsg','API NF-e configurada para buscar XML pela chave.',false);
+  focusRecebArmBip();
+}
+
+function recebArmBuildOnlineXmlUrl(template,chave){
+  const url=String(template||'').trim();
+  if(!url)return '';
+  if(url.includes('{chave}'))return url.replaceAll('{chave}',encodeURIComponent(chave));
+  const sep=url.includes('?')?'&':'?';
+  return `${url}${sep}chave=${encodeURIComponent(chave)}`;
+}
+
+function recebArmDecodeBase64Xml(value){
+  const text=String(value||'').trim();
+  if(!text||text.includes('<'))return text;
+  try{
+    const decoded=decodeURIComponent(escape(atob(text)));
+    return decoded.includes('<')?decoded:text;
+  }catch(_){
+    try{
+      const decoded=atob(text);
+      return decoded.includes('<')?decoded:text;
+    }catch(__){
+      return text;
+    }
+  }
+}
+
+function recebArmXmlFromOnlinePayload(text){
+  const raw=String(text||'').trim();
+  if(!raw)return '';
+  if(raw.startsWith('<'))return raw;
+  try{
+    const json=JSON.parse(raw);
+    const candidates=[
+      json.xml,
+      json.XML,
+      json.nfeXml,
+      json.nfe_xml,
+      json.procNFe,
+      json.procXml,
+      json.content,
+      json.data&&json.data.xml,
+      json.data&&json.data.XML,
+      json.data&&json.data.nfeXml,
+      json.data&&json.data.procNFe,
+      json.result&&json.result.xml,
+      json.result&&json.result.nfeXml
+    ].filter(Boolean);
+    for(const candidate of candidates){
+      const xml=recebArmDecodeBase64Xml(candidate);
+      if(String(xml||'').trim().startsWith('<'))return xml;
+    }
+  }catch(_){}
+  return '';
+}
+
+async function recebArmFetchXmlOnline(chave,data){
+  const key=recebArmAccessKey(chave);
+  const cfg=recebArmOnlineXmlApiConfig();
+  if(!key||!cfg.url)return{ok:false,missingConfig:true};
+  try{
+    const headers={'Accept':'application/xml,text/xml,application/json,text/plain'};
+    if(cfg.token)headers.Authorization=`Bearer ${cfg.token}`;
+    const response=await fetch(recebArmBuildOnlineXmlUrl(cfg.url,key),{method:'GET',headers,cache:'no-store'});
+    const text=await response.text();
+    if(!response.ok)return{ok:false,error:`API respondeu ${response.status}`};
+    const xmlText=recebArmXmlFromOnlinePayload(text);
+    if(!xmlText)return{ok:false,error:'API nao devolveu XML da NF-e'};
+    const nota=parseRecebArmXml(xmlText);
+    nota.source='api';
+    nota.fileName=`api-${key}.xml`;
+    nota.itens=recebArmEnrichItems(nota.itens,data);
+    if(recebArmAccessKey(nota.chave)!==key)return{ok:false,error:'XML retornado nao confere com a chave bipada'};
+    recebArmRememberBipXml(nota);
+    return{ok:true,nota};
+  }catch(e){
+    console.error(e);
+    return{ok:false,error:'API bloqueada/indisponivel ou sem CORS'};
+  }
 }
 
 async function selectRecebArmXmlAutoFolder(){
@@ -5621,9 +5737,9 @@ async function cacheRecebArmXmlBipFiles(ev){
       parsed.push(nota);
     }
     recebArmXmlBipCache=parsed;
-    recebArmMsg('recebArmNotaMsg',`${parsed.length} XML(s) prontos para bipagem. Agora bipe a chave do DANFE.`,false);
-    recebArmBipStatus(`${parsed.length} XML(s) carregados. Clique em Focar bipagem e bipe a barra preta do DANFE.`,false);
-    const bip=document.getElementById('recebArmXmlBip');
+    recebArmMsg('recebArmNotaMsg',`${parsed.length} XML(s) prontos para bipagem. Agora bipe no campo Chave NF-e.`,false);
+    recebArmBipStatus(`${parsed.length} XML(s) carregados. Clique em Focar bipagem e bipe a barra preta do DANFE no campo Chave NF-e.`,false);
+    const bip=document.getElementById('recebArmChave')||document.getElementById('recebArmXmlBip');
     if(bip)bip.focus();
     if(recebArmPendingBipChave&&parsed.some(n=>recebArmAccessKey(n.chave)===recebArmPendingBipChave)){
       recebArmBipStatus('XML da chave bipada encontrado. Importando a nota automaticamente...',false);
@@ -5957,10 +6073,21 @@ async function processRecebArmXmlBip(value){
         parsed=await recebArmFindXmlInAutoFolder(chave,data);
       }
       if(!parsed){
+        recebArmBipStatus(`Chave ${recebArmNotaNumberFromAccessKey(chave)} lida. Consultando XML online...`,false);
+        const online=await recebArmFetchXmlOnline(chave,data);
+        if(online.ok){
+          parsed=online.nota;
+        }else if(!online.missingConfig){
+          recebArmMsg('recebArmNotaMsg',`Chave lida, mas a consulta online nao trouxe o XML: ${online.error||'sem retorno'}.`,true);
+          recebArmBipStatus('Nao consegui baixar o XML online. Confira a API NF-e configurada.',true);
+          return;
+        }
+      }
+      if(!parsed){
         recebArmPendingBipChave=chave;
         recebArmFillFromAccessKey(chave);
-        recebArmMsg('recebArmNotaMsg',`Chave lida. Nao da para transformar a chave em XML completo so pelo numero; selecione o XML dessa NF ou ative a pasta XML automatica.`,false);
-        recebArmBipStatus(`NF ${recebArmNotaNumberFromAccessKey(chave)} preenchida pela barra. Falta o XML para carregar itens/caixas/unidades.`,false);
+        recebArmMsg('recebArmNotaMsg',`Chave lida. Para importar itens automaticamente sem anexar XML, configure uma API NF-e que devolva o XML completo pela chave.`,false);
+        recebArmBipStatus(`NF ${recebArmNotaNumberFromAccessKey(chave)} preenchida pela barra. Falta configurar a API NF-e ou anexar XML para carregar itens/caixas/unidades.`,false);
         return;
       }
     }
@@ -5977,7 +6104,7 @@ async function processRecebArmXmlBip(value){
     recebArmTouch(day);
     compareRecebArmStorage(false);
     renderRecebArm();
-    const bip=document.getElementById('recebArmXmlBip');
+    const bip=document.getElementById('recebArmChave')||document.getElementById('recebArmXmlBip');
     if(bip){bip.value='';setTimeout(()=>bip.focus(),80);}
     recebArmMsg('recebArmNotaMsg',`NF ${result.nota.nfNumero||result.nota.chave||''} ${result.updated?'já existia e foi atualizada':'importada pelo bip'}.`,false);
     recebArmBipStatus(`NF ${result.nota.nfNumero||result.nota.chave||''} importada. Pode bipar a proxima.`,false);
@@ -6682,6 +6809,13 @@ async function importRecebArm997(ev){
     data.qrpDayReceivedItems=recebArm997MergeDayReceivedItems(sameParser?(data.qrpDayReceivedItems||[]):[],importRecord.items,day.date);
     data.qrpLastItems=importRecord.items;
     data.qrpLastSummaryItems=recebArm997SummaryItemsForStorage(importRecord.items);
+    data.qrpLastPendingSummary={
+      skus:+importRecord.pending.total.linhas||rows.length,
+      volumes:+importRecord.pending.total.vol||0,
+      fileName:file.name,
+      importedAt:importRecord.importedAt,
+      dayDate:day.date
+    };
     data.qrpParserVersion='emf-997-v1';
     data.qrpImports=[...(data.qrpImports||[]),importRecord].slice(-36);
     recebArm997RefreshOpenPartials(data);
@@ -6710,6 +6844,7 @@ function clearRecebArm997(){
   data.qrpRows=[];
   data.qrpLastItems=[];
   data.qrpLastSummaryItems=[];
+  data.qrpLastPendingSummary=null;
   data.qrpOpenPartials=[];
   data.qrpImports=[];
   recebArm997ExportCache=null;
@@ -6883,6 +7018,12 @@ function recebArmPendArmTotal(data){
 
 function recebArm997AtualPendenteResumo(data){
   const rows=recebArmQrpCurrentSnapshot(data&&data.qrpRows);
+  if(!rows.length&&data&&data.qrpLastPendingSummary){
+    return{
+      skus:+data.qrpLastPendingSummary.skus||0,
+      volumes:+data.qrpLastPendingSummary.volumes||0
+    };
+  }
   const summary=recebArm997SummaryFromRows(rows,curDate||today());
   return{skus:+summary.total.linhas||rows.length,volumes:+summary.total.vol||0};
 }
