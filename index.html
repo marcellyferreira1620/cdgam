@@ -4965,7 +4965,7 @@ function recebArmStatusSelect(notaId,field,value){
 }
 
 function recebArmNotaIsBipada(nota){
-  return !!(nota&&(String(nota.chave||'').replace(/\D/g,'').length>=44||(Array.isArray(nota.itens)&&nota.itens.length)||nota.createdAt));
+  return !!(nota&&(String(nota.chave||'').replace(/\D/g,'').length>=44||(Array.isArray(nota.itens)&&nota.itens.length)));
 }
 
 function recebArmKey(text){
@@ -5318,10 +5318,13 @@ function renderRecebArmNotaPreview(parsed){
   if(list.length>1){
     const totalVol=list.reduce((s,n)=>s+(+n.volumes||0),0);
     const totalUn=list.reduce((s,n)=>s+(+n.unidades||0),0);
+    const previewList=list.slice(0,150);
+    const hiddenCount=Math.max(list.length-previewList.length,0);
     el.classList.add('on');
     el.innerHTML=`<div class="preview-title">${prodFmt(list.length,0)} XML(s) lidos - ${prodFmt(totalVol,0)} caixa(s) / ${prodFmt(totalUn,0)} un.</div>
       <table class="receb-arm-tbl"><thead><tr><th>NF</th><th>Fornecedor</th><th>Itens</th><th>Caixas</th><th>Unidades</th></tr></thead><tbody>
-      ${list.map(n=>`<tr><td style="color:#00e5ff;font-weight:bold">${excelText(n.nfNumero||'')}</td><td style="text-align:left;color:#fff;font-weight:bold">${excelText(n.fornecedor||'')}</td><td>${prodFmt((n.itens||[]).length,0)}</td><td style="color:#ffd700;font-weight:bold">${prodFmt(+n.volumes||0,0)}</td><td style="color:#ffd700;font-weight:bold">${prodFmt(+n.unidades||0,0)}</td></tr>`).join('')}
+      ${previewList.map(n=>`<tr><td style="color:#00e5ff;font-weight:bold">${excelText(n.nfNumero||'')}</td><td style="text-align:left;color:#fff;font-weight:bold">${excelText(n.fornecedor||'')}</td><td>${prodFmt((n.itens||[]).length,0)}</td><td style="color:#ffd700;font-weight:bold">${prodFmt(+n.volumes||0,0)}</td><td style="color:#ffd700;font-weight:bold">${prodFmt(+n.unidades||0,0)}</td></tr>`).join('')}
+      ${hiddenCount?`<tr><td colspan="5" style="color:#ffd700;font-weight:bold">+ ${prodFmt(hiddenCount,0)} XML(s) lidos no lote, ocultos apenas na prévia para não pesar a tela.</td></tr>`:''}
       </tbody></table>`;
     return;
   }
@@ -5348,13 +5351,19 @@ function parseRecebArmPdfText(text){
   };
 }
 
+function recebArmYield(){
+  return new Promise(resolve=>setTimeout(resolve,0));
+}
+
 async function readRecebArmNotaFile(ev){
   const files=[...(ev.target.files||[])];
   if(!files.length)return;
   try{
     const data=ensureRecebArm(getDay(curDate)||emptyDay(curDate||today()));
     const parsedList=[];
-    for(const file of files){
+    recebArmMsg('recebArmNotaMsg',files.length>1?`Lendo ${prodFmt(files.length,0)} arquivo(s). Aguarde concluir para adicionar.`:'Lendo arquivo...',false);
+    for(let idx=0;idx<files.length;idx++){
+      const file=files[idx];
       let parsed=null;
       if(/\.xml$/i.test(file.name)){
         parsed=parseRecebArmXml(await readFileText(file,'UTF-8'));
@@ -5374,6 +5383,10 @@ async function readRecebArmNotaFile(ev){
       parsed=parseRecebArmPdfText(text);
       recebArmMsg('recebArmNotaMsg','PDF lido para NF/chave/fornecedor. Para itens completos, prefira XML da nota.',false);
       parsedList.push(parsed);
+      }
+      if(files.length>25&&(idx+1)%25===0){
+        recebArmMsg('recebArmNotaMsg',`Lendo XMLs: ${prodFmt(idx+1,0)} de ${prodFmt(files.length,0)} arquivo(s)...`,false);
+        await recebArmYield();
       }
     }
     const parsed=parsedList[0]||null;
@@ -5887,6 +5900,9 @@ function recebArmUpsertParsedNota(day,data,parsed,overrides={}){
   if(!nfNumero&&!chave)return{ok:false,reason:'sem_nf'};
   if(!Array.isArray(parsed.itens)||!parsed.itens.length)return{ok:false,reason:'sem_itens'};
   const existing=recebArmFindExistingNota(data,nfNumero,chave,fornecedor);
+  if(existing&&recebArmNotaIsBipada(existing)){
+    return{ok:true,updated:false,protected:true,nota:existing};
+  }
   const nota=existing||{id:recebArmId('nf'),createdAt:Date.now(),itens:[],pendConf:[],pendArm:[]};
   const enrichedItems=recebArmEnrichItems(parsed.itens,data);
   Object.assign(nota,{
@@ -5921,27 +5937,31 @@ function addRecebArmNota(){
     recebArmMsg('recebArmNotaMsg','Informe o número da NF ou a chave.',true);
     return;
   }
-  let added=0,updated=0,skipped=0,missingItems=0;
+  let added=0,updated=0,protectedCount=0,skipped=0,missingItems=0;
   parsedList.forEach((parsed,idx)=>{
     const result=recebArmUpsertParsedNota(day,data,parsed||{},idx===0?manualOverrides:{protocolo:manualOverrides.protocolo});
     if(result.ok){
-      if(result.updated)updated++;else added++;
+      if(result.protected)protectedCount++;
+      else if(result.updated)updated++;
+      else added++;
     }else{
       skipped++;
       if(result.reason==='sem_itens')missingItems++;
     }
   });
-  if(!added&&!updated){
+  if(!added&&!updated&&!protectedCount){
     recebArmMsg('recebArmNotaMsg',missingItems?'Anexe XML da NF para carregar itens, caixas/volumes e unidades antes de adicionar.':'Nenhuma NF válida encontrada nos arquivos.',true);
     return;
   }
-  data.notas=recebArmUniqueNotas(data.notas);
-  recebArmTouch(day);
+  if(added||updated){
+    data.notas=recebArmUniqueNotas(data.notas);
+    recebArmTouch(day);
+  }
   ['recebArmNfNumero','recebArmChave','recebArmFornecedor','recebArmProtocolo'].forEach(id=>{const el=document.getElementById(id);if(el)el.value='';});
   if(fileEl){fileEl.value='';fileEl._parsedNota=null;fileEl._parsedNotas=[];}
   renderRecebArmNotaPreview(null);
-  recebArmMsg('recebArmNotaMsg',`${added} NF(s) adicionada(s)${updated?` | ${updated} repetida(s) atualizada(s)`:''}${skipped?` | ${skipped} ignorada(s)`:''}.`,false);
-  compareRecebArmStorage(false);
+  recebArmMsg('recebArmNotaMsg',`${added} NF(s) adicionada(s)${updated?` | ${updated} repetida(s) atualizada(s)`:''}${protectedCount?` | ${protectedCount} ja bipada(s) mantida(s), sem alterar status`:''}${skipped?` | ${skipped} ignorada(s)`:''}.`,false);
+  if(added||updated)compareRecebArmStorage(false);
   renderRecebArm();
 }
 
