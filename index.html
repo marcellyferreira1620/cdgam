@@ -9370,8 +9370,8 @@ function boletimTextarea(label,key,value){
 function boletimLine(label,value,detail=''){
   return `<div class="boletim-line"><b>${label}</b><span><strong>${value}</strong>${detail?` <small>${detail}</small>`:''}</span></div>`;
 }
-function boletimKpiWeekTable(b){
-  const rows=[
+function boletimKpiRows(){
+  return[
     ['Lead Time','leadTime'],
     ['Pend&ecirc;ncia 997','pendencia997'],
     ['Reservas','reservas'],
@@ -9379,7 +9379,9 @@ function boletimKpiWeekTable(b){
     ['Efici&ecirc;ncia de Expedi&ccedil;&atilde;o','eficienciaExpedicaoSemana'],
     ['Devolu&ccedil;&otilde;es de Clientes','devolucoesClientes']
   ];
-  const cols=[
+}
+function boletimKpiCols(){
+  return[
     ['Meta','meta'],
     ['Segunda','segunda'],
     ['Ter&ccedil;a','terca'],
@@ -9387,6 +9389,39 @@ function boletimKpiWeekTable(b){
     ['Quinta','quinta'],
     ['Sexta','sexta']
   ];
+}
+function boletimKpiFieldKeys(){
+  return boletimKpiRows().flatMap(([,rowKey])=>boletimKpiCols().map(([,colKey])=>`kpi_${rowKey}_${colKey}`));
+}
+function boletimCarryKpisFromPrevious(day){
+  if(!day||!day.date)return boletimManual(day);
+  day.boletim=day.boletim||{};
+  const b=day.boletim;
+  const keys=boletimKpiFieldKeys();
+  const needsCopy=keys.some(k=>String(b[k]??'').trim()==='');
+  if(!needsCopy)return b;
+  const prev=(Array.isArray(db.days)?db.days:[])
+    .filter(d=>d&&d.date&&d.date<day.date&&d.boletim&&keys.some(k=>String(d.boletim[k]??'').trim()!==''))
+    .sort((a,b)=>b.date.localeCompare(a.date))[0];
+  if(!prev)return b;
+  let copied=false;
+  keys.forEach(k=>{
+    if(String(b[k]??'').trim()===''&&String(prev.boletim[k]??'').trim()!==''){
+      b[k]=prev.boletim[k];
+      copied=true;
+    }
+  });
+  if(copied){
+    const ts=Date.now();
+    b._updatedAt=ts;
+    day._updatedAt=ts;
+    boletimSaveCurrent(day);
+  }
+  return b;
+}
+function boletimKpiWeekTable(b){
+  const rows=boletimKpiRows();
+  const cols=boletimKpiCols();
   const input=(rowKey,colKey)=>`<input class="boletim-kpi-input" type="text" value="${attrText(b[`kpi_${rowKey}_${colKey}`]||'')}" oninput="saveBoletimField('kpi_${rowKey}_${colKey}',this.value)">`;
   return `<section class="boletim-kpi-week">
     <div class="boletim-kpi-week-title">Acompanhamento di&aacute;rio de indicadores (KPIs)</div>
@@ -9496,7 +9531,7 @@ function renderBoletim(){
   const wrap=document.getElementById('boletimPage');
   if(!wrap)return;
   const day=getDay(curDate)||emptyDay(curDate||today());
-  const b=boletimManual(day);
+  const b=boletimCarryKpisFromPrevious(day);
   const r=boletimRecebStats(day);
   const n=boletimNightStats(day);
   const armFinalRows=boletimIsFinalDay(day)?`
