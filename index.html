@@ -5012,6 +5012,8 @@ let recebArmZxingReader=null;
 let recebArmZxingControls=null;
 const RECEB_ARM_XML_API_URL_KEY='receb_arm_xml_api_url';
 const RECEB_ARM_XML_API_TOKEN_KEY='receb_arm_xml_api_token';
+const RECEB_ARM_XML_API_AUTH_KEY='receb_arm_xml_api_auth';
+const RECEB_ARM_NFEIO_XML_URL='https://nfe.api.nfe.io/v3/productinvoices/serpro/{chave}.xml';
 
 function recebArmSheetRows(workbook){
   const ws=workbook.Sheets[workbook.SheetNames[0]];
@@ -5547,34 +5549,44 @@ function recebArmOnlineXmlApiConfig(){
   try{
     return{
       url:localStorage.getItem(RECEB_ARM_XML_API_URL_KEY)||'',
-      token:localStorage.getItem(RECEB_ARM_XML_API_TOKEN_KEY)||''
+      token:localStorage.getItem(RECEB_ARM_XML_API_TOKEN_KEY)||'',
+      auth:localStorage.getItem(RECEB_ARM_XML_API_AUTH_KEY)||''
     };
   }catch(_){
-    return{url:'',token:''};
+    return{url:'',token:'',auth:''};
   }
 }
 
 function configureRecebArmOnlineXmlApi(){
   const current=recebArmOnlineXmlApiConfig();
-  const url=prompt('Cole a URL da API que devolve o XML pela chave NF-e. Use {chave} onde entra a chave de 44 digitos.',current.url||'');
-  if(url===null)return;
-  const cleanUrl=String(url||'').trim();
-  if(!cleanUrl){
+  const value=prompt('Cole a Chave de Dados da NFE.io. Se usar outra API, cole a URL completa com {chave}.',current.url&&current.url!==RECEB_ARM_NFEIO_XML_URL?current.url:(current.token||''));
+  if(value===null)return;
+  const cleanValue=String(value||'').trim();
+  if(!cleanValue){
     try{
       localStorage.removeItem(RECEB_ARM_XML_API_URL_KEY);
       localStorage.removeItem(RECEB_ARM_XML_API_TOKEN_KEY);
+      localStorage.removeItem(RECEB_ARM_XML_API_AUTH_KEY);
     }catch(_){}
     recebArmBipStatus('API NF-e removida. Sem API, o site precisa de XML anexado para importar itens.',false);
     recebArmMsg('recebArmNotaMsg','API NF-e removida.',false);
     return;
   }
-  const token=prompt('Se a API usar token, cole aqui. Se nao usar, deixe em branco.',current.token||'');
+  let cleanUrl=RECEB_ARM_NFEIO_XML_URL;
+  let token=cleanValue;
+  let auth='raw';
+  if(/^https?:\/\//i.test(cleanValue)){
+    cleanUrl=cleanValue;
+    token=prompt('Se essa API usar token, cole aqui. Se nao usar, deixe em branco.',current.token||'');
+    auth=/nfe\.api\.nfe\.io/i.test(cleanUrl)?'raw':'bearer';
+  }
   try{
     localStorage.setItem(RECEB_ARM_XML_API_URL_KEY,cleanUrl);
     localStorage.setItem(RECEB_ARM_XML_API_TOKEN_KEY,String(token||'').trim());
+    localStorage.setItem(RECEB_ARM_XML_API_AUTH_KEY,auth);
   }catch(_){}
   recebArmBipStatus('API NF-e configurada. Agora bipe direto no campo Chave NF-e.',false);
-  recebArmMsg('recebArmNotaMsg','API NF-e configurada para buscar XML pela chave.',false);
+  recebArmMsg('recebArmNotaMsg',cleanUrl===RECEB_ARM_NFEIO_XML_URL?'NFE.io configurado para buscar XML pela chave.':'API NF-e configurada para buscar XML pela chave.',false);
   focusRecebArmBip();
 }
 
@@ -5637,7 +5649,12 @@ async function recebArmFetchXmlOnline(chave,data){
   if(!key||!cfg.url)return{ok:false,missingConfig:true};
   try{
     const headers={'Accept':'application/xml,text/xml,application/json,text/plain'};
-    if(cfg.token)headers.Authorization=`Bearer ${cfg.token}`;
+    if(cfg.token){
+      const auth=cfg.auth||(/nfe\.api\.nfe\.io/i.test(cfg.url)?'raw':'bearer');
+      if(auth==='raw')headers.Authorization=cfg.token;
+      else if(auth==='basic')headers.Authorization=`Basic ${btoa(`${cfg.token}:`)}`;
+      else headers.Authorization=`Bearer ${cfg.token}`;
+    }
     const response=await fetch(recebArmBuildOnlineXmlUrl(cfg.url,key),{method:'GET',headers,cache:'no-store'});
     const text=await response.text();
     if(!response.ok)return{ok:false,error:`API respondeu ${response.status}`};
