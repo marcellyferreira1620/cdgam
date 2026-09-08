@@ -4964,6 +4964,10 @@ function recebArmStatusSelect(notaId,field,value){
   </select>`;
 }
 
+function recebArmNotaIsBipada(nota){
+  return !!(nota&&(String(nota.chave||'').replace(/\D/g,'').length>=44||(Array.isArray(nota.itens)&&nota.itens.length)||nota.createdAt));
+}
+
 function recebArmKey(text){
   return String(text||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
 }
@@ -5891,8 +5895,8 @@ function recebArmUpsertParsedNota(day,data,parsed,overrides={}){
     fornecedor,
     protocolo:protocolo||nota.protocolo||'',
     entradaData:nota.entradaData||day.date||curDate||today(),
-    confStatus:existing?(nota.confStatus||'andamento'):'andamento',
-    armStatus:nota.armStatus||'pendente',
+    confStatus:existing?(recebArmNormalizeStatus(nota.confStatus)==='finalizado'?'finalizado':'andamento'):'andamento',
+    armStatus:existing?(recebArmNormalizeStatus(nota.armStatus)==='finalizado'?'finalizado':'andamento'):'andamento',
     volumes:parsed.volumes!==undefined?+parsed.volumes||0:(nota.volumes||0),
     unidades:parsed.unidades!==undefined?+parsed.unidades||0:(nota.unidades||0),
     itens:Array.isArray(enrichedItems)&&enrichedItems.length?enrichedItems:(nota.itens||[]),
@@ -5945,7 +5949,15 @@ function setRecebArmNotaStatus(notaId,field,value){
   const day=recebArmDay();
   const nota=ensureRecebArm(day).notas.find(n=>n.id===notaId);
   if(!nota)return;
-  nota[field]=recebArmNormalizeStatus(value);
+  const next=recebArmNormalizeStatus(value);
+  const current=recebArmNormalizeStatus(nota[field]);
+  if(recebArmNotaIsBipada(nota)&&current!=='pendente'&&next==='pendente'){
+    if(!confirm('Esta NF ja esta bipada/anexada. Confirmar voltar para pendente?')){
+      renderRecebArm();
+      return;
+    }
+  }
+  nota[field]=next;
   nota._updatedAt=Date.now();
   recebArmTouch(day);
   renderRecebArm();
@@ -5956,9 +5968,18 @@ function markRecebArmNota(notaId,field,value){
 }
 
 function removeRecebArmNota(notaId){
-  if(!confirm('Remover esta NF do fluxo?'))return;
   const day=recebArmDay();
   const data=ensureRecebArm(day);
+  const nota=data.notas.find(n=>n.id===notaId);
+  if(!nota)return;
+  if(recebArmNotaIsBipada(nota)){
+    const ref=String(nota.nfNumero||nota.chave||'NF').trim();
+    const typed=prompt(`Esta NF ja esta bipada/anexada. Para remover, digite REMOVER ${ref}`);
+    if(typed!==`REMOVER ${ref}`){
+      alert('NF mantida no fluxo.');
+      return;
+    }
+  }else if(!confirm('Remover esta NF do fluxo?'))return;
   data.notas=data.notas.filter(n=>n.id!==notaId);
   recebArmTouch(day);
   renderRecebArm();
@@ -6568,20 +6589,31 @@ function compareRecebArmStorage(showMsg=true){
   const index=recebArm997PendingIndex(data,day.date);
   const remaining=recebArm997InitialRemaining(index);
   const autoPend=[];
-  recebArmUniqueNotas(data.notas||[]).forEach(nota=>{
+  const has997=!!recebArmQrpCurrentSnapshot(data.qrpRows).length;
+  data.notas=recebArmUniqueNotas(data.notas||[]);
+  data.notas.forEach(nota=>{
     const rows=recebArmNota997Rows(nota,data,index,remaining);
+    const summary=recebArmNota997Summary(rows);
+    if(has997&&rows.length&&summary.base>0){
+      nota.armStatus=(summary.pendente<=0&&summary.semVinculo===0)?'finalizado':'andamento';
+      nota._updatedAt=Date.now();
+    }else if(recebArmNotaIsBipada(nota)&&recebArmNormalizeStatus(nota.armStatus)==='pendente'){
+      nota.armStatus='andamento';
+      nota._updatedAt=Date.now();
+    }
     rows.forEach((row,idx)=>{
       const item=(nota.itens||[])[idx]||{};
       const entrou=item.caixas!==undefined?+item.caixas:+item.qtdEntrada||0;
       if(!entrou)return;
       item.qtdArmazenada=+row.armazenadoBase||0;
       if(row.status==='Armazenado parcial'||row.status==='Nada armazenado'){
+        const pendQtd=(+row.pendenteVol||0)||(+row.pendenteBase||0);
         autoPend.push({
           id:`auto-${nota.id}-${row.item}`,
           nf:nota.nfNumero||nota.chave||'',
           item:row.codGam||row.codigoNf||row.item,
           descricao:row.descricao||item.descricaoBase||item.descricao||'',
-          qtd:+row.pendenteBase||0,
+          qtd:pendQtd,
           endereco:'997',
           origem:'automático 997 descrição+lote',
           _updatedAt:Date.now()
@@ -6708,20 +6740,32 @@ function recebArmToggleAgendaTipo(key){
   if(willOpen)el.classList.add('on');
 }
 
+function recebArmPendArmTotal(data){
+  const rows=Array.isArray(data&&data.pendArm)?data.pendArm:[];
+  const total=rows.reduce((sum,row)=>sum+(+row.qtd||+row.qtdVolumes||0),0);
+  return total>0?total:rows.length;
+}
+
 function renderRecebArmKpis(data){
   const el=document.getElementById('recebArmKpis');
   if(!el)return;
   const notas=recebArmUniqueNotas(data.notas||[]);
+  const confFinal=notas.filter(n=>recebArmNormalizeStatus(n.confStatus)==='finalizado').length;
+  const armFinal=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)==='finalizado').length;
+  const confRun=notas.filter(n=>recebArmNormalizeStatus(n.confStatus)!=='finalizado').length;
+  const armRun=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)!=='finalizado').length;
+  const pendArmRows=(data.pendArm||[]).length;
+  const pendArmTotal=recebArmPendArmTotal(data);
   const kpis=[
     ['Notas no dia',notas.length,'#ffd700'],
-    ['Conferência 100%',notas.filter(n=>n.confStatus==='finalizado').length,'#00e676'],
-    ['Em conferência',notas.filter(n=>n.confStatus==='andamento').length,'#1e88e5'],
-    ['Em armazenagem',notas.filter(n=>n.armStatus==='andamento').length,'#1e88e5'],
-    ['Armazenagem 100%',notas.filter(n=>n.armStatus==='finalizado').length,'#00e676'],
+    ['Conferência 100%',confFinal,'#00e676'],
+    ['Em conferência',confRun,'#1e88e5'],
+    ['Em armazenagem',armRun,'#1e88e5'],
+    ['Armazenagem 100%',armFinal,'#00e676'],
     ['Pend. conferência',(data.pendConf||[]).length,'#ff4c4c'],
-    ['Pend. armazenagem',(data.pendArm||[]).length,'#ff9500']
+    ['Pend. armazenagem',prodFmt(pendArmTotal,0),'#ff9500',pendArmRows?`${prodFmt(pendArmRows,0)} item(ns) 997/manual`:'']
   ];
-  el.innerHTML=kpis.map(([label,value,color])=>`<div class="receb-arm-kpi"><div class="lbl">${label}</div><div class="val" style="color:${color}">${value}</div></div>`).join('');
+  el.innerHTML=kpis.map(([label,value,color,sub])=>`<div class="receb-arm-kpi"><div class="lbl">${label}</div><div class="val" style="color:${color}">${value}</div>${sub?`<small style="color:#89b4d4;font-weight:bold">${excelText(sub)}</small>`:''}</div>`).join('');
 }
 
 function renderRecebArmAgenda(data){
@@ -7070,9 +7114,9 @@ function renderRecebArmFluxo(data){
     const nfSkus=notas.reduce((s,n)=>s+(Array.isArray(n.itens)?n.itens.length:0),0);
     const agendadoVol=Math.max(agendaVol,volNf);
     const agendadoSkus=Math.max(agendaSkus,nfSkus);
-    const confRun=notas.filter(n=>recebArmNormalizeStatus(n.confStatus)==='andamento');
+    const confRun=notas.filter(n=>recebArmNormalizeStatus(n.confStatus)!=='finalizado');
     const confOk=notas.filter(n=>recebArmNormalizeStatus(n.confStatus)==='finalizado');
-    const armRun=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)==='andamento');
+    const armRun=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)!=='finalizado');
     const armOk=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)==='finalizado');
     const qrpIndex=recebArm997PendingIndex(data,curDate||today());
     const armProgressNotes=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)!=='finalizado');
@@ -9573,7 +9617,7 @@ function exportRecebArmExcel(){
   const date=day.date||curDate||today();
   let html='<!doctype html><html><head><meta charset="utf-8"></head><body>';
   html+='<h3>Resumo</h3><table border="1"><tr><th>Data</th><th>Notas</th><th>Conferência 100%</th><th>Armazenagem 100%</th><th>Pend. conferência</th><th>Pend. armazenagem</th></tr>';
-  html+=`<tr><td>${excelText(fmtDateShort(date))}</td><td>${(data.notas||[]).length}</td><td>${(data.notas||[]).filter(n=>n.confStatus==='finalizado').length}</td><td>${(data.notas||[]).filter(n=>n.armStatus==='finalizado').length}</td><td>${(data.pendConf||[]).length}</td><td>${(data.pendArm||[]).length}</td></tr></table>`;
+  html+=`<tr><td>${excelText(fmtDateShort(date))}</td><td>${(data.notas||[]).length}</td><td>${(data.notas||[]).filter(n=>n.confStatus==='finalizado').length}</td><td>${(data.notas||[]).filter(n=>n.armStatus==='finalizado').length}</td><td>${(data.pendConf||[]).length}</td><td>${prodFmt(recebArmPendArmTotal(data),0)}</td></tr></table>`;
   const agendaSummary=recebArmAgendaSummary(data.agendaRows||[]);
   html+='<h3>Agenda - Volumetria por Tipo</h3><table border="1"><tr><th>Tipo</th><th>Volumes</th></tr>';
   RECEB_ARM_AGENDA_TIPOS.forEach(t=>{const item=agendaSummary.summary[t.key];html+=`<tr><td>${excelText(t.label)}</td><td>${item?item.volumes||0:0}</td></tr>`;});
