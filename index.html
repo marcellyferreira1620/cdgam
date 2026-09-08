@@ -1383,6 +1383,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
           <button class="receb-arm-btn gray" type="button" onclick="focusRecebArmBip()">Focar bipagem</button>
           <button class="receb-arm-btn purple" type="button" onclick="connectRecebArmScanner()">Conectar leitor USB/Serial</button>
           <button class="receb-arm-btn gray" type="button" onclick="startRecebArmScannerTest()">Teste do leitor</button>
+          <button class="receb-arm-btn purple" type="button" onclick="selectRecebArmXmlAutoFolder()">Ativar pasta XML automatica</button>
           <button class="receb-arm-btn green" type="button" onclick="startRecebArmCameraScanner()">Abrir camera da barra</button>
           <button class="receb-arm-btn" type="button" onclick="addRecebArmNota()">Adicionar NF</button>
           <button class="receb-arm-btn green" type="button" onclick="saveRecebArmDay()">Salvar Dia</button>
@@ -4993,6 +4994,7 @@ function readFileText(file,encoding){
 }
 
 let recebArmXmlBipCache=[];
+let recebArmXmlAutoDirHandle=null;
 let recebArmXmlBipTimer=null;
 let recebArmXmlBipBusy=false;
 let recebArmPendingBipChave='';
@@ -5522,6 +5524,84 @@ function recebArmFindParsedXmlForInput(nfNumero,chave){
   })||null;
 }
 
+async function recebArmParseXmlFileObject(file,data){
+  const nota=parseRecebArmXml(await readFileText(file,'UTF-8'));
+  nota.fileName=file.name||'';
+  nota.itens=recebArmEnrichItems(nota.itens,data);
+  return nota;
+}
+
+function recebArmRememberBipXml(nota){
+  if(!nota||!nota.chave)return;
+  const key=recebArmAccessKey(nota.chave);
+  recebArmXmlBipCache=[
+    nota,
+    ...recebArmXmlBipCache.filter(n=>recebArmAccessKey(n.chave)!==key)
+  ].slice(0,800);
+}
+
+async function selectRecebArmXmlAutoFolder(){
+  if(!window.showDirectoryPicker){
+    recebArmMsg('recebArmNotaMsg','Este navegador nao liberou pasta automatica. Use o campo XMLs para bipagem e selecione os XMLs.',true);
+    recebArmBipStatus('Pasta automatica indisponivel neste navegador. Carregue os XMLs em XMLs para bipagem.',true);
+    return;
+  }
+  try{
+    recebArmXmlAutoDirHandle=await window.showDirectoryPicker({mode:'read'});
+    recebArmMsg('recebArmNotaMsg','Pasta XML automatica ativada. Agora, ao bipar a chave, vou procurar o XML correspondente nessa pasta.',false);
+    recebArmBipStatus('Pasta XML automatica ativada. Pode bipar a barra preta do DANFE.',false);
+    if(recebArmPendingBipChave){
+      setTimeout(()=>processRecebArmXmlBip(recebArmPendingBipChave),80);
+    }
+  }catch(e){
+    recebArmMsg('recebArmNotaMsg','Pasta XML automatica nao foi ativada. Voce ainda pode usar XMLs para bipagem.',true);
+  }
+}
+
+async function recebArmFindXmlInAutoFolder(chave,data){
+  const key=recebArmAccessKey(chave);
+  if(!recebArmXmlAutoDirHandle||!key)return null;
+  try{
+    if(typeof recebArmXmlAutoDirHandle.queryPermission==='function'){
+      let perm=await recebArmXmlAutoDirHandle.queryPermission({mode:'read'});
+      if(perm!=='granted'&&typeof recebArmXmlAutoDirHandle.requestPermission==='function'){
+        perm=await recebArmXmlAutoDirHandle.requestPermission({mode:'read'});
+      }
+      if(perm!=='granted')return null;
+    }
+    const names=[
+      `${key}.xml`,
+      `NFe${key}.xml`,
+      `${key}-procNFe.xml`,
+      `procNFe-${key}.xml`
+    ];
+    for(const name of names){
+      try{
+        const handle=await recebArmXmlAutoDirHandle.getFileHandle(name);
+        const nota=await recebArmParseXmlFileObject(await handle.getFile(),data);
+        if(recebArmAccessKey(nota.chave)===key){
+          recebArmRememberBipXml(nota);
+          return nota;
+        }
+      }catch(_){}
+    }
+    if(typeof recebArmXmlAutoDirHandle.entries==='function'){
+      for await(const [name,handle] of recebArmXmlAutoDirHandle.entries()){
+        if(!handle||handle.kind!=='file'||!/\.xml$/i.test(name))continue;
+        if(!name.includes(key)&&!name.includes(key.slice(-12)))continue;
+        const nota=await recebArmParseXmlFileObject(await handle.getFile(),data);
+        if(recebArmAccessKey(nota.chave)===key){
+          recebArmRememberBipXml(nota);
+          return nota;
+        }
+      }
+    }
+  }catch(e){
+    console.error(e);
+  }
+  return null;
+}
+
 async function cacheRecebArmXmlBipFiles(ev){
   const files=[...(ev.target.files||[])].filter(file=>/\.xml$/i.test(file.name));
   if(!files.length){
@@ -5534,9 +5614,7 @@ async function cacheRecebArmXmlBipFiles(ev){
     const parsed=[];
     const seen=new Set();
     for(const file of files){
-      const nota=parseRecebArmXml(await readFileText(file,'UTF-8'));
-      nota.fileName=file.name;
-      nota.itens=recebArmEnrichItems(nota.itens,data);
+      const nota=await recebArmParseXmlFileObject(file,data);
       const key=recebArmAccessKey(nota.chave)||String(nota.nfNumero||file.name);
       if(seen.has(key))continue;
       seen.add(key);
@@ -5876,10 +5954,13 @@ async function processRecebArmXmlBip(value){
       }
       parsed=recebArmParsedXmlSources().find(n=>recebArmAccessKey(n.chave)===chave)||null;
       if(!parsed){
+        parsed=await recebArmFindXmlInAutoFolder(chave,data);
+      }
+      if(!parsed){
         recebArmPendingBipChave=chave;
         recebArmFillFromAccessKey(chave);
-        recebArmMsg('recebArmNotaMsg',`Chave lida. Para importar itens/caixas/unidades, selecione o XML dessa NF em Arquivo XML/PDF ou XMLs para bipagem.`,false);
-        recebArmBipStatus(`Chave lida e NF ${recebArmNotaNumberFromAccessKey(chave)} preenchida. Falta selecionar o XML dessa nota para carregar os itens.`,false);
+        recebArmMsg('recebArmNotaMsg',`Chave lida. Nao da para transformar a chave em XML completo so pelo numero; selecione o XML dessa NF ou ative a pasta XML automatica.`,false);
+        recebArmBipStatus(`NF ${recebArmNotaNumberFromAccessKey(chave)} preenchida pela barra. Falta o XML para carregar itens/caixas/unidades.`,false);
         return;
       }
     }
