@@ -2970,6 +2970,13 @@ function mergeRecebArmQrpRows(a,b){
   return bTs>=aTs?bRows:aRows;
 }
 
+function recebArmNewerPendingSummary(a,b){
+  if(!a&&!b)return null;
+  if(!a)return b||null;
+  if(!b)return a||null;
+  return (+b.importedAt||0)>=(+a.importedAt||0)?b:a;
+}
+
 function mergeRecebArm(current,next){
   if(!current&&!next)return null;
   const a=current||{};
@@ -2985,6 +2992,7 @@ function mergeRecebArm(current,next){
     qrpImports:mergeByIdOrIndex(a.qrpImports,b.qrpImports,'id'),
     qrpLastItems:(+b._updatedAt||0)>=(+a._updatedAt||0)?(b.qrpLastItems||a.qrpLastItems||[]):(a.qrpLastItems||b.qrpLastItems||[]),
     qrpLastSummaryItems:(+b._updatedAt||0)>=(+a._updatedAt||0)?(b.qrpLastSummaryItems||a.qrpLastSummaryItems||[]):(a.qrpLastSummaryItems||b.qrpLastSummaryItems||[]),
+    qrpLastPendingSummary:recebArmNewerPendingSummary(a.qrpLastPendingSummary,b.qrpLastPendingSummary),
     qrpOpenPartials:(+b._updatedAt||0)>=(+a._updatedAt||0)?(b.qrpOpenPartials||a.qrpOpenPartials||[]):(a.qrpOpenPartials||b.qrpOpenPartials||[]),
     productBase:mergeByIdOrIndex(a.productBase,b.productBase,'codigo'),
     _updatedAt:Math.max(+a._updatedAt||0,+b._updatedAt||0)
@@ -6826,9 +6834,10 @@ async function importRecebArm997(ev){
     data.qrpDayReceivedItems=recebArm997MergeDayReceivedItems(sameParser?(data.qrpDayReceivedItems||[]):[],importRecord.items,day.date);
     data.qrpLastItems=importRecord.items;
     data.qrpLastSummaryItems=recebArm997SummaryItemsForStorage(importRecord.items);
+    const latest997Total=(importRecord.exact&&importRecord.exact.total)?importRecord.exact.total:importRecord.pending.total;
     data.qrpLastPendingSummary={
-      skus:+importRecord.pending.total.linhas||rows.length,
-      volumes:+importRecord.pending.total.vol||0,
+      skus:+latest997Total.skus||+latest997Total.linhas||rows.length,
+      volumes:+latest997Total.vol||0,
       fileName:file.name,
       importedAt:importRecord.importedAt,
       dayDate:day.date
@@ -7033,7 +7042,32 @@ function recebArmPendArmTotal(data){
   return total>0?total:rows.length;
 }
 
+function recebArmLatest997Import(data){
+  const imports=(Array.isArray(data&&data.qrpImports)?data.qrpImports:[])
+    .filter(r=>r&&r.version==='997-hora-v2')
+    .slice()
+    .sort((a,b)=>(+a.importedAt||0)-(+b.importedAt||0));
+  return imports[imports.length-1]||null;
+}
+
+function recebArm997ImportResumo(record){
+  if(!record)return null;
+  const total=(record.exact&&record.exact.total)?record.exact.total:((record.pending&&record.pending.total)||null);
+  if(!total)return null;
+  return{
+    skus:+total.skus||+total.linhas||0,
+    volumes:+total.vol||0,
+    fileName:record.fileName||'997',
+    importedAt:+record.importedAt||0
+  };
+}
+
 function recebArm997AtualPendenteResumo(data){
+  const latestImport=recebArm997ImportResumo(recebArmLatest997Import(data));
+  if(latestImport){
+    if(data)data.qrpLastPendingSummary=latestImport;
+    return latestImport;
+  }
   const rows=recebArmQrpCurrentSnapshot(data&&data.qrpRows);
   if(!rows.length&&data&&data.qrpLastPendingSummary){
     return{
