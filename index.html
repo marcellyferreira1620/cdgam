@@ -5252,8 +5252,9 @@ async function importRecebArmAgenda(ev){
     const day=recebArmDay();
     const data=ensureRecebArm(day);
     data.agendaRows=agendaRows;
+    const carried=recebArmCarryPendingConferenceNotes(day,data);
     recebArmTouch(day);
-    recebArmMsg('recebArmAgendaMsg',`${agendaRows.length} linha(s) da agenda importadas.`,false);
+    recebArmMsg('recebArmAgendaMsg',`${agendaRows.length} linha(s) da agenda importadas.${carried?` ${carried} NF(s) em conferência de dia anterior mantida(s).`:''}`,false);
     renderRecebArm();
   }catch(e){
     console.error(e);
@@ -6145,6 +6146,40 @@ async function processRecebArmXmlBip(value){
 function recebArmFindExistingNota(data,nfNumero,chave,fornecedor){
   const lookupKey=recebArmNotaUniqueKey({nfNumero,chave,fornecedor});
   return (data.notas||[]).find(n=>recebArmNotaUniqueKey(n)===lookupKey);
+}
+
+function recebArmCarryPendingConferenceNotes(day,data){
+  if(!day||!data)return 0;
+  const targetDate=day.date||curDate||today();
+  const existingKeys=new Set((data.notas||[]).map(recebArmNotaUniqueKey).filter(Boolean));
+  const previousDays=(Array.isArray(db.days)?db.days:[])
+    .filter(d=>d&&d.date&&d.date<targetDate&&d.recebArm)
+    .sort((a,b)=>a.date.localeCompare(b.date));
+  const latestByKey=new Map();
+  previousDays.forEach(prevDay=>{
+    const prevData=ensureRecebArm(prevDay);
+    (prevData.notas||[]).forEach(nota=>{
+      const key=recebArmNotaUniqueKey(nota);
+      if(key)latestByKey.set(key,{nota,prevDay});
+    });
+  });
+  let added=0;
+  latestByKey.forEach(({nota,prevDay},key)=>{
+    if(!nota||recebArmNormalizeStatus(nota.confStatus)==='finalizado')return;
+    if(!key||existingKeys.has(key))return;
+    const carried=JSON.parse(JSON.stringify(nota));
+    carried.id=recebArmId('nfpend');
+    carried.carryFromDate=nota.carryFromDate||nota.entradaData||prevDay.date;
+    carried.entradaData=nota.entradaData||prevDay.date;
+    carried.confStatus=recebArmNormalizeStatus(carried.confStatus);
+    carried.armStatus=recebArmNormalizeStatus(carried.armStatus);
+    carried._updatedAt=Date.now()+added;
+    data.notas.push(carried);
+    existingKeys.add(key);
+    added++;
+  });
+  if(added)data.notas=recebArmUniqueNotas(data.notas);
+  return added;
 }
 
 function recebArmUpsertParsedNota(day,data,parsed,overrides={}){
@@ -7083,13 +7118,15 @@ function renderRecebArmKpis(data){
   const el=document.getElementById('recebArmKpis');
   if(!el)return;
   const notas=recebArmUniqueNotas(data.notas||[]);
+  const screenDate=curDate||today();
+  const notasRecebidasHoje=notas.filter(n=>!n.carryFromDate&&(n.entradaData||screenDate)===screenDate).length;
   const confFinal=notas.filter(n=>recebArmNormalizeStatus(n.confStatus)==='finalizado').length;
   const armFinal=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)==='finalizado').length;
   const confRun=notas.filter(n=>recebArmNormalizeStatus(n.confStatus)!=='finalizado').length;
   const armRun=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)!=='finalizado').length;
   const pend997=recebArm997AtualPendenteResumo(data);
   const kpis=[
-    ['Notas fiscais recebidas no dia',notas.length,'#ffd700'],
+    ['Notas fiscais recebidas no dia',notasRecebidasHoje,'#ffd700'],
     ['Notas fiscais em conferência',confRun,'#1e88e5'],
     ['Notas fiscais 100% conferidas',confFinal,'#00e676'],
     ['Notas fiscais em armazenagem',armRun,'#1e88e5'],
@@ -7221,6 +7258,8 @@ function recebArmUniqueNotas(notas){
     base.chave=base.chave||nota.chave||'';
     base.fornecedor=base.fornecedor||nota.fornecedor||'';
     base.protocolo=base.protocolo||nota.protocolo||'';
+    base.entradaData=base.entradaData||nota.entradaData||'';
+    base.carryFromDate=base.carryFromDate||nota.carryFromDate||'';
     base.volumes=Math.max(+base.volumes||0,+nota.volumes||0);
     base.unidades=Math.max(+base.unidades||0,+nota.unidades||0);
     base.confStatus=recebArmPickStatus(base.confStatus,nota.confStatus);
