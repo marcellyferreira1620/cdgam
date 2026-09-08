@@ -6795,11 +6795,10 @@ function renderRecebArmKpis(data){
   const pend997=recebArm997AtualPendenteResumo(data);
   const kpis=[
     ['Notas fiscais recebidas no dia',notas.length,'#ffd700'],
-    ['Notas fiscais 100% conferidas',confFinal,'#00e676'],
     ['Notas fiscais em conferência',confRun,'#1e88e5'],
+    ['Notas fiscais 100% conferidas',confFinal,'#00e676'],
     ['Notas fiscais em armazenagem',armRun,'#1e88e5'],
     ['Notas fiscais 100% armazenadas',armFinal,'#00e676'],
-    ['Notas fiscais com pendência de conferência',(data.pendConf||[]).length,'#ff4c4c'],
     ['Pendência de armazenagem',`SKUs: ${prodFmt(pend997.skus,0)}`,'#ff9500',`Volumes: ${prodFmt(pend997.volumes,0)}`]
   ];
   el.innerHTML=kpis.map(([label,value,color,sub])=>`<div class="receb-arm-kpi"><div class="lbl">${label}</div><div class="val" style="color:${color}">${value}</div>${sub?`<small style="color:#89b4d4;font-weight:bold">${excelText(sub)}</small>`:''}</div>`).join('');
