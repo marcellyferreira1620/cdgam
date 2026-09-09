@@ -2142,6 +2142,7 @@ let fbRestSaveRunning=false;
 let fbRestSaveQueued=false;
 let fbRestReplaceQueued=false;
 let pendingCloudSave=false;
+let cloudMirrorRunning=false;
 
 function load(){
   try{
@@ -2433,6 +2434,33 @@ function dataScoreValue(v,key){
 function dayDataScore(day){
   if(!day||typeof day!=='object')return 0;
   return Object.keys(day).reduce((s,k)=>s+dataScoreValue(day[k],k),0);
+}
+
+function cloudDayOperationalValue(day){
+  if(!day||typeof day!=='object')return 0;
+  const rootKeys=['osTotal','osTotalMed','osTotalPerf','osProdBase','osProdMedBase','osProdPerfBase','pnVol','pnUnid','pnDoca','rDoc','sys2130VolDoca','sys2130UnitCheckout'];
+  let total=rootKeys.reduce((s,k)=>s+(Number.isFinite(+day[k])?Math.max(+day[k],0):0),0);
+  const hd=day.hd&&typeof day.hd==='object'?day.hd:{};
+  ['Linhas Med.','Linhas Perf.','Vol. Med.','Vol. Perf.','Unid. Med.','Unid. Perf.','Vol. Checkout','Unid. Checkout','Vol. Doca','Vol. Especial','Vol. Esp. Frac.','Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.'].forEach(metric=>{
+    const arr=Array.isArray(hd[metric])?hd[metric]:[];
+    total+=arr.reduce((s,v)=>s+(v!==''&&v!==null&&v!==undefined?Math.max(+v||0,0):0),0);
+  });
+  return total;
+}
+
+function shouldPreferIncomingCloudDay(localDay,remoteDay){
+  if(!remoteDay)return false;
+  if(!localDay||!dayFieldHasValue(localDay))return true;
+  const localScore=dayDataScore(localDay);
+  const remoteScore=dayDataScore(remoteDay);
+  const localValue=cloudDayOperationalValue(localDay);
+  const remoteValue=cloudDayOperationalValue(remoteDay);
+  if(remoteScore>localScore)return true;
+  if(remoteValue>localValue*1.02)return true;
+  const remoteTs=+remoteDay._updatedAt||0;
+  const localTs=+localDay._updatedAt||0;
+  if(remoteTs>localTs&&remoteScore>=localScore&&remoteValue>=localValue)return true;
+  return remoteScore>=localScore&&remoteValue>=localValue;
 }
 
 function dayFieldHasValue(value){
@@ -3194,6 +3222,9 @@ function overlayCloudFilledValue(localValue,remoteValue){
 function preferCloudFilledDay(localDay,remoteDay,forceCloudFilled=false){
   const merged=mergeDayRecords(localDay,remoteDay);
   if((!forceCloudFilled&&!isCloudFreshPull())||!remoteDay)return merged;
+  if(forceCloudFilled&&!shouldPreferIncomingCloudDay(localDay,remoteDay)){
+    return stripTransientDayFlags(normalizeNightClosingBases(mergeDayRecords(remoteDay,localDay)));
+  }
   const remote=normalizeDay(remoteDay);
   const out=cloneData(merged)||{};
   Object.keys(remote).forEach(key=>{
@@ -3359,6 +3390,45 @@ async function fbRestWritePayload(payload){
   return await r.json().catch(()=>null);
 }
 
+async function mirrorPayloadToFirebaseRest(payload){
+  if(cloudMirrorRunning||!payload)return false;
+  cloudMirrorRunning=true;
+  try{
+    await fbRestWritePayload({...payload,savedAt:payload.savedAt||Date.now()});
+    return true;
+  }catch(e){
+    console.warn('Firebase mirror failed:',e);
+    return false;
+  }finally{
+    cloudMirrorRunning=false;
+  }
+}
+
+async function mirrorPayloadToSupabase(payload){
+  if(cloudMirrorRunning||!payload||typeof sbUrl==='undefined'||!sbUrl||!sbKey)return false;
+  cloudMirrorRunning=true;
+  try{
+    const ts=payload.savedAt||Date.now();
+    const r=await sbWritePayload({...payload,savedAt:ts},ts);
+    return !!(r&&r.ok);
+  }catch(e){
+    console.warn('Supabase mirror failed:',e);
+    return false;
+  }finally{
+    cloudMirrorRunning=false;
+  }
+}
+
+function currentCloudPayload(base={},ts=Date.now()){
+  return {
+    ...base,
+    days:Array.isArray(db.days)?db.days:[],
+    users:(base&&base.users)||getLocalUsersCache(),
+    fluxogramas:normalizeFluxogramas(db.fluxogramas),
+    savedAt:Math.max(+((base&&base.savedAt)||0),+ts||Date.now())
+  };
+}
+
 function payloadDaysHash(days){
   return simpleHash(JSON.stringify(Array.isArray(days)?days.map(compactDayForStorage):[]));
 }
@@ -3409,6 +3479,7 @@ async function saveToFirebaseRest(replaceDays=false){
       db.days=Array.isArray(confirmed.days)?confirmed.days:daysToSave;
       db.fluxogramas=normalizeFluxogramas(confirmed.fluxogramas||fluxogramasToSave);
       saveLocalDb(db);
+      mirrorPayloadToSupabase(confirmed).catch(()=>{});
       fbConnected=true;
       cloudConnecting=false;
       pendingCloudSave=false;
@@ -3447,6 +3518,7 @@ async function syncFromFirebaseRest(showOk){
     if(!isSaving){
       updated=!!applyRemoteData(remote);
       fbRestLastHash=remoteHash;
+      if(updated)mirrorPayloadToSupabase(currentCloudPayload(remote)).catch(()=>{});
     }
     if(!isCloudFreshPull()&&pendingCloudSave&&((db.days&&db.days.length)||db.fluxogramas)&&!fbRestSaveRunning){
       setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),50);
@@ -3616,7 +3688,6 @@ function save(replaceDays=false){
   if(typeof sbUrl!=='undefined'&&sbUrl&&sbKey&&sbConnected){
     sbSave(replaceDays);
     startFirebaseRestPolling(false);
-    saveToFirebaseRest(replaceDays).catch(()=>{});
   } else if(fbConnected&&fbDb){
     saveToFirebase(replaceDays).catch(()=>{});
     startFirebaseRestPolling(false);
@@ -12830,6 +12901,7 @@ async function sbSave(replaceDays=false){
           db.days=Array.isArray(confirmed.days)?confirmed.days:payload.days;
           db.fluxogramas=normalizeFluxogramas(confirmed.fluxogramas||payload.fluxogramas);
           saveLocalDb(db);
+          mirrorPayloadToFirebaseRest(confirmed).catch(()=>{});
           lastSyncHash=simpleHash(JSON.stringify({days:db.days,users:(confirmed.users||payload.users||{}),fluxogramas:db.fluxogramas||null}));
           sbConnected=true;
           pendingCloudSave=false;
@@ -12899,6 +12971,7 @@ async function sbLoad(){
     }
     if(remoteTs>sbLastTs)sbLastTs=remoteTs;
     if(changed||remoteHash!==lastSyncHash)lastSyncHash=remoteHash;
+    if(changed)mirrorPayloadToFirebaseRest(currentCloudPayload(remote,remoteTs||Date.now())).catch(()=>{});
     if(!isCloudFreshPull()&&pendingCloudSave&&((db.days&&db.days.length)||db.fluxogramas)&&!sbSaveRunning){
       setTimeout(()=>sbSave(false).catch(()=>{}),50);
     }
@@ -13115,10 +13188,16 @@ function forceCloudReconnect(){
   if(sbPollTimer){clearInterval(sbPollTimer);sbPollTimer=null;}
   if(fbRestTimer){clearInterval(fbRestTimer);fbRestTimer=null;}
   showSyncStatus('☁ Reconectando nuvem...',null);
-  startFirebaseRestPolling(false);
-  setTimeout(()=>syncFromFirebaseRest(true).catch(()=>{}),150);
-  setTimeout(()=>sbConnect().catch(()=>{}),450);
-  if(typeof initFirebase==='function')setTimeout(()=>initFirebase(),900);
+  setTimeout(async()=>{
+    await sbConnect().catch(()=>{});
+    if(!sbConnected){
+      startFirebaseRestPolling(false);
+      setTimeout(()=>syncFromFirebaseRest(true).catch(()=>{}),150);
+      if(typeof initFirebase==='function')setTimeout(()=>initFirebase(),900);
+    }else{
+      setTimeout(()=>startFirebaseRestPolling(false),1800);
+    }
+  },150);
 }
 
 // save() já foi atualizado acima para incluir Supabase
@@ -13536,12 +13615,17 @@ function startCloudSyncAfterLogin(){
   if(cloudSyncStarted)return;
   cloudSyncStarted=true;
   markCloudFreshPull();
-  startFirebaseRestPolling(false);
-  [800,2500,6000].forEach(ms=>setTimeout(()=>syncFromFirebaseRest(true).catch(()=>{}),ms));
   setTimeout(async()=>{
-    await sbConnect();
-    if(!sbConnected)setTimeout(initFirebase,500);
-  },500);
+    await sbConnect().catch(()=>{});
+    if(!sbConnected){
+      startFirebaseRestPolling(false);
+      [800,2500,6000].forEach(ms=>setTimeout(()=>syncFromFirebaseRest(true).catch(()=>{}),ms));
+      setTimeout(initFirebase,500);
+    }else{
+      setTimeout(()=>startFirebaseRestPolling(false),1800);
+      [3000,7000].forEach(ms=>setTimeout(()=>syncFromFirebaseRest(true).catch(()=>{}),ms));
+    }
+  },250);
 }
 function updateUserBadge(){
   const el=document.getElementById('userBadge');if(!el)return;
