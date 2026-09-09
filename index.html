@@ -4998,6 +4998,8 @@ function ensureRecebArm(day){
   const data=day.recebArm;
   ['agendaRows','notas','pendConf','pendArm','qrpRows','qrpImports','qrpLastItems','qrpLastSummaryItems','qrpOpenPartials','productBase'].forEach(k=>{if(!Array.isArray(data[k]))data[k]=[];});
   if(data.qrpLastPendingSummary&&typeof data.qrpLastPendingSummary!=='object')data.qrpLastPendingSummary=null;
+  if(day.date)data._date=day.date;
+  data.notas=data.notas.filter(n=>!(n&&n.carryFromDate));
   return data;
 }
 
@@ -5335,9 +5337,8 @@ async function importRecebArmAgenda(ev){
     const day=recebArmDay();
     const data=ensureRecebArm(day);
     data.agendaRows=agendaRows;
-    const carried=recebArmCarryPendingConferenceNotes(day,data);
     recebArmTouch(day);
-    recebArmMsg('recebArmAgendaMsg',`${agendaRows.length} linha(s) da agenda importadas.${carried?` ${carried} NF(s) em conferência de dia anterior mantida(s).`:''}`,false);
+    recebArmMsg('recebArmAgendaMsg',`${agendaRows.length} linha(s) da agenda importadas. NFs de dias anteriores nao entram automaticamente neste recebimento.`,false);
     renderRecebArm();
   }catch(e){
     console.error(e);
