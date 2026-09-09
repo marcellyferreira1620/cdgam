@@ -2184,7 +2184,7 @@ function normalizeDay(day){
     copy._correiaDirectHour=true;
   }
   if(Array.isArray(copy.rotas)){
-    copy.rotas=copy.rotas.map(r=>({...r,cod:normalizeRouteCode(r.cod)}));
+    copy.rotas=copy.rotas.map(r=>({...r,cod:normalizeRouteCode(r.cod),hReal:cleanHora(r.hReal)}));
   }
   return copy;
 }
@@ -2695,6 +2695,22 @@ function runNightOperationFormulaGuard(){
     );
     if(+partialBlankWithNewerStamp.pnDoca!==700||+partialBlankWithNewerStamp.hd[checkoutMetric][0]!==111){
       errors.push('campo/celula preenchidos nao podem ser apagados por branco parcial');
+    }
+
+    const cloudLowerCorrection=mergeCloudIncomingDays(
+      [{date:'2099-08-28',pnDoca:10165,hd:{[checkoutMetric]:[6850]},_updatedAt:100,_fieldUpdatedAt:{pnDoca:100},_hdUpdatedAt:{[checkoutMetric]:{0:100}}}],
+      [{date:'2099-08-28',pnDoca:6226,hd:{[checkoutMetric]:[3978]},_updatedAt:200,_fieldUpdatedAt:{pnDoca:200},_hdUpdatedAt:{[checkoutMetric]:{0:200}}}]
+    )[0];
+    if(+cloudLowerCorrection.pnDoca!==6226||+cloudLowerCorrection.hd[checkoutMetric][0]!==3978){
+      errors.push('nuvem preenchida precisa atualizar todos os computadores mesmo corrigindo para baixo');
+    }
+
+    const cloudBlankNoErase=mergeCloudIncomingDays(
+      [{date:'2099-08-29',pnDoca:6226,hd:{[checkoutMetric]:[3978]},prodSetores:{checkout:{vol:3978}},_updatedAt:100}],
+      [{date:'2099-08-29',pnDoca:0,hd:{[checkoutMetric]:['']},prodSetores:{checkout:{vol:''}},_updatedAt:200}]
+    )[0];
+    if(+cloudBlankNoErase.pnDoca!==6226||+cloudBlankNoErase.hd[checkoutMetric][0]!==3978||+cloudBlankNoErase.prodSetores.checkout.vol!==3978){
+      errors.push('nuvem em branco nao pode apagar preenchimento local');
     }
 
     const deltas=acumToDeltas([630,2394,3398,'',4524]);
@@ -3209,7 +3225,7 @@ function mergeDays(remoteDays,localDays){
   return Object.values(byDate).sort((a,b)=>a.date.localeCompare(b.date));
 }
 
-const CLOUD_PULL_ROOT_SKIP=new Set(['date','_updatedAt','_fieldUpdatedAt','_hdUpdatedAt','_nightPartialSave','rotas','prodSetores','prodDiurno','recebArm','boletim','devolucao','inventario','productBase']);
+const CLOUD_PULL_ROOT_SKIP=new Set(['date','_updatedAt','_fieldUpdatedAt','_hdUpdatedAt','_nightPartialSave']);
 
 function cloneData(value){
   return value===undefined?undefined:JSON.parse(JSON.stringify(value));
@@ -3253,9 +3269,6 @@ function overlayCloudFilledValue(localValue,remoteValue){
 function preferCloudFilledDay(localDay,remoteDay,forceCloudFilled=false){
   const merged=mergeDayRecords(localDay,remoteDay);
   if((!forceCloudFilled&&!isCloudFreshPull())||!remoteDay)return merged;
-  if(forceCloudFilled&&!shouldPreferIncomingCloudDay(localDay,remoteDay)){
-    return stripTransientDayFlags(normalizeNightClosingBases(mergeDayRecords(remoteDay,localDay)));
-  }
   const remote=normalizeDay(remoteDay);
   const out=cloneData(merged)||{};
   Object.keys(remote).forEach(key=>{
