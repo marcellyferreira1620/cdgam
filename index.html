@@ -13056,7 +13056,6 @@ function installFastSyncTriggers(){
 }
 
 async function sbConnect(){
-  restoreDefaultSupabaseConfig();
   sbUrl=localStorage.getItem('gam_sb_url')||SB_URL_DEFAULT;
   sbKey=localStorage.getItem('gam_sb_key')||SB_KEY_DEFAULT;
   if(!sbUrl||!sbKey){showSyncStatus('💾 Local',null);return;}
@@ -13185,20 +13184,13 @@ function forceCloudReconnect(){
   cloudConnecting=true;
   sbConnected=false;
   fbConnected=false;
-  restoreDefaultSupabaseConfig();
   if(sbPollTimer){clearInterval(sbPollTimer);sbPollTimer=null;}
   if(fbRestTimer){clearInterval(fbRestTimer);fbRestTimer=null;}
   showSyncStatus('☁ Reconectando nuvem...',null);
-  setTimeout(async()=>{
-    await sbConnect().catch(()=>{});
-    if(!sbConnected){
-      startFirebaseRestPolling(false);
-      setTimeout(()=>syncFromFirebaseRest(true).catch(()=>{}),150);
-      if(typeof initFirebase==='function')setTimeout(()=>initFirebase(),900);
-    }else{
-      setTimeout(()=>startFirebaseRestPolling(false),1800);
-    }
-  },150);
+  startFirebaseRestPolling(false);
+  setTimeout(()=>syncFromFirebaseRest(true).catch(()=>{}),150);
+  if(typeof initFirebase==='function')setTimeout(()=>initFirebase(),900);
+  setTimeout(()=>sbConnect().catch(()=>{}),2500);
 }
 
 // save() já foi atualizado acima para incluir Supabase
@@ -13616,18 +13608,12 @@ function startCloudSyncAfterLogin(){
   if(cloudSyncStarted)return;
   cloudSyncStarted=true;
   markCloudFreshPull();
-  restoreDefaultSupabaseConfig();
+  startFirebaseRestPolling(false);
+  [300,1200,3000,7000].forEach(ms=>setTimeout(()=>syncFromFirebaseRest(true).catch(()=>{}),ms));
+  if(typeof initFirebase==='function')setTimeout(initFirebase,800);
   setTimeout(async()=>{
     await sbConnect().catch(()=>{});
-    if(!sbConnected){
-      startFirebaseRestPolling(false);
-      [800,2500,6000].forEach(ms=>setTimeout(()=>syncFromFirebaseRest(true).catch(()=>{}),ms));
-      setTimeout(initFirebase,500);
-    }else{
-      setTimeout(()=>startFirebaseRestPolling(false),1800);
-      [3000,7000].forEach(ms=>setTimeout(()=>syncFromFirebaseRest(true).catch(()=>{}),ms));
-    }
-  },250);
+  },3500);
 }
 function updateUserBadge(){
   const el=document.getElementById('userBadge');if(!el)return;
