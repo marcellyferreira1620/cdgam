@@ -2541,8 +2541,8 @@ function mergeHourData(current,next,chosen){
       const hasA=hourFieldHasValue(av);
       const hasB=hourFieldHasValue(bv);
       if(ats||bts){
-        if(bts>ats)return (next&&next._nightPartialSave&&hasA&&!hasB)?av:bv;
-        if(ats>bts)return (current&&current._nightPartialSave&&hasB&&!hasA)?bv:av;
+        if(bts>ats)return (hasA&&!hasB)?av:bv;
+        if(ats>bts)return (hasB&&!hasA)?bv:av;
         return cv!==undefined?cv:(bv!==undefined?bv:av);
       }
       if(current&&current._nightPartialSave&&hasB)return bv;
@@ -2572,8 +2572,8 @@ function mergeDayRootFields(current,next,chosen){
     const hasA=dayFieldHasValue(av);
     const hasB=dayFieldHasValue(bv);
     if(ats||bts){
-      if(bts>ats)out[key]=(next&&next._nightPartialSave&&hasA&&!hasB)?av:bv;
-      else if(ats>bts)out[key]=(current&&current._nightPartialSave&&hasB&&!hasA)?bv:av;
+      if(bts>ats)out[key]=(hasA&&!hasB)?av:bv;
+      else if(ats>bts)out[key]=(hasB&&!hasA)?bv:av;
       else out[key]=cv!==undefined?cv:bv;
       return;
     }
@@ -12144,6 +12144,7 @@ function markNightFormUpdateStamps(existing,day){
     const before=existing?existing[key]:undefined;
     const after=day[key];
     if(existing){
+      if(dayFieldHasValue(before)&&!dayFieldHasValue(after))return;
       if(syncComparableValue(before)!==syncComparableValue(after))fieldUpdatedAt[key]=ts;
     }else if(dayFieldHasValue(after)){
       fieldUpdatedAt[key]=ts;
@@ -12159,6 +12160,7 @@ function markNightFormUpdateStamps(existing,day){
     for(let i=0;i<len;i++){
       const av=before[i],bv=after[i];
       const changed=existing?syncComparableValue(av)!==syncComparableValue(bv):hourFieldHasValue(bv);
+      if(existing&&hourFieldHasValue(av)&&!hourFieldHasValue(bv))continue;
       if(changed){
         if(!hdUpdatedAt[metric])hdUpdatedAt[metric]={};
         hdUpdatedAt[metric][i]=ts;
