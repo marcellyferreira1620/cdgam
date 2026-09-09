@@ -2715,6 +2715,13 @@ function runNightOperationFormulaGuard(){
       if(+mergedRoute[routeKey][0]!==0||+mergedRoute[routeTotalKey][0]!==942){
         errors.push('rotas precisam preservar pendente menor e total atualizado');
       }
+      const mergedRouteHour=mergeRouteRecords(
+        {cod:route.cod,hReal:'19:30',_fieldUpdatedAt:{hReal:1},_updatedAt:1},
+        {cod:route.cod,hReal:'100%',_fieldUpdatedAt:{hReal:2},_updatedAt:2}
+      );
+      if(mergedRouteHour.hReal!=='19:30'||calcAtraso('19:15','100%')!==null){
+        errors.push('horario realizado da rota nao pode aceitar percentual');
+      }
     }
 
     const closingBase=normalizeNightClosingBases({
@@ -2769,9 +2776,25 @@ function isSparseReplacement(existing,candidate){
 }
 
 const ROUTE_DATA_FIELDS=['tipo','placa','vol','paletes','hReal','obs'];
+function cleanHora(value){
+  if(value===null||value===undefined)return '';
+  const text=String(value).trim();
+  const m=text.match(/^(\d{1,2}):([0-5]\d)(?::[0-5]\d)?$/);
+  if(!m)return '';
+  const hh=+m[1];
+  if(!Number.isFinite(hh)||hh<0||hh>23)return '';
+  return`${String(hh).padStart(2,'0')}:${m[2]}`;
+}
+function hasValidHora(value){
+  return cleanHora(value)!=='';
+}
+function routeHasRealized(route){
+  return hasValidHora(route&&route.hReal);
+}
 function routeFieldHasValue(field,value){
   if(value===null||value===undefined)return false;
   if(field==='vol'||field==='paletes')return Number.isFinite(+value)&&+value!==0;
+  if(field==='hReal')return hasValidHora(value);
   return String(value).trim()!=='';
 }
 
@@ -2793,6 +2816,14 @@ function mergeRouteRecords(current,next){
     const av=a[field],bv=b[field];
     const aFieldTs=+(a._fieldUpdatedAt&&a._fieldUpdatedAt[field])||0;
     const bFieldTs=+(b._fieldUpdatedAt&&b._fieldUpdatedAt[field])||0;
+    if(field==='hReal'){
+      const ah=cleanHora(av),bh=cleanHora(bv);
+      if(ah&&bh)out[field]=(aFieldTs||bFieldTs)?(bFieldTs>=aFieldTs?bh:ah):((aTs||bTs)?(bTs>=aTs?bh:ah):bh);
+      else if(ah)out[field]=ah;
+      else if(bh)out[field]=bh;
+      else out[field]='';
+      return;
+    }
     if(aFieldTs||bFieldTs){
       out[field]=bFieldTs>=aFieldTs?bv:av;
       return;
@@ -9834,8 +9865,8 @@ function boletimNightStats(day){
   const vales=sumActiveHoraField('Vales',hd,day.date);
   const especial=sumActiveHoraField('Vol. Especial',hd,day.date);
   const expedicao=sumActiveHoraField('Vol. Doca',hd,day.date);
-  const routes=buildRotasMerged(day).filter(r=>r&&r.hPrev&&r.hReal);
-  const atrasadas=routes.filter(r=>calcAtraso(r.hPrev,r.hReal)>0).length;
+  const routes=buildRotasMerged(day).filter(r=>r&&r.hPrev&&routeHasRealized(r));
+  const atrasadas=routes.filter(r=>routeHasRealized(r)&&calcAtraso(r.hPrev,r.hReal)>0).length;
   const noHorario=routes.length-atrasadas;
   const pctNoHorario=routes.length?Math.round(noHorario/routes.length*100):0;
   const pctAtraso=routes.length?Math.round(atrasadas/routes.length*100):0;
@@ -10792,7 +10823,7 @@ function renderDashCharts(day){
   const expImpactedRoutes=buildRotasMerged(day).filter(r=>{
     const realDelay=calcAtraso(r.hPrev,r.hReal);
     const exp=calcExpRotaImpact(day,r.hPrev);
-    return r.hReal&&realDelay>0&&exp&&exp.delayMin>0;
+    return routeHasRealized(r)&&realDelay>0&&exp&&exp.delayMin>0;
   }).length;
   if(totalExp>0){
     alertEl.style.display='block';
@@ -10853,7 +10884,7 @@ function renderRouteClosure(day){
   const expedidos=routeSnapshots.map(s=>s.completed);
   const pendencias=routeSnapshots.map(s=>s.remaining);
   const percentuais=rotas.map((_,i)=>totais[i]>0?Math.min(Math.round(expedidos[i]/totais[i]*100),100):null);
-  const percentuaisFechamento=rotas.map((r,i)=>r.hReal?100:percentuais[i]);
+  const percentuaisFechamento=rotas.map((r,i)=>routeHasRealized(r)?100:percentuais[i]);
   const percentuaisFaltaFechamento=percentuaisFechamento.map(p=>p===null?null:Math.max(100-p,0));
   const barrasFechamento=percentuaisFechamento.map(p=>p===null?null:100);
   const statusRotas=rotas.map(r=>calcRotaStatus(day,r));
@@ -10882,7 +10913,7 @@ function renderRouteClosure(day){
   const totalSaida=expedidos.reduce((s,v)=>s+v,0);
   const totalDocaHora=sumHoraField('Vol. Doca',hd);
   const totalRotasHora=rotasHora.reduce((s,v)=>s+(v||0),0);
-  const rotasFinalizadas=rotas.filter((r,i)=>!!r.hReal||(totais[i]>0&&expedidos[i]>=totais[i])).length;
+  const rotasFinalizadas=rotas.filter((r,i)=>routeHasRealized(r)||(totais[i]>0&&expedidos[i]>=totais[i])).length;
   const rotasPendentes=rotas.length-rotasFinalizadas;
   const volumePendente=totalRotas-totalSaida;
   const saldoFinal=totalEntrada-totalSaida;
@@ -10944,7 +10975,7 @@ function renderRouteClosure(day){
               ` Pendente: ${pendencias[i].toLocaleString('pt-BR')}`
             ];
           },
-          afterBody:items=>{const i=items[0].dataIndex,r=rotas[i],st=statusRotas[i];return[`Horário previsto: ${r.hPrev}`,`Horário realizado: ${r.hReal||'Pendente'}`,`Status: ${st.stLabel.replace(/^[^A-ZÀ-Ú—]+/,'')}`];}
+          afterBody:items=>{const i=items[0].dataIndex,r=rotas[i],st=statusRotas[i],h=cleanHora(r.hReal);return[`Horário previsto: ${r.hPrev}`,`Horário realizado: ${h||'Pendente'}`,`Status: ${st.stLabel.replace(/^[^A-ZÀ-Ú—]+/,'')}`];}
         }}},
       scales:{
         x:{ticks:{color:'#00385f',font:{size:10,weight:'bold'},maxRotation:0,minRotation:0,autoSkip:false,padding:7},grid:{display:false},offset:true},
@@ -11669,7 +11700,7 @@ function compRouteDailyRow(day,routeDef){
   const snap=routeProgressSnapshot(day,route,day.hd||{});
   const volume=Math.max(+route.vol||0,+snap.total||0);
   const delay=calcAtraso(route.hPrev,route.hReal);
-  const finished=!!route.hReal;
+  const finished=routeHasRealized(route);
   const late=finished&&delay>0;
   const bottomLabel=!volume?'':finished?(late?fmtAtraso(delay):'00:00:00'):'Pendente';
   const status=finished?(late?'Atraso':'No horario'):(volume?'Pendente':'Sem volume');
@@ -11705,7 +11736,7 @@ function renderCompRouteCharts(days,labels){
         tooltipLabels:rows.map(r=>[
           `Volume: ${Math.round(r.volume||0).toLocaleString('pt-BR')}`,
           `Previsto: ${r.route.hPrev||'--'}`,
-          `Realizado: ${r.route.hReal||'Pendente'}`,
+          `Realizado: ${cleanHora(r.route.hReal)||'Pendente'}`,
           `Status: ${r.status}`,
           `Atraso: ${r.finished?fmtAtraso(r.delay||0):'Pendente'}`
         ])
@@ -11765,10 +11796,10 @@ function renderComp(){
     let count=0,totalMin=0;
     buildRotasMerged(day).forEach(r=>{
       const delay=calcAtraso(r.hPrev,r.hReal);
-      if(r.hReal&&delay>0){
+      if(routeHasRealized(r)&&delay>0){
         count++;
         totalMin+=delay;
-        delayRows.push({date:day.date,cod:r.cod,cidade:r.cidade,hPrev:r.hPrev,hReal:r.hReal,delay});
+        delayRows.push({date:day.date,cod:r.cod,cidade:r.cidade,hPrev:r.hPrev,hReal:cleanHora(r.hReal),delay});
       }
     });
     return{day,count,totalMin};
@@ -12520,7 +12551,7 @@ function buildRotasMerged(day){
     return{cod,cidade:rf.cidade,hPrev:rf.hPrev,
       tipo:s.tipo||'TRUCK',placa:s.placa||'',
       vol:s.vol||0,paletes:s.paletes||0,
-      hReal:s.hReal||'',obs:s.obs||''};
+      hReal:cleanHora(s.hReal),obs:s.obs||''};
   });
 }
 
@@ -12538,7 +12569,7 @@ function saveRotaField(cod,field,val){
   day.rotas=day.rotas.map(r=>({...r,cod:normalizeRouteCode(r.cod)}));
   let r=day.rotas.find(x=>normalizeRouteCode(x.cod)===cod);
   if(!r){r={cod};day.rotas.push(r);}
-  r[field]=field==='vol'||field==='paletes'?+val:val;
+  r[field]=field==='vol'||field==='paletes'?+val:(field==='hReal'?cleanHora(val):val);
   const ts=Date.now();
   r._updatedAt=ts;
   r._fieldUpdatedAt={...(r._fieldUpdatedAt||{}),[field]:ts};
@@ -12550,16 +12581,20 @@ function saveRotaField(cod,field,val){
 }
 
 function calcAtraso(hPrev,hReal){
+  hPrev=cleanHora(hPrev);
+  hReal=cleanHora(hReal);
   if(!hPrev||!hReal)return null;
   // convert HH:MM to minutes, handling midnight crossing
   const toMin=h=>{const[hh,mm]=h.split(':').map(Number);return hh*60+mm;};
   let prev=toMin(hPrev),real=toMin(hReal);
+  if(!Number.isFinite(prev)||!Number.isFinite(real))return null;
   // if real < 12:00, it's next day
   if(real<360&&prev>360)real+=1440;
   if(prev<360&&real>1080)prev+=1440;
   return real-prev; // positive = atrasado, negative = adiantado
 }
 function rotaPrevDateTime(dayDate,hPrev){
+  hPrev=cleanHora(hPrev);
   if(!dayDate||!hPrev)return null;
   const p=String(hPrev).split(':').map(Number);
   if(p.length<2||p.some(Number.isNaN))return null;
@@ -12577,7 +12612,7 @@ function calcAtrasoAoVivo(day,hPrev,now=new Date()){
 }
 
 function fmtAtraso(min){
-  if(min===null)return'—';
+  if(min===null||!Number.isFinite(min))return'-';
   if(min===0)return'00:00:00';
   const abs=Math.abs(min);
   const h=Math.floor(abs/60).toString().padStart(2,'0');
@@ -12587,6 +12622,7 @@ function fmtAtraso(min){
 
 const SHIFT_START_MIN=17*60+30;
 function horaToShiftMin(h){
+  h=cleanHora(h);
   if(!h)return null;
   const p=String(h).split(':').map(Number);
   if(p.length<2||p.some(Number.isNaN))return null;
@@ -12673,7 +12709,7 @@ function calcExpRotaImpact(day,hPrev){
 }
 function calcRotaStatus(day,r){
   const realDelay=calcAtraso(r.hPrev,r.hReal);
-  if(!r.hReal){
+  if(!routeHasRealized(r)){
     const liveDelay=null;
     if(liveDelay!==null)return{delay:liveDelay,realDelay:null,liveDelay,exp:null,stClass:'st-atrasado',stLabel:'✖ FORA DO HORÁRIO'};
     return{delay:null,realDelay,liveDelay:null,exp:null,stClass:'st-pendente',stLabel:'— PENDENTE'};
@@ -12711,6 +12747,7 @@ function renderRotasTbl(day,tblId){
       <th style="text-align:left;min-width:160px">Obs</th>
     </tr></thead><tbody>`;
   rotas.forEach(r=>{
+    const hReal=cleanHora(r.hReal);
     const st=calcRotaStatus(day,r);
     const atr=st.delay;
     const stClass=st.stClass,stLabel=st.stLabel;
@@ -12740,8 +12777,8 @@ function renderRotasTbl(day,tblId){
       <td style="color:#ffd700;font-weight:bold;text-align:center">${r.hPrev}</td>
       <td style="text-align:center">
         ${editable
-          ?`<input type="time" value="${escAttr(r.hReal)}" oninput="saveRotaField('${r.cod}','hReal',this.value)" onchange="renderRotasTblFull(getDay(curDate))" style="${inpSG};text-align:center"/>`
-          :`<span style="color:#00e676;font-weight:bold">${r.hReal||'—'}</span>`}
+          ?`<input type="time" value="${escAttr(hReal)}" oninput="saveRotaField('${r.cod}','hReal',this.value)" onchange="renderRotasTblFull(getDay(curDate))" style="${inpSG};text-align:center"/>`
+          :`<span style="color:#00e676;font-weight:bold">${hReal||'-'}</span>`}
       </td>
       <td style="text-align:center;color:${atrColor};font-weight:bold">${fmtAtraso(atr)}</td>
       <td style="text-align:center"><span class="${stClass}">${stLabel}</span></td>
@@ -12782,9 +12819,9 @@ function updateRotasKPIs(day){
   const rotas=buildRotasMerged(day);
   const total=rotas.reduce((s,r)=>s+(r.vol||0),0);
   const status=rotas.map(r=>calcRotaStatus(day,r));
-  const ok=status.filter((st,i)=>rotas[i].hReal&&st.stClass==='st-ok').length;
+  const ok=status.filter((st,i)=>routeHasRealized(rotas[i])&&st.stClass==='st-ok').length;
   const atras=status.filter(st=>st.stClass==='st-atrasado').length;
-  const pend=status.filter((st,i)=>!rotas[i].hReal&&st.stClass!=='st-atrasado').length;
+  const pend=status.filter((st,i)=>!routeHasRealized(rotas[i])&&st.stClass!=='st-atrasado').length;
   const consideradas=ok+atras;
   const efic=consideradas>0?Math.round(ok/consideradas*100):0;
   const totalPal=rotas.reduce((s,r)=>s+(r.paletes||0),0);
@@ -12803,7 +12840,7 @@ function refreshRouteLiveDelay(){
   const day=getDay(curDate);
   if(!day||!useRouteLiveDelay(day.date))return;
   const rotas=buildRotasMerged(day);
-  if(!rotas.some(r=>!r.hReal))return;
+  if(!rotas.some(r=>!routeHasRealized(r)))return;
   renderRotasTbl(day,'rotasTbl');
   updateRotasKPIs(day);
   if(activeTab()==='rotas'&&!isEditingDataField())renderRotasTblFull(day);
