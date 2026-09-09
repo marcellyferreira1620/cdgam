@@ -904,7 +904,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
   <button type="button" class="area-switch-btn" id="areaSwitchBtn" onclick="showAreaHub()">Trocar de área</button>
   <div class="hdr-title">ACOMPANHAMENTO DE PRODUTIVIDADE - CD GAM (GENESIO A. MENDES)</div>
   <span class="live-badge" id="liveBadge" style="display:none">⬤ AO VIVO</span>
-  <span id="syncStatus" style="font-size:10px;color:#89b4d4;padding:2px 8px;background:#122033;border-radius:3px;">☁ Conectando...</span>
+  <span id="syncStatus" onclick="forceCloudReconnect()" title="Clique para reconectar a nuvem" style="font-size:10px;color:#89b4d4;padding:2px 8px;background:#122033;border-radius:3px;cursor:pointer;">☁ Conectando...</span>
   <span id="userBadge" class="user-badge" onclick="doLogout()" title="Clique para sair" style="display:none">—</span>
   <div class="hdr-date" id="hdrDate"></div>
 </div>
@@ -3327,6 +3327,7 @@ async function saveToFirebaseRest(replaceDays=false){
       db.fluxogramas=normalizeFluxogramas(confirmed.fluxogramas||fluxogramasToSave);
       saveLocalDb(db);
       fbConnected=true;
+      cloudConnecting=false;
       pendingCloudSave=false;
       fbRestLastHash=cloudPayloadHash(confirmed);
       showSyncStatus('Nuvem ativa',false);
@@ -3349,6 +3350,7 @@ async function syncFromFirebaseRest(showOk){
   try{
     const remote=await fbRestReadPayload();
     fbConnected=true;
+    cloudConnecting=false;
     const lb=document.getElementById('liveBadge');if(lb)lb.style.display='inline';
     if(!remote||!Array.isArray(remote.days)||!remote.days.length){
       if(db.days&&db.days.length)await saveToFirebaseRest(false);
@@ -3429,6 +3431,8 @@ function startFirebaseFallback(reason,pushLocal=false,replaceDays=false){
   sbConnected=false;
   if(sbPollTimer){clearInterval(sbPollTimer);sbPollTimer=null;}
   if(reason)console.warn('Supabase fallback:',reason);
+  cloudConnecting=true;
+  showSyncStatus('☁ Reconectando nuvem...',null);
   startFirebaseRestPolling(pushLocal,replaceDays);
   if(!fbConnected)initFirebase();
   if(pushLocal&&((db.days&&db.days.length)||db.fluxogramas)){
@@ -3447,6 +3451,7 @@ function showSyncStatus(msg,isErr){
     if(sbConnected&&fbConnected){el.textContent='☁ Firebase + Supabase';el.style.color='#00e676';}
     else if(sbConnected){el.textContent='☁ Supabase ativo';el.style.color='#00e676';}
     else if(fbConnected){el.textContent='☁ Firebase ativo';el.style.color='#00e676';}
+    else if(cloudConnecting){el.textContent='☁ Reconectando nuvem...';el.style.color='#ffd700';}
     else{el.textContent='💾 Local';el.style.color='#89b4d4';}
     el.style.borderColor='';
   },3000);
@@ -3557,6 +3562,7 @@ function initFirebase(){
       (snapshot)=>{
         const remote=decodeFirebasePayload(snapshot.val());
         fbConnected=true;
+        cloudConnecting=false;
         const liveBadge=document.getElementById('liveBadge');
         if(liveBadge)liveBadge.style.display='inline';
         if(!remote||!remote.days){
@@ -12652,6 +12658,7 @@ let sbUrl=localStorage.getItem('gam_sb_url')||SB_URL_DEFAULT;
 let sbKey=localStorage.getItem('gam_sb_key')||SB_KEY_DEFAULT;
 let sbConnected=false,sbSyncing=false,sbPollTimer=null,sbLastTs=0,sbLoadRunning=false,sbFastSyncReady=false;
 let sbSaveRunning=false,sbSaveQueued=false,sbReplaceDaysQueued=false;
+let cloudConnecting=false;
 const SB_TABLE='cdgam_data';
 const SB_ROW_ID='main';
 const SB_POLL_MS=2000;
@@ -12839,6 +12846,7 @@ async function syncFromCloud(showOk){
   sbLoadRunning=true;
   try{
     const updated=await sbLoad();
+    if(sbConnected)cloudConnecting=false;
     if(updated){
       refreshFromDb();
       if(showOk){
@@ -12876,6 +12884,7 @@ async function sbConnect(){
   sbUrl=localStorage.getItem('gam_sb_url')||SB_URL_DEFAULT;
   sbKey=localStorage.getItem('gam_sb_key')||SB_KEY_DEFAULT;
   if(!sbUrl||!sbKey){showSyncStatus('💾 Local',null);return;}
+  cloudConnecting=true;
   showSyncStatus('☁ Conectando ao Supabase...',null);
   try{
     // Test + load
@@ -12893,6 +12902,7 @@ async function sbConnect(){
       return;
     }
     sbConnected=true;
+    cloudConnecting=false;
     installFastSyncTriggers();
     // Carregar dados remotos na inicialização
     const updated=await sbLoad();
@@ -12910,7 +12920,7 @@ async function sbConnect(){
   }catch(e){
     sbConnected=false;
     showSyncStatus('⚠ Sem conexão — dados locais OK',true);
-    startFirebaseFallback(e.message,true);
+    startFirebaseFallback(e.message,false);
     // Tentar reconectar em 1 minuto
     setTimeout(sbConnect,60000);
   }
@@ -12981,6 +12991,31 @@ function clearSyncConfig(){
   if(sbPollTimer){clearInterval(sbPollTimer);sbPollTimer=null;}
   showSyncStatus('☁ Sem nuvem — só local',null);
   document.getElementById('syncOv').classList.remove('on');
+}
+
+function restoreDefaultSupabaseConfig(){
+  try{
+    const url=localStorage.getItem('gam_sb_url')||'';
+    const key=localStorage.getItem('gam_sb_key')||'';
+    if(url&&url!==SB_URL_DEFAULT)localStorage.setItem('gam_sb_url',SB_URL_DEFAULT);
+    if(key&&key!==SB_KEY_DEFAULT)localStorage.setItem('gam_sb_key',SB_KEY_DEFAULT);
+  }catch(_){}
+  sbUrl=SB_URL_DEFAULT;
+  sbKey=SB_KEY_DEFAULT;
+}
+
+function forceCloudReconnect(){
+  cloudConnecting=true;
+  sbConnected=false;
+  fbConnected=false;
+  restoreDefaultSupabaseConfig();
+  if(sbPollTimer){clearInterval(sbPollTimer);sbPollTimer=null;}
+  if(fbRestTimer){clearInterval(fbRestTimer);fbRestTimer=null;}
+  showSyncStatus('☁ Reconectando nuvem...',null);
+  startFirebaseRestPolling(false);
+  setTimeout(()=>syncFromFirebaseRest(true).catch(()=>{}),150);
+  setTimeout(()=>sbConnect().catch(()=>{}),450);
+  if(typeof initFirebase==='function')setTimeout(()=>initFirebase(),900);
 }
 
 // save() já foi atualizado acima para incluir Supabase
