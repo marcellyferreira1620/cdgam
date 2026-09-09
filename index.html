@@ -3150,6 +3150,77 @@ function mergeDays(remoteDays,localDays){
   return Object.values(byDate).sort((a,b)=>a.date.localeCompare(b.date));
 }
 
+const CLOUD_PULL_ROOT_SKIP=new Set(['date','_updatedAt','_fieldUpdatedAt','_hdUpdatedAt','_nightPartialSave','rotas','prodSetores','prodDiurno','recebArm','boletim','devolucao','inventario','productBase']);
+
+function cloneData(value){
+  return value===undefined?undefined:JSON.parse(JSON.stringify(value));
+}
+
+function cloudValueFilled(value){
+  if(value===null||value===undefined)return false;
+  if(Array.isArray(value))return value.some(cloudValueFilled);
+  if(typeof value==='object')return Object.keys(value).some(k=>cloudValueFilled(value[k]));
+  if(typeof value==='number')return Number.isFinite(value)&&value!==0;
+  if(typeof value==='string'){
+    const t=value.trim();
+    return t!==''&&t!=='0';
+  }
+  if(typeof value==='boolean')return value;
+  return false;
+}
+
+function overlayCloudFilledValue(localValue,remoteValue){
+  if(remoteValue===null||remoteValue===undefined)return cloneData(localValue);
+  if(Array.isArray(remoteValue)){
+    const localArr=Array.isArray(localValue)?localValue:[];
+    const len=Math.max(localArr.length,remoteValue.length);
+    return new Array(len).fill(null).map((_,i)=>{
+      const rv=remoteValue[i];
+      const lv=localArr[i];
+      return cloudValueFilled(rv)?overlayCloudFilledValue(lv,rv):cloneData(lv);
+    });
+  }
+  if(typeof remoteValue==='object'){
+    const out=localValue&&typeof localValue==='object'&&!Array.isArray(localValue)?cloneData(localValue):{};
+    Object.keys(remoteValue).forEach(key=>{
+      const rv=remoteValue[key];
+      if(cloudValueFilled(rv))out[key]=overlayCloudFilledValue(out[key],rv);
+    });
+    return out;
+  }
+  return cloudValueFilled(remoteValue)?remoteValue:cloneData(localValue);
+}
+
+function preferCloudFilledDay(localDay,remoteDay){
+  const merged=mergeDayRecords(localDay,remoteDay);
+  if(!isCloudFreshPull()||!remoteDay)return merged;
+  const remote=normalizeDay(remoteDay);
+  const out=cloneData(merged)||{};
+  Object.keys(remote).forEach(key=>{
+    if(CLOUD_PULL_ROOT_SKIP.has(key))return;
+    if(cloudValueFilled(remote[key]))out[key]=overlayCloudFilledValue(out[key],remote[key]);
+  });
+  if(remote.hd&&cloudValueFilled(remote.hd))out.hd=overlayCloudFilledValue(out.hd,remote.hd);
+  out.date=remote.date||out.date;
+  out._fieldUpdatedAt={...((localDay&&localDay._fieldUpdatedAt)||{}),...((remote&&remote._fieldUpdatedAt)||{})};
+  out._hdUpdatedAt=mergeHourUpdatedAt(localDay,remote)||out._hdUpdatedAt;
+  const ts=Math.max(+(localDay&&localDay._updatedAt)||0,+(remote&&remote._updatedAt)||0,+(merged&&merged._updatedAt)||0);
+  if(ts)out._updatedAt=ts;
+  return stripTransientDayFlags(normalizeNightClosingBases(out));
+}
+
+function mergeCloudFreshDays(localDays,remoteDays){
+  const byDate={};
+  (Array.isArray(localDays)?localDays:[]).forEach(day=>{
+    if(day&&day.date)byDate[day.date]=normalizeDay(day);
+  });
+  (Array.isArray(remoteDays)?remoteDays:[]).forEach(day=>{
+    if(!day||!day.date)return;
+    byDate[day.date]=byDate[day.date]?preferCloudFilledDay(byDate[day.date],day):normalizeDay(day);
+  });
+  return Object.values(byDate).sort((a,b)=>a.date.localeCompare(b.date));
+}
+
 function uid(){
   return 'id-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9);
 }
@@ -3482,7 +3553,8 @@ function applyRemoteData(remote){
   const previousCurrent=curDate;
   const remoteLatest=maxDayDate(remote.days);
   const beforeHash=payloadDaysHash(db.days);
-  const mergedDays=mergeDays(db.days,JSON.parse(JSON.stringify(remote.days)));
+  const remoteDaysCopy=JSON.parse(JSON.stringify(remote.days));
+  const mergedDays=isCloudFreshPull()?mergeCloudFreshDays(db.days,remoteDaysCopy):mergeDays(db.days,remoteDaysCopy);
   const afterHash=payloadDaysHash(mergedDays);
   if(beforeHash===afterHash)return changed;
   db.days=mergedDays;
@@ -12659,9 +12731,18 @@ let sbKey=localStorage.getItem('gam_sb_key')||SB_KEY_DEFAULT;
 let sbConnected=false,sbSyncing=false,sbPollTimer=null,sbLastTs=0,sbLoadRunning=false,sbFastSyncReady=false;
 let sbSaveRunning=false,sbSaveQueued=false,sbReplaceDaysQueued=false;
 let cloudConnecting=false;
+let cloudFreshPullUntil=0;
 const SB_TABLE='cdgam_data';
 const SB_ROW_ID='main';
 const SB_POLL_MS=2000;
+
+function markCloudFreshPull(ms=90000){
+  cloudFreshPullUntil=Date.now()+ms;
+}
+
+function isCloudFreshPull(){
+  return Date.now()<cloudFreshPullUntil&&!isEditingDataField();
+}
 
 function sbHeaders(){return{'apikey':sbKey,'Authorization':'Bearer '+sbKey,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'};}
 
@@ -12783,7 +12864,7 @@ async function sbLoad(){
       const previousCurrent=curDate;
       const remoteLatest=maxDayDate(remoteDays);
       const beforeHash=payloadDaysHash(db.days);
-      const mergedDays=mergeDays(db.days,remoteDays);
+      const mergedDays=isCloudFreshPull()?mergeCloudFreshDays(db.days,remoteDays):mergeDays(db.days,remoteDays);
       const afterHash=payloadDaysHash(mergedDays);
       if(afterHash!==beforeHash||remoteTs>localTs||remoteHash!==lastSyncHash||remoteDaysHaveBetterData(remoteDays)){
         if(afterHash!==beforeHash){
@@ -12802,7 +12883,7 @@ async function sbLoad(){
     }
     return changed;
   }catch(e){
-    startFirebaseFallback(e.message,true);
+    startFirebaseFallback(e.message,false);
     return false;
   }
 }
@@ -12894,11 +12975,11 @@ async function sbConnect(){
       const err=await r.json().catch(()=>({}));
       if(r.status===404||r.status===400){
         showSyncStatus('⚠ Tabela não encontrada — ver guia',true);
-        startFirebaseFallback(`connect HTTP ${r.status}`,true);
+        startFirebaseFallback(`connect HTTP ${r.status}`,false);
         return;
       }
       showSyncStatus('⚠ Erro '+r.status,true);
-      startFirebaseFallback(`connect HTTP ${r.status}`,true);
+      startFirebaseFallback(`connect HTTP ${r.status}`,false);
       return;
     }
     sbConnected=true;
@@ -13005,6 +13086,7 @@ function restoreDefaultSupabaseConfig(){
 }
 
 function forceCloudReconnect(){
+  markCloudFreshPull();
   cloudConnecting=true;
   sbConnected=false;
   fbConnected=false;
@@ -13432,6 +13514,7 @@ function afterLogin(opts={}){
 function startCloudSyncAfterLogin(){
   if(cloudSyncStarted)return;
   cloudSyncStarted=true;
+  markCloudFreshPull();
   startFirebaseRestPolling(false);
   [800,2500,6000].forEach(ms=>setTimeout(()=>syncFromFirebaseRest(true).catch(()=>{}),ms));
   setTimeout(async()=>{
