@@ -12886,10 +12886,11 @@ const SB_POLL_MS=2000;
 
 function markCloudFreshPull(ms=90000){
   cloudFreshPullUntil=Date.now()+ms;
+  pendingCloudSave=false;
 }
 
 function isCloudFreshPull(){
-  return Date.now()<cloudFreshPullUntil&&!isEditingDataField();
+  return Date.now()<cloudFreshPullUntil;
 }
 
 function sbHeaders(){return{'apikey':sbKey,'Authorization':'Bearer '+sbKey,'Content-Type':'application/json','Prefer':'resolution=merge-duplicates'};}
