@@ -19,6 +19,14 @@
 <div class="boot"><div class="box"><div class="brand">CD GAM</div><div class="msg">Carregando versao atualizada...</div><div id="err" class="err"></div></div></div>
 <script>
 (async function(){
+  const canonicalVersion='55bb68f';
+  const params=new URLSearchParams(location.search);
+  if(params.get('v')!==canonicalVersion){
+    params.set('v',canonicalVersion);
+    params.delete('t');
+    location.replace(location.pathname+'?'+params.toString()+location.hash);
+    return;
+  }
   const endpoint='https://gam-sjp-default-rtdb.firebaseio.com/cdgam/appHtml.json?t='+Date.now();
   try{
     const res=await fetch(endpoint,{cache:'no-store'});
