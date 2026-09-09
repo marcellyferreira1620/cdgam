@@ -6306,15 +6306,18 @@ function addRecebArmNota(){
     fornecedor:(document.getElementById('recebArmFornecedor').value||'').trim(),
     protocolo:(document.getElementById('recebArmProtocolo').value||'').trim()
   };
-  const matchedParsed=recebArmFindParsedXmlForInput(manualOverrides.nfNumero,manualOverrides.chave);
-  const parsedList=matchedParsed?[matchedParsed]:(fileEl&&Array.isArray(fileEl._parsedNotas)&&fileEl._parsedNotas.length?fileEl._parsedNotas:[fileEl&&fileEl._parsedNota?fileEl._parsedNota:{}]);
+  const fileParsedList=fileEl&&Array.isArray(fileEl._parsedNotas)?fileEl._parsedNotas.filter(Boolean):[];
+  const batchMode=fileParsedList.length>1;
+  const matchedParsed=batchMode?null:recebArmFindParsedXmlForInput(manualOverrides.nfNumero,manualOverrides.chave);
+  const parsedList=batchMode?fileParsedList:(matchedParsed?[matchedParsed]:(fileParsedList.length?fileParsedList:[fileEl&&fileEl._parsedNota?fileEl._parsedNota:{}]));
   if(parsedList.length===1&&!manualOverrides.nfNumero&&!manualOverrides.chave&&!(parsedList[0]&&parsedList[0].nfNumero)&&!(parsedList[0]&&parsedList[0].chave)){
     recebArmMsg('recebArmNotaMsg','Informe o número da NF ou a chave.',true);
     return;
   }
   let added=0,updated=0,protectedCount=0,skipped=0,missingItems=0;
   parsedList.forEach((parsed,idx)=>{
-    const result=recebArmUpsertParsedNota(day,data,parsed||{},idx===0?manualOverrides:{protocolo:manualOverrides.protocolo});
+    const overrides=batchMode?{protocolo:manualOverrides.protocolo}:(idx===0?manualOverrides:{protocolo:manualOverrides.protocolo});
+    const result=recebArmUpsertParsedNota(day,data,parsed||{},overrides);
     if(result.ok){
       if(result.protected)protectedCount++;
       else if(result.updated)updated++;
