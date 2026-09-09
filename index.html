@@ -3191,9 +3191,9 @@ function overlayCloudFilledValue(localValue,remoteValue){
   return cloudValueFilled(remoteValue)?remoteValue:cloneData(localValue);
 }
 
-function preferCloudFilledDay(localDay,remoteDay){
+function preferCloudFilledDay(localDay,remoteDay,forceCloudFilled=false){
   const merged=mergeDayRecords(localDay,remoteDay);
-  if(!isCloudFreshPull()||!remoteDay)return merged;
+  if((!forceCloudFilled&&!isCloudFreshPull())||!remoteDay)return merged;
   const remote=normalizeDay(remoteDay);
   const out=cloneData(merged)||{};
   Object.keys(remote).forEach(key=>{
@@ -3216,7 +3216,19 @@ function mergeCloudFreshDays(localDays,remoteDays){
   });
   (Array.isArray(remoteDays)?remoteDays:[]).forEach(day=>{
     if(!day||!day.date)return;
-    byDate[day.date]=byDate[day.date]?preferCloudFilledDay(byDate[day.date],day):normalizeDay(day);
+    byDate[day.date]=byDate[day.date]?preferCloudFilledDay(byDate[day.date],day,true):normalizeDay(day);
+  });
+  return Object.values(byDate).sort((a,b)=>a.date.localeCompare(b.date));
+}
+
+function mergeCloudIncomingDays(localDays,remoteDays){
+  const byDate={};
+  (Array.isArray(localDays)?localDays:[]).forEach(day=>{
+    if(day&&day.date)byDate[day.date]=normalizeDay(day);
+  });
+  (Array.isArray(remoteDays)?remoteDays:[]).forEach(day=>{
+    if(!day||!day.date)return;
+    byDate[day.date]=byDate[day.date]?preferCloudFilledDay(byDate[day.date],day,true):normalizeDay(day);
   });
   return Object.values(byDate).sort((a,b)=>a.date.localeCompare(b.date));
 }
@@ -3554,7 +3566,7 @@ function applyRemoteData(remote){
   const remoteLatest=maxDayDate(remote.days);
   const beforeHash=payloadDaysHash(db.days);
   const remoteDaysCopy=JSON.parse(JSON.stringify(remote.days));
-  const mergedDays=isCloudFreshPull()?mergeCloudFreshDays(db.days,remoteDaysCopy):mergeDays(db.days,remoteDaysCopy);
+  const mergedDays=mergeCloudIncomingDays(db.days,remoteDaysCopy);
   const afterHash=payloadDaysHash(mergedDays);
   if(beforeHash===afterHash)return changed;
   db.days=mergedDays;
@@ -12873,7 +12885,7 @@ async function sbLoad(){
       const previousCurrent=curDate;
       const remoteLatest=maxDayDate(remoteDays);
       const beforeHash=payloadDaysHash(db.days);
-      const mergedDays=isCloudFreshPull()?mergeCloudFreshDays(db.days,remoteDays):mergeDays(db.days,remoteDays);
+      const mergedDays=mergeCloudIncomingDays(db.days,remoteDays);
       const afterHash=payloadDaysHash(mergedDays);
       if(afterHash!==beforeHash||remoteTs>localTs||remoteHash!==lastSyncHash||remoteDaysHaveBetterData(remoteDays)){
         if(afterHash!==beforeHash){
