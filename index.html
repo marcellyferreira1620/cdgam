@@ -3424,7 +3424,7 @@ async function syncFromFirebaseRest(showOk){
     cloudConnecting=false;
     const lb=document.getElementById('liveBadge');if(lb)lb.style.display='inline';
     if(!remote||!Array.isArray(remote.days)||!remote.days.length){
-      if(db.days&&db.days.length)await saveToFirebaseRest(false);
+      if(!isCloudFreshPull()&&db.days&&db.days.length)await saveToFirebaseRest(false);
       else if(showOk)showSyncStatus('Nuvem ativa',false);
       return false;
     }
@@ -3436,7 +3436,7 @@ async function syncFromFirebaseRest(showOk){
       updated=!!applyRemoteData(remote);
       fbRestLastHash=remoteHash;
     }
-    if(pendingCloudSave&&((db.days&&db.days.length)||db.fluxogramas)&&!fbRestSaveRunning){
+    if(!isCloudFreshPull()&&pendingCloudSave&&((db.days&&db.days.length)||db.fluxogramas)&&!fbRestSaveRunning){
       setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),50);
     }
     if(showOk)showSyncStatus(updated?'Sincronizado':'Nuvem ativa',false);
@@ -3594,6 +3594,11 @@ function save(replaceDays=false){
     db.fluxogramas=mergeFluxogramas(stored.fluxogramas,db.fluxogramas);
   }
   saveLocalDb(db);
+  if(isCloudFreshPull()){
+    pendingCloudSave=false;
+    showSyncStatus('☁ Puxando dados completos...',null);
+    return true;
+  }
   pendingCloudSave=true;
   // Supabase tem prioridade
   if(typeof sbUrl!=='undefined'&&sbUrl&&sbKey&&sbConnected){
@@ -3639,7 +3644,7 @@ function initFirebase(){
         if(liveBadge)liveBadge.style.display='inline';
         if(!remote||!remote.days){
           showSyncStatus('☁ Nuvem ativa ✓',false);
-          if(db.days&&db.days.length>0)save();
+          if(!isCloudFreshPull()&&db.days&&db.days.length>0)save();
           return;
         }
         const remoteHash=cloudPayloadHash(remote);
@@ -12878,7 +12883,7 @@ async function sbLoad(){
     }
     if(remoteTs>sbLastTs)sbLastTs=remoteTs;
     if(changed||remoteHash!==lastSyncHash)lastSyncHash=remoteHash;
-    if(pendingCloudSave&&((db.days&&db.days.length)||db.fluxogramas)&&!sbSaveRunning){
+    if(!isCloudFreshPull()&&pendingCloudSave&&((db.days&&db.days.length)||db.fluxogramas)&&!sbSaveRunning){
       setTimeout(()=>sbSave(false).catch(()=>{}),50);
     }
     return changed;
@@ -12993,7 +12998,7 @@ async function sbConnect(){
     } else {
       showSyncStatus('☁ Nuvem ativa ✓',false);
       // Se temos dados locais e nuvem vazia, salvar para a nuvem
-      if(db.days&&db.days.length>0)await sbSave();
+      if(!isCloudFreshPull()&&db.days&&db.days.length>0)await sbSave();
     }
     startSbPolling();
     // Badge ao vivo
