@@ -3518,7 +3518,10 @@ async function syncFromFirebaseRest(showOk){
     if(!isSaving){
       updated=!!applyRemoteData(remote);
       fbRestLastHash=remoteHash;
-      if(updated)mirrorPayloadToSupabase(currentCloudPayload(remote)).catch(()=>{});
+      if(updated){
+        refreshFromDb();
+        mirrorPayloadToSupabase(currentCloudPayload(remote)).catch(()=>{});
+      }
     }
     if(!isCloudFreshPull()&&pendingCloudSave&&((db.days&&db.days.length)||db.fluxogramas)&&!fbRestSaveRunning){
       setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),50);
@@ -3735,7 +3738,8 @@ function initFirebase(){
         const shouldApply=!isSaving&&(remoteTs>lastSaveTs||remoteDaysHaveBetterData(remote.days)||remoteHash!==fbRestLastHash);
         if(shouldApply){
           lastSaveTs=remoteTs;
-          if(!shouldRejectOlderCloud(remote.days,'firebase-sdk'))applyRemoteData(remote);
+          const applied=!shouldRejectOlderCloud(remote.days,'firebase-sdk')&&applyRemoteData(remote);
+          if(applied)refreshFromDb();
           fbRestLastHash=remoteHash;
           showSyncStatus('☁ Sincronizado ✓',false);
           setTimeout(()=>showSyncStatus('☁ Nuvem ativa ✓',false),2500);
