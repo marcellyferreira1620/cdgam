@@ -13757,7 +13757,8 @@ const PREV_ENC_INDICADORES=[
   ['vendaFraldaFracionadoCaixas','VENDA FRALDA FRACIONADO "CAIXAS"'],
   ['volumesExpedicao','VOLUMES EXPEDICAO'],
   ['eficienciaExpedicao','EFICIENCIA DE EXPEDICAO'],
-  ['vales','VALES']
+  ['vales','VALES'],
+  ['faltas','FALTAS']
 ];
 
 const PREV_ENC_PROCESSOS=[
@@ -13767,8 +13768,7 @@ const PREV_ENC_PROCESSOS=[
   {nome:'ESPECIAL',resultado:'vendaEspecialCaixas',cap:'capEsp',capDefault:340,realizado:'espFim'},
   {nome:'FRALDA FECHADO',resultado:'vendaFraldaFechadoFardos',cap:'capFrF',capDefault:100,realizado:'frFFim'},
   {nome:'FRALDA FRACIONADO',resultado:'vendaFraldaFracionadoCaixas',cap:'capFrFc',capDefault:89,realizado:'frFcFim'},
-  {nome:'EXPEDICAO',resultado:'volumesExpedicao',cap:'capVE',capDefault:1303,realizado:'expFim'},
-  {nome:'FALTAS',resultado:null,cap:null,capDefault:0,realizado:'faltas'}
+  {nome:'EXPEDICAO',resultado:'volumesExpedicao',cap:'capVE',capDefault:1303,realizado:'expFim'}
 ];
 
 function ensurePrevisaoEncerramento(day){
@@ -13821,10 +13821,6 @@ function previsaoEncEfficiencyClass(pct){
 }
 
 function previsaoEncProcessCalc(day,row){
-  if(row.nome==='FALTAS'){
-    const faltas=day&&day.faltas!==undefined&&day.faltas!==null&&String(day.faltas).trim()!==''?prodFmt(+day.faltas||0,0):'-';
-    return{resultado:'-',cap:'-',previsto:'-',realizado:faltas,eficiencia:null};
-  }
   const total=previsaoEncRawNumber(previsaoEncGetResult(day,row.resultado));
   const cap=+(day&&day[row.cap])||row.capDefault||0;
   const previsto=previsaoEncExpectedTime(total,cap);
