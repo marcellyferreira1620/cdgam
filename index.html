@@ -2902,7 +2902,7 @@ function routeHasRealized(route){
 }
 function routeFieldHasValue(field,value){
   if(value===null||value===undefined)return false;
-  if(field==='vol'||field==='paletes')return Number.isFinite(+value)&&+value!==0;
+  if(field==='vol'||field==='paletes')return value!==''&&Number.isFinite(+value);
   if(field==='hReal')return hasValidHora(value);
   return String(value).trim()!=='';
 }
@@ -13183,9 +13183,16 @@ function saveRotaField(cod,field,val){
     ?(raw===''?'':(+raw||0))
     :(field==='hReal'?cleanHora(val):String(val??''));
   const ts=Date.now();
+  const hasNextValue=routeFieldHasValue(field,nextValue);
+  const hadSavedValue=routeFieldHasValue(field,r[field]);
+  if(!hasNextValue&&hadSavedValue){
+    updateRotasKPIs(day);
+    renderRotasTbl(day,'rotasTbl');
+    return;
+  }
   r[field]=nextValue;
   r._fieldUpdatedAt={...(r._fieldUpdatedAt||{})};
-  if(routeFieldHasValue(field,nextValue)){
+  if(hasNextValue){
     r._fieldUpdatedAt[field]=ts;
     r._updatedAt=ts;
     day._updatedAt=ts;
@@ -13196,13 +13203,15 @@ function saveRotaField(cod,field,val){
   const saved=save();
   if(saved!==false){
     pendingCloudSave=true;
-    fbRestWriteRotasShadow({days:[day],savedAt:Date.now()}).catch(()=>{});
+    const persistedDay=getDay(day.date)||day;
+    fbRestWriteRotasShadow({days:[persistedDay],savedAt:Date.now()}).catch(()=>{});
     setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),120);
     setTimeout(()=>{if(typeof sbSave==='function')sbSave(false).catch(()=>{});},350);
   }
-  updateRotasKPIs(day);
-  renderRotasTbl(day,'rotasTbl');
-  renderRouteClosure(day);
+  const renderDay=getDay(day.date)||day;
+  updateRotasKPIs(renderDay);
+  renderRotasTbl(renderDay,'rotasTbl');
+  renderRouteClosure(renderDay);
 }
 
 function calcAtraso(hPrev,hReal){
