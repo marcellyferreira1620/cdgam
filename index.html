@@ -2186,6 +2186,8 @@ const FB_ROTAS_PATH='cdgam/rotasByDate';
 const FB_ROTAS_REST_URL=FB_CONFIG.databaseURL+'/'+FB_ROTAS_PATH+'.json';
 const FB_RECEB_ARM_997_PATH='cdgam/recebArm997ByDate';
 const FB_RECEB_ARM_997_REST_URL=FB_CONFIG.databaseURL+'/'+FB_RECEB_ARM_997_PATH+'.json';
+const FB_INVENTARIO_PATH='cdgam/inventarioByDate';
+const FB_INVENTARIO_REST_URL=FB_CONFIG.databaseURL+'/'+FB_INVENTARIO_PATH+'.json';
 const FB_REST_POLL_MS=2000;
 let fbDb=null;
 let fbConnected=false;
@@ -3149,6 +3151,7 @@ function mergeRecebArm(current,next){
   if(!current&&!next)return null;
   const a=current||{};
   const b=next||{};
+  const history=mergeRecebArm997History(a,b);
   return{
     ...a,
     ...b,
@@ -3157,11 +3160,12 @@ function mergeRecebArm(current,next){
     pendConf:mergeByIdOrIndex(a.pendConf,b.pendConf,'id'),
     pendArm:mergeByIdOrIndex(a.pendArm,b.pendArm,'id'),
     qrpRows:mergeRecebArmQrpRows(a.qrpRows,b.qrpRows),
-    qrpImports:mergeByIdOrIndex(a.qrpImports,b.qrpImports,'id'),
+    qrpImports:history.qrpImports,
     qrpLastItems:(+b._updatedAt||0)>=(+a._updatedAt||0)?(b.qrpLastItems||a.qrpLastItems||[]):(a.qrpLastItems||b.qrpLastItems||[]),
-    qrpLastSummaryItems:(+b._updatedAt||0)>=(+a._updatedAt||0)?(b.qrpLastSummaryItems||a.qrpLastSummaryItems||[]):(a.qrpLastSummaryItems||b.qrpLastSummaryItems||[]),
-    qrpLastPendingSummary:recebArmNewerPendingSummary(a.qrpLastPendingSummary,b.qrpLastPendingSummary),
-    qrpOpenPartials:(+b._updatedAt||0)>=(+a._updatedAt||0)?(b.qrpOpenPartials||a.qrpOpenPartials||[]):(a.qrpOpenPartials||b.qrpOpenPartials||[]),
+    qrpLastSummaryItems:history.qrpLastSummaryItems,
+    qrpLastPendingSummary:history.qrpLastPendingSummary,
+    qrpOpenPartials:history.qrpOpenPartials,
+    qrpParserVersion:history.qrpParserVersion||b.qrpParserVersion||a.qrpParserVersion||'',
     productBase:mergeByIdOrIndex(a.productBase,b.productBase,'codigo'),
     _updatedAt:Math.max(+a._updatedAt||0,+b._updatedAt||0)
   };
@@ -3255,6 +3259,27 @@ function mergeInventario(current,next){
     });
     return merged;
   };
+  const mergeReservaComparativo=(av,bv)=>{
+    const aa=av&&typeof av==='object'?av:{};
+    const bb=bv&&typeof bv==='object'?bv:{};
+    const merged={...aa};
+    ['inicio','final'].forEach(type=>{
+      const cur=aa[type];
+      const nxt=bb[type];
+      if(!cur&&nxt){merged[type]=cloneData(nxt);return;}
+      if(cur&&!nxt){merged[type]=cloneData(cur);return;}
+      if(cur&&nxt){
+        const curTs=+cur.importedAt||0;
+        const nxtTs=+nxt.importedAt||0;
+        merged[type]=nxtTs>=curTs?{...cur,...nxt}:{...nxt,...cur};
+      }
+    });
+    Object.keys(bb).forEach(key=>{
+      if(key==='inicio'||key==='final')return;
+      if(dayFieldHasValue(bb[key])||!dayFieldHasValue(merged[key]))merged[key]=cloneData(bb[key]);
+    });
+    return merged;
+  };
   keys.forEach(key=>{
     if(key==='_fieldUpdatedAt'||key==='_updatedAt')return;
     const av=a[key],bv=b[key];
@@ -3264,6 +3289,10 @@ function mergeInventario(current,next){
     const hasB=bv!==undefined&&bv!==null;
     if(key==='farol'){
       out[key]=mergeFarol(av,bv);
+      return;
+    }
+    if(key==='reservaComparativo'){
+      out[key]=mergeReservaComparativo(av,bv);
       return;
     }
     if(ats||bts){
@@ -3525,6 +3554,7 @@ async function fbRestReadPayload(){
   let payload=decodeFirebasePayload(await r.json());
   payload=await hydratePayloadRotasFromShadow(payload).catch(()=>payload);
   payload=await hydratePayloadRecebArm997FromShadow(payload).catch(()=>payload);
+  payload=await hydratePayloadInventarioFromShadow(payload).catch(()=>payload);
   return payload;
 }
 
@@ -3745,6 +3775,87 @@ async function fbRestWriteRecebArm997Shadow(payload){
   }));
 }
 
+function inventarioShadowUrl(date){
+  return FB_CONFIG.databaseURL+'/'+FB_INVENTARIO_PATH+'/'+encodeURIComponent(date)+'.json';
+}
+
+function inventarioReservaFileHasData(record){
+  if(!record||typeof record!=='object')return false;
+  return !!record.fileName||!!(+record.importedAt||0)||dayFieldHasValue(record.totals)||dayFieldHasValue(record.grupos);
+}
+
+function inventarioShadowHasData(data){
+  if(!data||typeof data!=='object')return false;
+  const comp=data.reservaComparativo&&typeof data.reservaComparativo==='object'?data.reservaComparativo:null;
+  if(comp&&(inventarioReservaFileHasData(comp.inicio)||inventarioReservaFileHasData(comp.final)))return true;
+  return dayFieldHasValue(data.valorReservaLocalizado)||dayFieldHasValue(data.valorReservado)||dayFieldHasValue(data.palletMenu24Devolvidos)||dayFieldHasValue(data.farol);
+}
+
+function compactInventarioHistoryForShadow(data){
+  if(!inventarioShadowHasData(data))return null;
+  return compactInventarioForStorage({
+    ...data,
+    updatedAt:+data._updatedAt||Date.now()
+  });
+}
+
+function mergeInventarioHistory(current,next){
+  const a=current||{};
+  const b=next||{};
+  const merged=mergeInventario(current,next)||{};
+  merged.updatedAt=Math.max(+a.updatedAt||+a._updatedAt||0,+b.updatedAt||+b._updatedAt||0,+merged._updatedAt||0);
+  return merged;
+}
+
+async function fbRestReadInventarioShadow(){
+  const r=await fetch(FB_INVENTARIO_REST_URL+'?t='+Date.now(),{cache:'no-store'});
+  if(!r.ok)return {};
+  return await r.json().catch(()=>({}))||{};
+}
+
+async function hydratePayloadInventarioFromShadow(payload){
+  if(!payload||!Array.isArray(payload.days)||!payload.days.length)return payload;
+  const shadows=await fbRestReadInventarioShadow().catch(()=>({}));
+  if(!shadows||typeof shadows!=='object')return payload;
+  let changed=false;
+  const days=payload.days.map(day=>{
+    if(!day||!day.date)return day;
+    const shadow=shadows[day.date];
+    const shadowInventario=shadow&&shadow.inventario?shadow.inventario:shadow;
+    if(!inventarioShadowHasData(shadowInventario))return day;
+    const current=day.inventario||{};
+    const inventario=mergeInventarioHistory(current,shadowInventario);
+    const before=payloadDaysHash([{date:day.date,inventario:current}]);
+    const after=payloadDaysHash([{date:day.date,inventario}]);
+    if(before===after)return day;
+    changed=true;
+    return {...day,inventario,_updatedAt:Math.max(+day._updatedAt||0,+inventario.updatedAt||+inventario._updatedAt||0)};
+  });
+  return changed?{...payload,days}:payload;
+}
+
+async function fbRestWriteInventarioShadow(payload){
+  if(!payload||!Array.isArray(payload.days))return;
+  await Promise.all(payload.days.map(day=>{
+    if(!day||!day.date||!inventarioShadowHasData(day.inventario))return Promise.resolve();
+    const incoming=compactInventarioHistoryForShadow(day.inventario);
+    if(!incoming)return Promise.resolve();
+    const ts=Math.max(+day._updatedAt||0,+payload.savedAt||0,+incoming.updatedAt||0,Date.now());
+    incoming.updatedAt=ts;
+    return fetch(inventarioShadowUrl(day.date)+'?t='+Date.now(),{cache:'no-store'})
+      .then(r=>r.ok?r.json().catch(()=>null):null)
+      .then(shadow=>{
+        const current=shadow&&shadow.inventario?shadow.inventario:shadow;
+        const merged=mergeInventarioHistory(current,incoming);
+        return fetch(inventarioShadowUrl(day.date),{
+          method:'PUT',
+          headers:{'Content-Type':'application/json'},
+          body:JSON.stringify({inventario:{...merged,updatedAt:Math.max(+merged.updatedAt||0,ts)}})
+        });
+      }).catch(()=>null);
+  }));
+}
+
 async function fbRestWritePayload(payload){
   const r=await fetch(FB_REST_URL,{
     method:'PUT',
@@ -3752,7 +3863,7 @@ async function fbRestWritePayload(payload){
     body:JSON.stringify(encodeFirebasePayload(payload))
   });
   if(!r.ok)throw new Error(`Firebase REST HTTP ${r.status}`);
-  await Promise.allSettled([fbRestWriteRotasShadow(payload),fbRestWriteRecebArm997Shadow(payload)]);
+  await Promise.allSettled([fbRestWriteRotasShadow(payload),fbRestWriteRecebArm997Shadow(payload),fbRestWriteInventarioShadow(payload)]);
   return await r.json().catch(()=>null);
 }
 
@@ -3935,6 +4046,7 @@ async function saveToFirebase(replaceDays=false){
   const payload={days:daysToSave,users:getLocalUsersCache(),fluxogramas:fluxogramasToSave,savedAt:ts};
   return fbDb.ref(FB_PATH).set(encodeFirebasePayload(payload))
     .then(async()=>{
+      await Promise.allSettled([fbRestWriteRotasShadow(payload),fbRestWriteRecebArm997Shadow(payload),fbRestWriteInventarioShadow(payload)]);
       const confirmed=await confirmFirebaseRestSave(payload).catch(()=>payload);
       db.days=Array.isArray(confirmed.days)?confirmed.days:daysToSave;
       db.fluxogramas=normalizeFluxogramas(confirmed.fluxogramas||fluxogramasToSave);
