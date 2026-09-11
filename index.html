@@ -12734,7 +12734,17 @@ function readHoraData(){
     byMetric[m][i]=inp.value!==''?+inp.value:'';
   });
   // Rotas: total atualizado + saldo pendente → realizado por hora. Demais deltas: acumulado → realizado por hora.
-  metrics.forEach(m=>{
+  const metricsToRead=new Set(metrics);
+  Object.keys(byMetric).forEach(m=>{
+    if(routeFromAnyMetric(m)){
+      const route=routeFromAnyMetric(m);
+      metricsToRead.add(routeMetricKey(route));
+      metricsToRead.add(routeTotalMetricKey(route));
+    }
+  });
+  metricsToRead.forEach(m=>{
+    if(isRouteTotalMetric(m))return;
+    if(!hd[m])hd[m]=new Array(HOURS.length).fill('');
     const vals=byMetric[m]||new Array(HOURS.length).fill('');
     if(isRouteMetric(m)){
       const route=routeFromMetric(m);
@@ -13186,7 +13196,9 @@ function saveRotaField(cod,field,val){
   const saved=save();
   if(saved!==false){
     pendingCloudSave=true;
+    fbRestWriteRotasShadow({days:[day],savedAt:Date.now()}).catch(()=>{});
     setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),120);
+    setTimeout(()=>{if(typeof sbSave==='function')sbSave(false).catch(()=>{});},350);
   }
   updateRotasKPIs(day);
   renderRotasTbl(day,'rotasTbl');
