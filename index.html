@@ -79,6 +79,7 @@ body.privacy-lock::after{content:attr(data-watermark);position:fixed;right:16px;
 .prev-enc-title{background:#2e6faa;color:#071525;text-align:center;font-weight:900;text-transform:uppercase;font-size:13px}
 .prev-enc-date{background:#2e6faa;color:#071525;text-align:center;font-weight:900;width:130px}
 .prev-enc-side{background:#9fc3df;color:#071525;text-align:center;font-weight:800;text-transform:uppercase;writing-mode:vertical-rl;transform:rotate(180deg);letter-spacing:.8px;width:26px}
+.prev-enc-side-fill{background:#9fc3df;width:26px}
 .prev-enc-head{background:#377ab5;color:#071525;text-align:center;font-weight:900;text-transform:uppercase}
 .prev-enc-label{background:#c7def0;color:#061d33;font-weight:800;text-transform:uppercase}
 .prev-enc-input{width:100%;box-sizing:border-box;background:rgba(255,255,255,.5);border:0;color:#061d33;font:800 12px Arial,sans-serif;text-align:right;padding:3px 5px;outline:1px solid transparent}
@@ -13859,6 +13860,7 @@ function renderPrevisaoEncProcessRows(day){
     const calc=previsaoEncProcessCalc(day,row);
     const eff=calc.eficiencia===null?'-':calc.eficiencia+'%';
     return `<tr>
+      <td class="prev-enc-side-fill"></td>
       <td class="prev-enc-label">${excelText(row.nome)}</td>
       <td class="prev-enc-auto">${excelText(calc.resultado)}</td>
       <td class="prev-enc-auto">${excelText(calc.cap)}</td>
