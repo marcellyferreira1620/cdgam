@@ -11116,6 +11116,10 @@ function renderFlowBar(day){
 }
 
 // ── DASHBOARD CHARTS ──────────────────────────────────────
+function fitHourValues(values,fill=''){
+  const source=Array.isArray(values)?values:[];
+  return HOURS.map((_,i)=>source[i]!==undefined?source[i]:fill);
+}
 function dv(hd,m){return HOURS.map((_,i)=>{const v=hd&&hd[m]?hd[m][i]:'';return(v!==''&&v!==null)?+v:null;});}
 function epmValue(errorCount,unitCount){
   if(errorCount===''||errorCount===null||errorCount===undefined)return null;
@@ -11755,8 +11759,8 @@ function renderDashTables(day){
     'Vales':day.capVales,'Vol. Expedição':day.capVE,'Vol. Especial':day.capEsp,
     'Vol. Fralda Frac.':day.capFrFc,'Vol. Fralda Fech.':day.capFrF};
   const renderConfTbl=(id,plannedMetric,activeMetric)=>{
-    const cp=hd[plannedMetric]||new Array(HOURS.length).fill('');
-    const ca=hd[activeMetric]||new Array(HOURS.length).fill('');
+    const cp=fitHourValues(hd[plannedMetric]);
+    const ca=fitHourValues(hd[activeMetric]);
     let h=`<table><thead><tr><th style="text-align:left">Conferentes</th>${HOURS.map(x=>`<th>${x}</th>`).join('')}</tr></thead><tbody>`;
     h+=`<tr><td class="row-lbl">Planejado</td>${cp.map(v=>`<td>${v!==''?v:'-'}</td>`).join('')}</tr>`;
     h+=`<tr><td class="row-lbl">Ativo</td>${ca.map((v,i)=>{
@@ -11790,10 +11794,10 @@ function renderDashTables(day){
     group.metrics.forEach(m=>{
       const cap=CAP_VALS[m]||null;const isInv=MHORA_INV.includes(m);const isRoute=isRouteMetric(m);
       const isCK=['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.','Vol. Checkout','Linhas Checkout','Unid. Checkout'].includes(m);
-      const rawVals=hd[m]||new Array(HOURS.length).fill('');
+      const rawVals=fitHourValues(hd[m]);
       const initialTotal=isRoute?routeInitialTotal(day,m):0;
       const route=isRoute?routeFromMetric(m):null;
-      const rawTotals=isRoute?(hd[routeTotalMetricKey(route)]||new Array(HOURS.length).fill('')):new Array(HOURS.length).fill('');
+      const rawTotals=isRoute?fitHourValues(hd[routeTotalMetricKey(route)]):fitHourValues([]);
       const carriedTotals=isRoute?routeCarriedTotals(rawTotals,initialTotal):rawTotals;
       const vals=isRoute?routeDoneToPending(rawVals,rawTotals,initialTotal):(isEpmMetric(m)?epmSeries(rawVals,hd['Unid. Med.']||[]):rawVals);
       const displayMetric=metricDisplayName(m);
@@ -11801,7 +11805,8 @@ function renderDashTables(day){
       const routeLbl=isRoute?`<span style="font-size:9px;color:#00e676;font-weight:normal;display:block">Total atualizado | saldo pendente</span>`:'';
       const epmLbl=isEpmMetric(m)?`<span style="font-size:9px;color:#00e5ff;font-weight:normal;display:block">erros ÷ unid. med. × 1.000.000</span>`:'';
       h2+=`<tr><td class="row-lbl">${displayMetric}${capLbl}${routeLbl}${epmLbl}</td>`;
-      vals.forEach((v,i)=>{
+      HOURS.forEach((_,i)=>{
+        const v=vals[i];
         const dimmed=isCK&&i>=H_CK;
         let bg='',style='';
         if(dimmed){bg='background:#071525';style='color:#2a3a4a';}
