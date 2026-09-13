@@ -12587,8 +12587,8 @@ function routePendingToDone(pending,totals,totalInitial){
 }
 
 function routeProgressSnapshot(day,route,hd){
-  const done=hd[routeMetricKey(route)]||new Array(HOURS.length).fill('');
-  const totals=hd[routeTotalMetricKey(route)]||new Array(HOURS.length).fill('');
+  const done=fitHourValues(hd[routeMetricKey(route)]||[]);
+  const totals=fitHourValues(hd[routeTotalMetricKey(route)]||[]);
   const fallback=+route.vol||routeInitialTotal(day,routeMetricKey(route));
   const carried=routeCarriedTotals(totals,fallback);
   const pending=routeDoneToPending(done,totals,fallback);
