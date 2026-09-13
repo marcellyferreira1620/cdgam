@@ -2569,6 +2569,18 @@ function dayFieldHasValue(value){
   return false;
 }
 
+function moduleFieldHasValue(value){
+  if(value===null||value===undefined)return false;
+  if(Array.isArray(value))return value.some(moduleFieldHasValue);
+  if(typeof value==='object'){
+    return Object.keys(value).some(k=>!['_fieldUpdatedAt','_updatedAt','updatedAt'].includes(k)&&moduleFieldHasValue(value[k]));
+  }
+  if(typeof value==='number')return Number.isFinite(value);
+  if(typeof value==='string')return value.trim()!=='';
+  if(typeof value==='boolean')return true;
+  return false;
+}
+
 function stripTransientDayFlags(day){
   if(!day||typeof day!=='object')return day;
   const out={...day};
@@ -2794,7 +2806,7 @@ function runNightOperationFormulaGuard(){
       [{date:'2099-08-28',pnDoca:10165,hd:{[checkoutMetric]:[6850]},_updatedAt:100,_fieldUpdatedAt:{pnDoca:100},_hdUpdatedAt:{[checkoutMetric]:{0:100}}}],
       [{date:'2099-08-28',pnDoca:6226,hd:{[checkoutMetric]:[3978]},_updatedAt:200,_fieldUpdatedAt:{pnDoca:200},_hdUpdatedAt:{[checkoutMetric]:{0:200}}}]
     )[0];
-    if(+cloudLowerCorrection.pnDoca!==6226||+cloudLowerCorrection.hd[checkoutMetric][0]!==3978){
+    if(+cloudLowerCorrection.pnDoca!==6226||sumActiveHoraField(checkoutMetric,cloudLowerCorrection.hd,cloudLowerCorrection.date)!==3978){
       errors.push('nuvem preenchida precisa atualizar todos os computadores mesmo corrigindo para baixo');
     }
 
@@ -2802,8 +2814,40 @@ function runNightOperationFormulaGuard(){
       [{date:'2099-08-29',pnDoca:6226,hd:{[checkoutMetric]:[3978]},prodSetores:{checkout:{vol:3978}},_updatedAt:100}],
       [{date:'2099-08-29',pnDoca:0,hd:{[checkoutMetric]:['']},prodSetores:{checkout:{vol:''}},_updatedAt:200}]
     )[0];
-    if(+cloudBlankNoErase.pnDoca!==6226||+cloudBlankNoErase.hd[checkoutMetric][0]!==3978||+cloudBlankNoErase.prodSetores.checkout.vol!==3978){
+    if(+cloudBlankNoErase.pnDoca!==6226||sumActiveHoraField(checkoutMetric,cloudBlankNoErase.hd,cloudBlankNoErase.date)!==3978||+cloudBlankNoErase.prodSetores.checkout.vol!==3978){
       errors.push('nuvem em branco nao pode apagar preenchimento local');
+    }
+
+    const boletimBlankNoErase=mergeBoletim(
+      {kpi_vales_seg:'11',_fieldUpdatedAt:{kpi_vales_seg:100},_updatedAt:100},
+      {kpi_vales_seg:'',_fieldUpdatedAt:{kpi_vales_seg:200},_updatedAt:200}
+    );
+    if(String(boletimBlankNoErase.kpi_vales_seg)!=='11'){
+      errors.push('boletim nao pode apagar preenchimento com branco recente');
+    }
+
+    const previsaoBlankNoErase=mergePrevisaoEncerramento(
+      {vendaLinhasPerfumaria:'20525',_fieldUpdatedAt:{vendaLinhasPerfumaria:100},_updatedAt:100},
+      {vendaLinhasPerfumaria:'',_fieldUpdatedAt:{vendaLinhasPerfumaria:200},_updatedAt:200}
+    );
+    if(String(previsaoBlankNoErase.vendaLinhasPerfumaria)!=='20525'){
+      errors.push('previsao de encerramento nao pode apagar preenchimento com branco recente');
+    }
+
+    const inventarioBlankNoErase=mergeInventario(
+      {valorReservaLocalizado:'1234',_fieldUpdatedAt:{valorReservaLocalizado:100},_updatedAt:100},
+      {valorReservaLocalizado:'',_fieldUpdatedAt:{valorReservaLocalizado:200},_updatedAt:200}
+    );
+    if(String(inventarioBlankNoErase.valorReservaLocalizado)!=='1234'){
+      errors.push('inventario nao pode apagar preenchimento com branco recente');
+    }
+
+    const zeroIsValidInModules=mergeBoletim(
+      {kpi_devolucao_seg:'76',_fieldUpdatedAt:{kpi_devolucao_seg:100},_updatedAt:100},
+      {kpi_devolucao_seg:'0',_fieldUpdatedAt:{kpi_devolucao_seg:200},_updatedAt:200}
+    );
+    if(String(zeroIsValidInModules.kpi_devolucao_seg)!=='0'){
+      errors.push('zero digitado em modulo precisa ser salvo como valor valido');
     }
 
     const deltas=acumToDeltas([630,2394,3398,'',4524]);
@@ -2834,7 +2878,7 @@ function runNightOperationFormulaGuard(){
     }
 
     const closingBase=normalizeNightClosingBases({
-      date:'2000-01-01',
+      date:'2026-09-11',
       pnDoca:5734,
       pnVol:5734,
       pnUnid:7701,
@@ -2996,12 +3040,14 @@ function mergeProdRow(current,next){
     const av=a[field],bv=b[field];
     const aTs=+(a._fieldUpdatedAt&&a._fieldUpdatedAt[field])||0;
     const bTs=+(b._fieldUpdatedAt&&b._fieldUpdatedAt[field])||0;
-    if(aTs||bTs){
-      out[field]=bTs>=aTs?bv:av;
-      return;
-    }
     const hasA=prodFieldHasValue(av);
     const hasB=prodFieldHasValue(bv);
+    if(aTs||bTs){
+      if(bTs>aTs)out[field]=(hasB||!hasA)?bv:av;
+      else if(aTs>bTs)out[field]=(hasA||!hasB)?av:bv;
+      else out[field]=hasB?bv:av;
+      return;
+    }
     if(hasA&&hasB)out[field]=bv;
     else if(hasA)out[field]=av;
     else if(hasB)out[field]=bv;
@@ -3032,7 +3078,13 @@ function mergeProdSetores(current,next){
         bySection[sec][i]=mergeProdRow(bySection[sec]&&bySection[sec][i],row);
       });
     });
-    out[setor]={...a,...b,bySection};
+    const sectorOut={...a};
+    Object.entries(b).forEach(([key,bv])=>{
+      if(key==='bySection')return;
+      const av=a[key];
+      if(moduleFieldHasValue(bv)||!moduleFieldHasValue(av))sectorOut[key]=bv;
+    });
+    out[setor]={...sectorOut,bySection};
   });
   return out;
 }
@@ -3184,16 +3236,18 @@ function mergeBoletim(current,next){
     const av=a[key],bv=b[key];
     const ats=+aft[key]||0;
     const bts=+bft[key]||0;
-    const hasA=av!==undefined&&av!==null;
-    const hasB=bv!==undefined&&bv!==null;
+    const hasA=moduleFieldHasValue(av);
+    const hasB=moduleFieldHasValue(bv);
     if(ats||bts){
-      out[key]=bts>=ats&&hasB?bv:av;
+      if(bts>ats)out[key]=(hasB||!hasA)?bv:av;
+      else if(ats>bts)out[key]=(hasA||!hasB)?av:bv;
+      else out[key]=hasB?bv:av;
       return;
     }
-    if(hasB&&dayFieldHasValue(bv))out[key]=bv;
-    else if(hasA&&dayFieldHasValue(av))out[key]=av;
-    else if(hasB)out[key]=bv;
+    if(hasB)out[key]=bv;
     else if(hasA)out[key]=av;
+    else if(bv!==undefined&&bv!==null)out[key]=bv;
+    else if(av!==undefined&&av!==null)out[key]=av;
   });
   out._fieldUpdatedAt={...aft,...bft};
   Object.keys(aft).forEach(key=>{
@@ -3221,16 +3275,18 @@ function mergeDevolucao(current,next){
     const av=a[key],bv=b[key];
     const ats=+aft[key]||0;
     const bts=+bft[key]||0;
-    const hasA=av!==undefined&&av!==null;
-    const hasB=bv!==undefined&&bv!==null;
+    const hasA=moduleFieldHasValue(av);
+    const hasB=moduleFieldHasValue(bv);
     if(ats||bts){
-      out[key]=bts>=ats&&hasB?bv:av;
+      if(bts>ats)out[key]=(hasB||!hasA)?bv:av;
+      else if(ats>bts)out[key]=(hasA||!hasB)?av:bv;
+      else out[key]=hasB?bv:av;
       return;
     }
-    if(hasB&&dayFieldHasValue(bv))out[key]=bv;
-    else if(hasA&&dayFieldHasValue(av))out[key]=av;
-    else if(hasB)out[key]=bv;
+    if(hasB)out[key]=bv;
     else if(hasA)out[key]=av;
+    else if(bv!==undefined&&bv!==null)out[key]=bv;
+    else if(av!==undefined&&av!==null)out[key]=av;
   });
   out._fieldUpdatedAt={...aft,...bft};
   Object.keys(aft).forEach(key=>{
@@ -3295,14 +3351,18 @@ function mergeInventario(current,next){
       out[key]=mergeReservaComparativo(av,bv);
       return;
     }
+    const hasAValue=moduleFieldHasValue(av);
+    const hasBValue=moduleFieldHasValue(bv);
     if(ats||bts){
-      out[key]=bts>=ats&&hasB?bv:av;
+      if(bts>ats)out[key]=(hasBValue||!hasAValue)?bv:av;
+      else if(ats>bts)out[key]=(hasAValue||!hasBValue)?av:bv;
+      else out[key]=hasBValue?bv:av;
       return;
     }
-    if(hasB&&dayFieldHasValue(bv))out[key]=bv;
-    else if(hasA&&dayFieldHasValue(av))out[key]=av;
-    else if(hasB)out[key]=bv;
-    else if(hasA)out[key]=av;
+    if(hasBValue)out[key]=bv;
+    else if(hasAValue)out[key]=av;
+    else if(bv!==undefined&&bv!==null)out[key]=bv;
+    else if(av!==undefined&&av!==null)out[key]=av;
   });
   out._fieldUpdatedAt={...aft,...bft};
   Object.keys(aft).forEach(key=>{
@@ -3405,9 +3465,10 @@ function overlayCloudFilledValue(localValue,remoteValue){
 }
 
 function preferCloudFilledDay(localDay,remoteDay,forceCloudFilled=false){
-  const merged=mergeDayRecords(localDay,remoteDay);
-  if((!forceCloudFilled&&!isCloudFreshPull())||!remoteDay)return merged;
+  const local=normalizeDay(localDay);
   const remote=normalizeDay(remoteDay);
+  const merged=mergeDayRecords(local,remote);
+  if((!forceCloudFilled&&!isCloudFreshPull())||!remote)return merged;
   const out=cloneData(merged)||{};
   Object.keys(remote).forEach(key=>{
     if(CLOUD_PULL_ROOT_SKIP.has(key))return;
@@ -3415,9 +3476,9 @@ function preferCloudFilledDay(localDay,remoteDay,forceCloudFilled=false){
   });
   if(remote.hd&&cloudValueFilled(remote.hd))out.hd=overlayCloudFilledValue(out.hd,remote.hd);
   out.date=remote.date||out.date;
-  out._fieldUpdatedAt={...((localDay&&localDay._fieldUpdatedAt)||{}),...((remote&&remote._fieldUpdatedAt)||{})};
-  out._hdUpdatedAt=mergeHourUpdatedAt(localDay,remote)||out._hdUpdatedAt;
-  const ts=Math.max(+(localDay&&localDay._updatedAt)||0,+(remote&&remote._updatedAt)||0,+(merged&&merged._updatedAt)||0);
+  out._fieldUpdatedAt={...((local&&local._fieldUpdatedAt)||{}),...((remote&&remote._fieldUpdatedAt)||{})};
+  out._hdUpdatedAt=mergeHourUpdatedAt(local,remote)||out._hdUpdatedAt;
+  const ts=Math.max(+(local&&local._updatedAt)||0,+(remote&&remote._updatedAt)||0,+(merged&&merged._updatedAt)||0);
   if(ts)out._updatedAt=ts;
   return stripTransientDayFlags(normalizeNightClosingBases(out));
 }
@@ -3435,7 +3496,7 @@ function mergeCloudFreshDays(localDays,remoteDays){
 }
 
 function mergeCloudIncomingDays(localDays,remoteDays){
-  return mergeDays(remoteDays,localDays);
+  return mergeCloudFreshDays(localDays,remoteDays);
 }
 
 function uid(){
@@ -4151,13 +4212,14 @@ function applyRemoteData(remote){
 
 function cloudNeedsLocalMerge(remote){
   if(!remote||!Array.isArray(remote.days))return false;
-  const mergedDays=mergeDays(remote.days,db.days);
+  const mergedDays=mergeDaysForCloudSave(remote.days,db.days);
   if(payloadDaysHash(mergedDays)!==payloadDaysHash(remote.days))return true;
   const mergedFluxogramas=mergeFluxogramas(remote.fluxogramas,db.fluxogramas);
   return simpleHash(JSON.stringify(mergedFluxogramas||null))!==simpleHash(JSON.stringify(remote.fluxogramas||null));
 }
 
 function queueCloudMergeSave(remote){
+  if(!localUserEditActive())return;
   if(!cloudNeedsLocalMerge(remote))return;
   pendingCloudSave=true;
   setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),120);
