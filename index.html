@@ -13449,7 +13449,7 @@ function renderRotasTbl(day,tblId){
       <td style="color:#ffd700;font-weight:bold;text-align:center">${r.hPrev}</td>
       <td style="text-align:center">
         ${editable
-          ?`<input type="text" value="${escAttr(hReal)}" inputmode="numeric" maxlength="5" oninput="formatRouteTimeDraft(this)" onchange="saveRotaField('${r.cod}','hReal',this.value);renderRotasTblFull(getDay(curDate))" onblur="saveRotaField('${r.cod}','hReal',this.value);renderRotasTblFull(getDay(curDate))" style="${inpSG};text-align:center" placeholder="--:--"/>`
+          ?`<input type="text" value="${escAttr(hReal)}" inputmode="numeric" maxlength="5" oninput="saveRotaTimeDraft('${r.cod}',this)" onchange="saveRotaField('${r.cod}','hReal',this.value);renderRotasTblFull(getDay(curDate))" onblur="saveRotaField('${r.cod}','hReal',this.value);renderRotasTblFull(getDay(curDate))" style="${inpSG};text-align:center" placeholder="--:--"/>`
           :`<span style="color:#00e676;font-weight:bold">${hReal||'-'}</span>`}
       </td>
       <td style="text-align:center;color:${atrColor};font-weight:bold">${fmtAtraso(atr)}</td>
@@ -13478,6 +13478,13 @@ function renderRotasTbl(day,tblId){
 function formatRouteTimeDraft(input){
   const raw=String(input.value||'').replace(/[^\d:]/g,'').slice(0,5);
   input.value=raw;
+}
+function saveRotaTimeDraft(cod,input){
+  formatRouteTimeDraft(input);
+  const value=String(input.value||'').trim();
+  if(value===''||/^\d{1,2}:[0-5]\d$/.test(value)){
+    saveRotaField(cod,'hReal',value);
+  }
 }
 
 function updateRotasDateLabel(dayOrDate){
