@@ -2507,7 +2507,7 @@ function remoteDaysHaveBetterData(remoteDays){
   });
 }
 
-const DATA_SCORE_IGNORED_KEYS=new Set(['date','savedAt','_updatedAt','_fieldUpdatedAt','_hdUpdatedAt','_nightPartialSave','_correiaDirectHour',HOUR_1630_READY_KEY,'cod','cidade','destino','hPrev','recebArm','prodSetores','prodDiurno','previsaoEncerramento','productBase']);
+const DATA_SCORE_IGNORED_KEYS=new Set(['date','savedAt','_updatedAt','_fieldUpdatedAt','_fieldClearedAt','_hdUpdatedAt','_nightPartialSave','_correiaDirectHour',HOUR_1630_READY_KEY,'cod','cidade','destino','hPrev','recebArm','prodSetores','prodDiurno','previsaoEncerramento','productBase']);
 
 function dataScoreValue(v,key){
   if(DATA_SCORE_IGNORED_KEYS.has(key))return 0;
@@ -2663,22 +2663,24 @@ function mergeHourData(current,next,chosen){
 
 function mergeDayRootFields(current,next,chosen){
   const out={...chosen};
-  const skip=new Set(['date','_updatedAt','_fieldUpdatedAt','_hdUpdatedAt','_nightPartialSave',HOUR_1630_READY_KEY,'rotas','prodSetores','prodDiurno','previsaoEncerramento','recebArm','boletim','devolucao','inventario','hd']);
+  const skip=new Set(['date','_updatedAt','_fieldUpdatedAt','_fieldClearedAt','_hdUpdatedAt','_nightPartialSave',HOUR_1630_READY_KEY,'rotas','prodSetores','prodDiurno','previsaoEncerramento','recebArm','boletim','devolucao','inventario','hd']);
   const aft=(current&&current._fieldUpdatedAt)||{};
   const bft=(next&&next._fieldUpdatedAt)||{};
+  const acf=(current&&current._fieldClearedAt)||{};
+  const bcf=(next&&next._fieldClearedAt)||{};
   const keys=new Set([...Object.keys(current||{}),...Object.keys(next||{}),...Object.keys(chosen||{})]);
   keys.forEach(key=>{
     if(skip.has(key))return;
     const av=current&&current[key];
     const bv=next&&next[key];
     const cv=chosen&&chosen[key];
-    const ats=+aft[key]||0;
-    const bts=+bft[key]||0;
+    const ats=Math.max(+aft[key]||0,+acf[key]||0);
+    const bts=Math.max(+bft[key]||0,+bcf[key]||0);
     const hasA=dayFieldHasValue(av);
     const hasB=dayFieldHasValue(bv);
     if(ats||bts){
-      if(bts>ats)out[key]=(hasA&&!hasB)?av:bv;
-      else if(ats>bts)out[key]=(hasB&&!hasA)?bv:av;
+      if(bts>ats)out[key]=bv;
+      else if(ats>bts)out[key]=av;
       else out[key]=cv!==undefined?cv:bv;
       return;
     }
@@ -2696,6 +2698,13 @@ function mergeDayRootFields(current,next,chosen){
   Object.entries(bft).forEach(([key,ts])=>{fieldUpdatedAt[key]=Math.max(+fieldUpdatedAt[key]||0,+ts||0);});
   if(Object.keys(fieldUpdatedAt).length)out._fieldUpdatedAt=fieldUpdatedAt;
   else delete out._fieldUpdatedAt;
+  const fieldClearedAt={...acf};
+  Object.entries(bcf).forEach(([key,ts])=>{fieldClearedAt[key]=Math.max(+fieldClearedAt[key]||0,+ts||0);});
+  Object.keys(fieldClearedAt).forEach(key=>{
+    if((+fieldUpdatedAt[key]||0)>(+fieldClearedAt[key]||0))delete fieldClearedAt[key];
+  });
+  if(Object.keys(fieldClearedAt).length)out._fieldClearedAt=fieldClearedAt;
+  else delete out._fieldClearedAt;
   const hdUpdatedAt=mergeHourUpdatedAt(current,next);
   if(hdUpdatedAt)out._hdUpdatedAt=hdUpdatedAt;
   else delete out._hdUpdatedAt;
@@ -12753,7 +12762,7 @@ function onHoraInput(inp){
       td.style.background=current!==''&&carried[idx]!==''&&current>carried[idx]?'rgba(180,20,20,.5)':current===0?'rgba(0,100,50,.45)':'';
     });
     const latestTotal=[...totals].reverse().find(v=>v!=='');
-    if(latestTotal!==undefined)syncRouteCurrentTotal(route.cod,latestTotal);
+    if(latestTotal!==undefined)syncRouteCurrentTotal(route.cod,latestTotal,{fromUser:true});
   } else if(useDelta){
     // Recalcular e atualizar os hints Δ da linha inteira
     const row=inp.closest('tr');
@@ -12778,16 +12787,21 @@ function onHoraInput(inp){
   }
 }
 
-function syncRouteCurrentTotal(cod,total){
+function syncRouteCurrentTotal(cod,total,opts={}){
   const day=getDay(currentFormDate());if(!day)return;
   if(!Array.isArray(day.rotas))day.rotas=[];
   cod=normalizeRouteCode(cod);
   let route=day.rotas.find(r=>normalizeRouteCode(r.cod)===cod);
   if(!route){route={cod};day.rotas.push(route);}
+  if(routeFieldWasCleared(route,'vol')&&!opts.fromUser)return;
   route.vol=Math.max(+total||0,0);
   const ts=Date.now();
   route._updatedAt=ts;
   route._fieldUpdatedAt={...(route._fieldUpdatedAt||{}),vol:ts};
+  if(route._fieldClearedAt){
+    delete route._fieldClearedAt.vol;
+    if(!Object.keys(route._fieldClearedAt).length)delete route._fieldClearedAt;
+  }
   day._updatedAt=ts;
 }
 
@@ -12857,23 +12871,61 @@ function syncComparableValue(value){
   return JSON.stringify(value);
 }
 
+let nightEditedFieldIds=new Set();
+const NIGHT_INPUT_FIELD_KEYS={
+  iPNVol:'pnVol',iPNUnid:'pnUnid',iPNCorreia:'pnCorreia',iPNPsico:'pnPsico',iPNEspecial:'pnEspecial',
+  iPNEspFrac:'pnEspFrac',iPNEspMed:'pnEspMed',iPNEspPerf:'pnEspPerf',iPNFralda:'pnFralda',
+  iPNFraldaF:'pnFraldaF',iPNGel:'pnGel',iPNOnco:'pnOnco',iPNOncoT:'pnOncoT',iPNJuncao:'pnJuncao',iPNDoca:'pnDoca',
+  iAcumMed:'acumMed',iAcumPerf:'acumPerf',iMeta:'meta',iOsImpMed:'osImpMed',iOsImpPerf:'osImpPerf',
+  iOsNaoImpMed:'osNaoImpMed',iOsNaoImpPerf:'osNaoImpPerf',iOsTotalMed:'osTotalMed',iOsTotalPerf:'osTotalPerf',
+  iOsFinMed:'osFinMed',iOsFinPerf:'osFinPerf',iOsProdMedBase:'osProdMedBase',iOsProdPerfBase:'osProdPerfBase',
+  iSysLineMed:'sys2130LineMed',iSysUnitMed:'sys2130UnitMed',iSysVolMed:'sys2130VolMed',
+  iSysLinePerf:'sys2130LinePerf',iSysUnitPerf:'sys2130UnitPerf',iSysVolPerf:'sys2130VolPerf',
+  iSysVolCheckout:'sys2130VolCheckout',iSysUnitCheckout:'sys2130UnitCheckout',
+  iSysVolCheckoutPsico:'sys2130VolCheckoutPsico',iSysUnitCheckoutPsico:'sys2130UnitCheckoutPsico',
+  iSysVolGeladeira:'sys2130VolGeladeira',iSysVolEspecial:'sys2130VolEspecial',
+  iSysFraldaFechado:'sys2130FraldaFechado',iSysFraldaFrac:'sys2130FraldaFrac',iSysVolDoca:'sys2130VolDoca',
+  iMedIt:'medIt',iFaltas:'faltas',iObs:'obs',iCPer:'cPer',iCMed:'cMed',iCkOut:'ckOut',iEsp:'esp',iFrF:'frF',iFrFc:'frFc',iExp:'exp',
+  iCPerFim:'cPerFim',iCMedFim:'cMedFim',iCkOutFim:'ckOutFim',iEspFim:'espFim',iFrFFim:'frFFim',iFrFcFim:'frFcFim',iExpFim:'expFim',
+  iCapLM:'capLM',iCapVMed:'capVMed',iCapUMed:'capUMed',iCapLP:'capLP',iCapVPerf:'capVPerf',iCapUPerf:'capUPerf',
+  iCapErros:'capErros',iCapVC:'capVC',iCapLC:'capLC',iCapVCPsi:'capVCPsi',iCapLCPsi:'capLCPsi',iCapUCPsi:'capUCPsi',
+  iCapUC:'capUC',iCapGel:'capGel',iCapVales:'capVales',iCapEsp:'capEsp',iCapEspFrac:'capEspFrac',
+  iCapEspMed:'capEspMed',iCapEspPerf:'capEspPerf',iCapFrF:'capFrF',iCapFrFc:'capFrFc',iCapVE:'capVE',
+  iRPsico:'rPsico',iRGel:'rGel',iROnco:'rOnco',iROncoT:'rOncoT',iRJuncao:'rJuncao',iRDoc:'rDoc'
+};
+function rememberNightEditedField(el){
+  if(el&&el.id&&NIGHT_INPUT_FIELD_KEYS[el.id])nightEditedFieldIds.add(el.id);
+}
+function nightEditedDayKeys(){
+  return new Set([...nightEditedFieldIds].map(id=>NIGHT_INPUT_FIELD_KEYS[id]).filter(Boolean));
+}
+
 function markNightFormUpdateStamps(existing,day){
   const ts=+day._updatedAt||Date.now();
   day._nightPartialSave=true;
-  const skip=new Set(['date','_updatedAt','_fieldUpdatedAt','_hdUpdatedAt','_nightPartialSave','_correiaDirectHour',HOUR_1630_READY_KEY,'hd','rotas','prodSetores','prodDiurno','previsaoEncerramento','recebArm','boletim','devolucao','inventario']);
+  const skip=new Set(['date','_updatedAt','_fieldUpdatedAt','_fieldClearedAt','_hdUpdatedAt','_nightPartialSave','_correiaDirectHour',HOUR_1630_READY_KEY,'hd','rotas','prodSetores','prodDiurno','previsaoEncerramento','recebArm','boletim','devolucao','inventario']);
   const fieldUpdatedAt={...((existing&&existing._fieldUpdatedAt)||{})};
+  const fieldClearedAt={...((existing&&existing._fieldClearedAt)||{})};
+  const editedKeys=nightEditedDayKeys();
   Object.keys(day||{}).forEach(key=>{
     if(skip.has(key))return;
     const before=existing?existing[key]:undefined;
     const after=day[key];
     if(existing){
-      if(dayFieldHasValue(before)&&!dayFieldHasValue(after))return;
+      if(dayFieldHasValue(before)&&!dayFieldHasValue(after)&&!editedKeys.has(key))return;
       if(syncComparableValue(before)!==syncComparableValue(after))fieldUpdatedAt[key]=ts;
     }else if(dayFieldHasValue(after)){
       fieldUpdatedAt[key]=ts;
     }
+    if(editedKeys.has(key)&&!dayFieldHasValue(after)){
+      delete fieldUpdatedAt[key];
+      fieldClearedAt[key]=ts;
+    }else if(dayFieldHasValue(after)){
+      delete fieldClearedAt[key];
+    }
   });
   if(Object.keys(fieldUpdatedAt).length)day._fieldUpdatedAt=fieldUpdatedAt;
+  if(Object.keys(fieldClearedAt).length)day._fieldClearedAt=fieldClearedAt;
   const hdUpdatedAt=mergeHourUpdatedAt(existing,null)||{};
   const metrics=new Set([...Object.keys((existing&&existing.hd)||{}),...Object.keys(day.hd||{})]);
   metrics.forEach(metric=>{
@@ -13127,6 +13179,7 @@ function persistDayNow(){
   setCurrentDate(merged.date);
   saveNightDayDraft(merged);
   save();
+  nightEditedFieldIds.clear();
   if(wasNew)buildDayNav();
   refreshOpenPrevisaoEncerramento(merged);
   return merged;
@@ -13151,6 +13204,7 @@ function saveNightImmediately(){
 function scheduleNightImmediateSave(event){
   const el=event&&event.target;
   if(!isNightPersistentTarget(el))return;
+  rememberNightEditedField(el);
   if(!event||event.isTrusted!==false)markLocalUserEdit();
   if(el.id==='iData')rememberCurrentDate(el.value);
   clearTimeout(nightImmediateSaveTimer);
@@ -13172,7 +13226,7 @@ function saveDay(){
   if(idx>=0)db.days[idx]=merged;else db.days.push(merged);
   db.days.sort((a,b)=>a.date.localeCompare(b.date));
   saveNightDayDraft(merged);
-  save();setCurrentDate(merged.date);buildDayNav();
+  save();nightEditedFieldIds.clear();setCurrentDate(merged.date);buildDayNav();
   renderKPIs(merged);renderFlowBar(merged);renderDashCharts(merged);renderDashTables(merged);renderRotasTbl(merged,'rotasTblFull');updateRotasKPIs(merged);
   renderRecebArm();
   renderInventario();
@@ -14819,9 +14873,16 @@ function persistPreenchInputsNow(changedMetric){
         const cod=normalizeRouteCode(route.cod);
         let savedRoute=day.rotas.find(r=>normalizeRouteCode(r.cod)===cod);
         if(!savedRoute){savedRoute={cod};day.rotas.push(savedRoute);}
-        savedRoute.vol=Math.max(+latestTotal||0,0);
-        savedRoute._updatedAt=ts;
-        savedRoute._fieldUpdatedAt={...(savedRoute._fieldUpdatedAt||{}),vol:ts};
+        const routeWasTouched=!!changedMetric&&normalizeRouteCode(routeFromAnyMetric(changedMetric)?.cod)===cod;
+        if(!routeFieldWasCleared(savedRoute,'vol')||routeWasTouched){
+          savedRoute.vol=Math.max(+latestTotal||0,0);
+          savedRoute._updatedAt=ts;
+          savedRoute._fieldUpdatedAt={...(savedRoute._fieldUpdatedAt||{}),vol:ts};
+          if(savedRoute._fieldClearedAt){
+            delete savedRoute._fieldClearedAt.vol;
+            if(!Object.keys(savedRoute._fieldClearedAt).length)delete savedRoute._fieldClearedAt;
+          }
+        }
       }
     }else if(!isRouteTotalMetric(metric)){
       const vals=byMetric[metric]||new Array(HOURS.length).fill('');
