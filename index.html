@@ -2277,7 +2277,7 @@ function normalizeDay(day){
     copy._correiaDirectHour=true;
   }
   if(Array.isArray(copy.rotas)){
-    copy.rotas=copy.rotas.map(r=>({...r,cod:normalizeRouteCode(r.cod),hReal:cleanHora(r.hReal)}));
+    copy.rotas=copy.rotas.map(r=>({...r,cod:normalizeRouteCode(r.cod),hReal:cleanRotaRealHora(r.hReal)}));
   }
   return copy;
 }
@@ -2938,16 +2938,20 @@ function cleanHora(value){
   if(!Number.isFinite(hh)||hh<0||hh>23)return '';
   return`${String(hh).padStart(2,'0')}:${m[2]}`;
 }
+function cleanRotaRealHora(value){
+  const h=cleanHora(value);
+  return h==='00:00'?'':h;
+}
 function hasValidHora(value){
   return cleanHora(value)!=='';
 }
 function routeHasRealized(route){
-  return hasValidHora(route&&route.hReal);
+  return cleanRotaRealHora(route&&route.hReal)!=='';
 }
 function routeFieldHasValue(field,value){
   if(value===null||value===undefined)return false;
   if(field==='vol'||field==='paletes')return value!==''&&Number.isFinite(+value);
-  if(field==='hReal')return hasValidHora(value);
+  if(field==='hReal')return cleanRotaRealHora(value)!=='';
   return String(value).trim()!=='';
 }
 
@@ -2972,7 +2976,7 @@ function mergeRouteRecords(current,next){
     const hasA=routeFieldHasValue(field,av);
     const hasB=routeFieldHasValue(field,bv);
     if(field==='hReal'){
-      const ah=cleanHora(av),bh=cleanHora(bv);
+      const ah=cleanRotaRealHora(av),bh=cleanRotaRealHora(bv);
       if(aFieldTs||bFieldTs){
         if(bFieldTs>aFieldTs)out[field]=bh;
         else if(aFieldTs>bFieldTs)out[field]=ah;
@@ -3631,6 +3635,8 @@ function rotasShadowUrl(date){
 
 function routeRecordHasData(route){
   if(!route)return false;
+  if(route._fieldUpdatedAt&&Object.keys(route._fieldUpdatedAt).length)return true;
+  if(+route._updatedAt||0)return true;
   return ROUTE_DATA_FIELDS.some(field=>routeFieldHasValue(field,route[field]));
 }
 
@@ -3653,9 +3659,9 @@ function mergeRouteRecordsKeepFilled(current,next){
     const ats=+(a._fieldUpdatedAt&&a._fieldUpdatedAt[field])||(+a._updatedAt||0);
     const bts=+(b._fieldUpdatedAt&&b._fieldUpdatedAt[field])||(+b._updatedAt||0);
     if(ats||bts){
-      if(bts>ats)out[field]=field==='hReal'?cleanHora(bv):bv;
-      else if(ats>bts)out[field]=field==='hReal'?cleanHora(av):av;
-      else out[field]=field in b?(field==='hReal'?cleanHora(bv):bv):(field==='hReal'?cleanHora(av):av);
+      if(bts>ats)out[field]=field==='hReal'?cleanRotaRealHora(bv):bv;
+      else if(ats>bts)out[field]=field==='hReal'?cleanRotaRealHora(av):av;
+      else out[field]=field in b?(field==='hReal'?cleanRotaRealHora(bv):bv):(field==='hReal'?cleanRotaRealHora(av):av);
       return;
     }
     const hasA=routeFieldHasValue(field,av);
@@ -11608,7 +11614,7 @@ function renderRouteClosure(day){
               ` Pendente: ${pendencias[i].toLocaleString('pt-BR')}`
             ];
           },
-          afterBody:items=>{const i=items[0].dataIndex,r=rotas[i],st=statusRotas[i],h=cleanHora(r.hReal);return[`Horário previsto: ${r.hPrev}`,`Horário realizado: ${h||'Pendente'}`,`Status: ${st.stLabel.replace(/^[^A-ZÀ-Ú—]+/,'')}`];}
+          afterBody:items=>{const i=items[0].dataIndex,r=rotas[i],st=statusRotas[i],h=cleanRotaRealHora(r.hReal);return[`Horário previsto: ${r.hPrev}`,`Horário realizado: ${h||'Pendente'}`,`Status: ${st.stLabel.replace(/^[^A-ZÀ-Ú—]+/,'')}`];}
         }}},
       scales:{
         x:{ticks:{color:'#00385f',font:{size:10,weight:'bold'},maxRotation:0,minRotation:0,autoSkip:false,padding:7},grid:{display:false},offset:true},
@@ -12370,7 +12376,7 @@ function renderCompRouteCharts(days,labels){
         tooltipLabels:rows.map(r=>[
           `Volume: ${Math.round(r.volume||0).toLocaleString('pt-BR')}`,
           `Previsto: ${r.route.hPrev||'--'}`,
-          `Realizado: ${cleanHora(r.route.hReal)||'Pendente'}`,
+          `Realizado: ${cleanRotaRealHora(r.route.hReal)||'Pendente'}`,
           `Status: ${r.status}`,
           `Atraso: ${r.finished?fmtAtraso(r.delay||0):'Pendente'}`
         ])
@@ -12433,7 +12439,7 @@ function renderComp(){
       if(routeHasRealized(r)&&delay>0){
         count++;
         totalMin+=delay;
-        delayRows.push({date:day.date,cod:r.cod,cidade:r.cidade,hPrev:r.hPrev,hReal:cleanHora(r.hReal),delay});
+        delayRows.push({date:day.date,cod:r.cod,cidade:r.cidade,hPrev:r.hPrev,hReal:cleanRotaRealHora(r.hReal),delay});
       }
     });
     return{day,count,totalMin};
@@ -13201,7 +13207,7 @@ function buildRotasMerged(day){
     return{cod,cidade:rf.cidade,hPrev:rf.hPrev,
       tipo:s.tipo||'TRUCK',placa:s.placa||'',
       vol:s.vol||0,paletes:s.paletes||0,
-      hReal:cleanHora(s.hReal),obs:s.obs||''};
+      hReal:cleanRotaRealHora(s.hReal),obs:s.obs||''};
   });
 }
 
@@ -13224,7 +13230,7 @@ function saveRotaField(cod,field,val){
   const raw=isNumeric?String(val??'').trim():val;
   const nextValue=isNumeric
     ?(raw===''?'':(+raw||0))
-    :(field==='hReal'?cleanHora(val):String(val??''));
+    :(field==='hReal'?cleanRotaRealHora(val):String(val??''));
   const ts=Date.now();
   r[field]=nextValue;
   r._fieldUpdatedAt={...(r._fieldUpdatedAt||{})};
@@ -13248,7 +13254,7 @@ function saveRotaField(cod,field,val){
 
 function calcAtraso(hPrev,hReal){
   hPrev=cleanHora(hPrev);
-  hReal=cleanHora(hReal);
+  hReal=cleanRotaRealHora(hReal);
   if(!hPrev||!hReal)return null;
   // convert HH:MM to minutes, handling midnight crossing
   const toMin=h=>{const[hh,mm]=h.split(':').map(Number);return hh*60+mm;};
@@ -13413,7 +13419,7 @@ function renderRotasTbl(day,tblId){
       <th style="text-align:left;min-width:160px">Obs</th>
     </tr></thead><tbody>`;
   rotas.forEach(r=>{
-    const hReal=cleanHora(r.hReal);
+    const hReal=cleanRotaRealHora(r.hReal);
     const st=calcRotaStatus(day,r);
     const atr=st.delay;
     const stClass=st.stClass,stLabel=st.stLabel;
@@ -13443,7 +13449,7 @@ function renderRotasTbl(day,tblId){
       <td style="color:#ffd700;font-weight:bold;text-align:center">${r.hPrev}</td>
       <td style="text-align:center">
         ${editable
-          ?`<input type="time" value="${escAttr(hReal)}" oninput="saveRotaField('${r.cod}','hReal',this.value)" onchange="renderRotasTblFull(getDay(curDate))" style="${inpSG};text-align:center"/>`
+          ?`<input type="text" value="${escAttr(hReal)}" inputmode="numeric" maxlength="5" oninput="formatRouteTimeDraft(this)" onchange="saveRotaField('${r.cod}','hReal',this.value);renderRotasTblFull(getDay(curDate))" onblur="saveRotaField('${r.cod}','hReal',this.value);renderRotasTblFull(getDay(curDate))" style="${inpSG};text-align:center" placeholder="--:--"/>`
           :`<span style="color:#00e676;font-weight:bold">${hReal||'-'}</span>`}
       </td>
       <td style="text-align:center;color:${atrColor};font-weight:bold">${fmtAtraso(atr)}</td>
@@ -13467,6 +13473,11 @@ function renderRotasTbl(day,tblId){
   </tr>`;
   html+='</tbody></table>';
   el.innerHTML=html;
+}
+
+function formatRouteTimeDraft(input){
+  const raw=String(input.value||'').replace(/[^\d:]/g,'').slice(0,5);
+  input.value=raw;
 }
 
 function updateRotasDateLabel(dayOrDate){
