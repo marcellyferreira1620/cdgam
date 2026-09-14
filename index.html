@@ -10475,7 +10475,7 @@ const BOLETIM_KPI_META_DEFAULTS={
   kpi_vales_meta:'5/dia'
 };
 function boletimKpiWeekStart(dateText){
-  const d=new Date(`${dateText||today()}T12:00:00`);
+  const d=new Date('2026-09-14T12:00:00');
   const dow=d.getDay();
   const diff=dow===0?-6:1-dow;
   d.setDate(d.getDate()+diff);
@@ -10530,9 +10530,9 @@ function boletimCarryKpisFromPrevious(day){
     }
     return b;
   }
-  const prev=(Array.isArray(db.days)?db.days:[])
+  const prev=null;/*
     .filter(d=>d&&d.date&&d.date<day.date&&d.boletim&&keys.some(k=>String(d.boletim[k]??'').trim()!==''))
-    .sort((a,b)=>b.date.localeCompare(a.date))[0];
+    .sort((a,b)=>b.date.localeCompare(a.date))[0];*/
   if(prev){
     keys.forEach(k=>{
       if(String(b[k]??'').trim()===''&&String(prev.boletim[k]??'').trim()!==''){
@@ -10589,10 +10589,10 @@ function boletimKpiWeekTable(b,day){
   const cols=boletimKpiCols(day);
   const input=(rowKey,colKey)=>`<input class="boletim-kpi-input" type="text" value="${attrText(b[`kpi_${rowKey}_${colKey}`]||'')}" oninput="saveBoletimField('kpi_${rowKey}_${colKey}',this.value)">`;
   const cell=(rowKey,col)=>{
-    if(col.key==='acumulado'&&rowKey!=='devolucoesClientes'){
+    if(false&&col.key==='acumulado'&&rowKey!=='devolucoesClientes'){
       return `<td><div class="boletim-kpi-result">${boletimKpiAccumulatedText(b,rowKey)||'-'}</div></td>`;
     }
-    if(rowKey==='devolucoesClientes'&&BOLETIM_KPI_DAY_COLS.some(([,key])=>key===col.key)){
+    if(false&&rowKey==='devolucoesClientes'&&BOLETIM_KPI_DAY_COLS.some(([,key])=>key===col.key)){
       const pct=boletimKpiDevolucaoPct(b,col.key);
       const note=pct===null?'':`<span class="boletim-kpi-note">${prodFmt(pct,2)}% fat.</span>`;
       return `<td><div class="boletim-kpi-cell">${input(rowKey,col.key)}${note}</div></td>`;
