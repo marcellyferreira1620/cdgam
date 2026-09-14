@@ -4117,6 +4117,12 @@ async function syncFromFirebaseRest(showOk){
       else if(showOk)showSyncStatus('Nuvem ativa',false);
       return false;
     }
+    if(localUserEditActive()){
+      pendingCloudSave=true;
+      setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),20);
+      if(showOk)showSyncStatus('Salvando preenchimento...',null);
+      return false;
+    }
     const remoteDays=remote.days;
     if(shouldRejectOlderCloud(remoteDays,'firebase-rest'))return false;
     const remoteHash=cloudPayloadHash(remote);
@@ -12899,6 +12905,46 @@ function rememberNightEditedField(el){
 function nightEditedDayKeys(){
   return new Set([...nightEditedFieldIds].map(id=>NIGHT_INPUT_FIELD_KEYS[id]).filter(Boolean));
 }
+function nightInputValueForStorage(el,key){
+  if(!el)return '';
+  if(key==='osProdMedBase'||key==='osProdPerfBase')return parseSumNumber(el.value||0);
+  if(el.type==='number')return el.value===''?0:(+el.value||0);
+  return String(el.value??'');
+}
+function persistNightSingleFieldNow(el){
+  if(!el||!el.id)return;
+  const key=NIGHT_INPUT_FIELD_KEYS[el.id];
+  if(!key)return;
+  const dt=currentFormDate();
+  if(!dt)return;
+  let day=getDay(dt);
+  if(!day){
+    day=emptyDay(dt);
+    db.days.push(day);
+  }
+  const value=nightInputValueForStorage(el,key);
+  const ts=Date.now();
+  day[key]=value;
+  day._updatedAt=ts;
+  day._fieldUpdatedAt={...(day._fieldUpdatedAt||{})};
+  day._fieldClearedAt={...(day._fieldClearedAt||{})};
+  if(dayFieldHasValue(value)){
+    day._fieldUpdatedAt[key]=ts;
+    delete day._fieldClearedAt[key];
+  }else{
+    delete day._fieldUpdatedAt[key];
+    day._fieldClearedAt[key]=ts;
+  }
+  if(!Object.keys(day._fieldUpdatedAt).length)delete day._fieldUpdatedAt;
+  if(!Object.keys(day._fieldClearedAt).length)delete day._fieldClearedAt;
+  db.days.sort((a,b)=>a.date.localeCompare(b.date));
+  setCurrentDate(dt);
+  saveNightDayDraft(day);
+  saveLocalDb(db);
+  pendingCloudSave=true;
+  setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),40);
+  setTimeout(()=>{if(typeof sbSave==='function')sbSave(false).catch(()=>{});},120);
+}
 
 function markNightFormUpdateStamps(existing,day){
   const ts=+day._updatedAt||Date.now();
@@ -13207,6 +13253,7 @@ function scheduleNightImmediateSave(event){
   rememberNightEditedField(el);
   if(!event||event.isTrusted!==false)markLocalUserEdit();
   if(el.id==='iData')rememberCurrentDate(el.value);
+  persistNightSingleFieldNow(el);
   clearTimeout(nightImmediateSaveTimer);
   nightImmediateSaveTimer=setTimeout(()=>saveNightImmediately(),30);
 }
@@ -13664,7 +13711,7 @@ function markCloudFreshPull(ms=90000){
   pendingCloudSave=false;
 }
 
-function markLocalUserEdit(ms=15000){
+function markLocalUserEdit(ms=90000){
   cloudLocalEditUntil=Date.now()+ms;
 }
 
@@ -13765,6 +13812,12 @@ async function sbLoad(){
   try{
     const remote=await sbReadPayload();
     if(!remote)return false;
+    if(localUserEditActive()){
+      pendingCloudSave=true;
+      setTimeout(()=>sbSave(false).catch(()=>{}),20);
+      setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),80);
+      return false;
+    }
     const remoteTs=remote.savedAt||0;
     // Sempre aplicar se remoto tem dados e é diferente do que temos
     const localTs=sbLastTs||0;
