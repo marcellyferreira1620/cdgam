@@ -2973,6 +2973,12 @@ function mergeRouteRecords(current,next){
     const hasB=routeFieldHasValue(field,bv);
     if(field==='hReal'){
       const ah=cleanHora(av),bh=cleanHora(bv);
+      if(aFieldTs||bFieldTs){
+        if(bFieldTs>aFieldTs)out[field]=bh;
+        else if(aFieldTs>bFieldTs)out[field]=ah;
+        else out[field]=field in b?bh:ah;
+        return;
+      }
       if(ah&&bh)out[field]=(aFieldTs||bFieldTs)?(bFieldTs>=aFieldTs?bh:ah):((aTs||bTs)?(bTs>=aTs?bh:ah):bh);
       else if(ah)out[field]=ah;
       else if(bh)out[field]=bh;
@@ -2980,9 +2986,9 @@ function mergeRouteRecords(current,next){
       return;
     }
     if(aFieldTs||bFieldTs){
-      if(hasA&&!hasB){out[field]=av;return;}
-      if(hasB&&!hasA){out[field]=bv;return;}
-      out[field]=bFieldTs>=aFieldTs?bv:av;
+      if(bFieldTs>aFieldTs)out[field]=bv;
+      else if(aFieldTs>bFieldTs)out[field]=av;
+      else out[field]=field in b?bv:av;
       return;
     }
     if(hasA&&hasB){
@@ -3239,9 +3245,9 @@ function mergeBoletim(current,next){
     const hasA=moduleFieldHasValue(av);
     const hasB=moduleFieldHasValue(bv);
     if(ats||bts){
-      if(bts>ats)out[key]=(hasB||!hasA)?bv:av;
-      else if(ats>bts)out[key]=(hasA||!hasB)?av:bv;
-      else out[key]=hasB?bv:av;
+      if(bts>ats)out[key]=bv;
+      else if(ats>bts)out[key]=av;
+      else out[key]=key in b?bv:av;
       return;
     }
     if(hasB)out[key]=bv;
@@ -3644,13 +3650,19 @@ function mergeRouteRecordsKeepFilled(current,next){
   fields.delete('_fieldUpdatedAt');
   fields.forEach(field=>{
     const av=a[field],bv=b[field];
+    const ats=+(a._fieldUpdatedAt&&a._fieldUpdatedAt[field])||(+a._updatedAt||0);
+    const bts=+(b._fieldUpdatedAt&&b._fieldUpdatedAt[field])||(+b._updatedAt||0);
+    if(ats||bts){
+      if(bts>ats)out[field]=field==='hReal'?cleanHora(bv):bv;
+      else if(ats>bts)out[field]=field==='hReal'?cleanHora(av):av;
+      else out[field]=field in b?(field==='hReal'?cleanHora(bv):bv):(field==='hReal'?cleanHora(av):av);
+      return;
+    }
     const hasA=routeFieldHasValue(field,av);
     const hasB=routeFieldHasValue(field,bv);
     if(hasA&&!hasB)out[field]=av;
     else if(hasB&&!hasA)out[field]=bv;
     else if(hasA&&hasB){
-      const ats=+(a._fieldUpdatedAt&&a._fieldUpdatedAt[field])||(+a._updatedAt||0);
-      const bts=+(b._fieldUpdatedAt&&b._fieldUpdatedAt[field])||(+b._updatedAt||0);
       out[field]=bts>=ats?bv:av;
     }
   });
@@ -10469,13 +10481,16 @@ const BOLETIM_KPI_DAY_COLS=[
   ['Quinta','quinta',3],
   ['Sexta','sexta',4]
 ];
+const BOLETIM_KPI_MANUAL_WEEK_START='2026-09-14';
 const BOLETIM_KPI_META_DEFAULTS={
   kpi_leadTime_meta:'2 dias',
   kpi_pendencia997_meta:'2 dias',
   kpi_vales_meta:'5/dia'
 };
 function boletimKpiWeekStart(dateText){
-  const d=new Date('2026-09-14T12:00:00');
+  const forced=new Date(`${BOLETIM_KPI_MANUAL_WEEK_START}T12:00:00`);
+  if(!Number.isNaN(forced.getTime()))return forced;
+  const d=new Date(`${dateText||today()}T12:00:00`);
   const dow=d.getDay();
   const diff=dow===0?-6:1-dow;
   d.setDate(d.getDate()+diff);
@@ -10518,31 +10533,7 @@ function boletimCarryKpisFromPrevious(day){
   if(!day||!day.date)return boletimManual(day);
   day.boletim=day.boletim||{};
   const b=day.boletim;
-  const keys=boletimKpiFieldKeys();
-  const needsCopy=keys.some(k=>String(b[k]??'').trim()==='');
-  let copied=false;
-  if(!needsCopy){
-    if(boletimApplyKpiDefaults(b)){
-      const ts=Date.now();
-      b._updatedAt=ts;
-      day._updatedAt=ts;
-      boletimSaveCurrent(day);
-    }
-    return b;
-  }
-  const prev=null;/*
-    .filter(d=>d&&d.date&&d.date<day.date&&d.boletim&&keys.some(k=>String(d.boletim[k]??'').trim()!==''))
-    .sort((a,b)=>b.date.localeCompare(a.date))[0];*/
-  if(prev){
-    keys.forEach(k=>{
-      if(String(b[k]??'').trim()===''&&String(prev.boletim[k]??'').trim()!==''){
-        b[k]=prev.boletim[k];
-        copied=true;
-      }
-    });
-  }
-  copied=boletimApplyKpiDefaults(b)||copied;
-  if(copied){
+  if(boletimApplyKpiDefaults(b)){
     const ts=Date.now();
     b._updatedAt=ts;
     day._updatedAt=ts;
@@ -10588,17 +10579,7 @@ function boletimKpiWeekTable(b,day){
   const rows=boletimKpiRows();
   const cols=boletimKpiCols(day);
   const input=(rowKey,colKey)=>`<input class="boletim-kpi-input" type="text" value="${attrText(b[`kpi_${rowKey}_${colKey}`]||'')}" oninput="saveBoletimField('kpi_${rowKey}_${colKey}',this.value)">`;
-  const cell=(rowKey,col)=>{
-    if(false&&col.key==='acumulado'&&rowKey!=='devolucoesClientes'){
-      return `<td><div class="boletim-kpi-result">${boletimKpiAccumulatedText(b,rowKey)||'-'}</div></td>`;
-    }
-    if(false&&rowKey==='devolucoesClientes'&&BOLETIM_KPI_DAY_COLS.some(([,key])=>key===col.key)){
-      const pct=boletimKpiDevolucaoPct(b,col.key);
-      const note=pct===null?'':`<span class="boletim-kpi-note">${prodFmt(pct,2)}% fat.</span>`;
-      return `<td><div class="boletim-kpi-cell">${input(rowKey,col.key)}${note}</div></td>`;
-    }
-    return `<td>${input(rowKey,col.key)}</td>`;
-  };
+  const cell=(rowKey,col)=>`<td>${input(rowKey,col.key)}</td>`;
   return `<section class="boletim-kpi-week">
     <div class="boletim-kpi-week-title">Acompanhamento di&aacute;rio de indicadores (KPIs)</div>
     <div class="boletim-kpi-table-wrap">
@@ -13245,22 +13226,11 @@ function saveRotaField(cod,field,val){
     ?(raw===''?'':(+raw||0))
     :(field==='hReal'?cleanHora(val):String(val??''));
   const ts=Date.now();
-  const hasNextValue=routeFieldHasValue(field,nextValue);
-  const hadSavedValue=routeFieldHasValue(field,r[field]);
-  if(!hasNextValue&&hadSavedValue){
-    updateRotasKPIs(day);
-    renderRotasTbl(day,'rotasTbl');
-    return;
-  }
   r[field]=nextValue;
   r._fieldUpdatedAt={...(r._fieldUpdatedAt||{})};
-  if(hasNextValue){
-    r._fieldUpdatedAt[field]=ts;
-    r._updatedAt=ts;
-    day._updatedAt=ts;
-  }else{
-    delete r._fieldUpdatedAt[field];
-  }
+  r._fieldUpdatedAt[field]=ts;
+  r._updatedAt=ts;
+  day._updatedAt=ts;
   if(!Object.keys(r._fieldUpdatedAt).length)delete r._fieldUpdatedAt;
   const saved=save();
   if(saved!==false){
