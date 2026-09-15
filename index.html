@@ -4331,6 +4331,12 @@ function applyRemoteData(remote){
     }
   }
   if(!remote.days||!Array.isArray(remote.days))return changed;
+  if(localUserEditActive()){
+    pendingCloudSave=true;
+    setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),20);
+    setTimeout(()=>{if(typeof sbSave==='function')sbSave(false).catch(()=>{});},80);
+    return changed;
+  }
   if(shouldRejectOlderCloud(remote.days,'remote-apply'))return changed;
   const previousLatest=maxDayDate(db.days);
   const previousCurrent=curDate;
@@ -4446,6 +4452,14 @@ function initFirebase(){
         }
         const remoteHash=cloudPayloadHash(remote);
         const remoteTs=remote.savedAt||0;
+        if(localUserEditActive()){
+          pendingCloudSave=true;
+          setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),20);
+          setTimeout(()=>{if(typeof sbSave==='function')sbSave(false).catch(()=>{});},80);
+          fbRestLastHash=remoteHash;
+          showSyncStatus('Salvando preenchimento...',null);
+          return;
+        }
         const shouldApply=!isSaving&&(remoteTs>lastSaveTs||remoteDaysHaveBetterData(remote.days)||remoteHash!==fbRestLastHash);
         if(shouldApply){
           lastSaveTs=remoteTs;
@@ -13540,8 +13554,8 @@ function queueRouteCloudSave(day){
     const payloadDay={...latest,rotas:completeRotasForStorage(latest),_updatedAt:+latest._updatedAt||Date.now()};
     fbRestWriteRotasShadow({days:[payloadDay],savedAt:Date.now()}).catch(()=>{});
     saveToFirebaseRest(false).catch(()=>{});
-    setTimeout(()=>{if(typeof sbSave==='function')sbSave(false).catch(()=>{});},350);
-  },180);
+    setTimeout(()=>{if(typeof sbSave==='function')sbSave(false).catch(()=>{});},80);
+  },30);
 }
 
 function saveRotaField(cod,field,val){
@@ -13583,7 +13597,7 @@ function saveRotaField(cod,field,val){
   queueRouteCloudSave(getDay(day.date)||day);
   const renderDay=getDay(day.date)||day;
   updateRotasKPIs(renderDay);
-  renderRotasTbl(renderDay,'rotasTbl');
+  if(!isEditingDataField())renderRotasTbl(renderDay,'rotasTbl');
   renderRouteClosure(renderDay);
 }
 
