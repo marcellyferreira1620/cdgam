@@ -3014,9 +3014,11 @@ function routeHasRealized(route){
 }
 function routeFieldHasValue(field,value){
   if(value===null||value===undefined)return false;
-  if(field==='vol'||field==='paletes')return value!==''&&Number.isFinite(+value);
+  if(field==='vol'||field==='paletes')return value!==''&&Number.isFinite(+value)&&+value!==0;
   if(field==='hReal')return cleanRotaRealHora(value)!=='';
-  return String(value).trim()!=='';
+  const text=String(value).trim();
+  if(field==='placa'&&text.toUpperCase()==='PLACA')return false;
+  return text!=='';
 }
 function routeFieldUpdatedStamp(route,field){
   return +(route&&route._fieldUpdatedAt&&route._fieldUpdatedAt[field])||0;
@@ -3546,7 +3548,7 @@ function mergeDaysForCloudSave(remoteDays,localDays){
     : mergeCloudIncomingDays(localDays,remoteDays);
 }
 
-const CLOUD_PULL_ROOT_SKIP=new Set(['date','_updatedAt','_fieldUpdatedAt','_fieldClearedAt','_hdUpdatedAt','_hdClearedAt','_nightPartialSave']);
+const CLOUD_PULL_ROOT_SKIP=new Set(['date','_updatedAt','_fieldUpdatedAt','_fieldClearedAt','_hdUpdatedAt','_hdClearedAt','_nightPartialSave','rotas']);
 
 function cloneData(value){
   return value===undefined?undefined:JSON.parse(JSON.stringify(value));
@@ -13492,9 +13494,54 @@ function buildRotasMerged(day){
     const s=savedByCod[cod]||{};
     return{cod,cidade:rf.cidade,hPrev:rf.hPrev,
       tipo:s.tipo||'TRUCK',placa:s.placa||'',
-      vol:s.vol||0,paletes:s.paletes||0,
+      vol:s.vol??'',paletes:s.paletes??'',
       hReal:cleanRotaRealHora(s.hReal),obs:s.obs||''};
   });
+}
+
+let routeCloudSaveTimer=null;
+
+function completeRotasForStorage(day){
+  const saved=Array.isArray(day&&day.rotas)?day.rotas:[];
+  const savedByCod={};
+  saved.forEach(r=>{
+    if(!r||r.cod===undefined||r.cod===null)return;
+    const cod=normalizeRouteCode(r.cod);
+    savedByCod[cod]={...r,cod};
+  });
+  return ROTAS_FIXAS.map(rf=>{
+    const cod=normalizeRouteCode(rf.cod);
+    const s=savedByCod[cod]||{};
+    const out={...s,cod,cidade:rf.cidade,hPrev:rf.hPrev};
+    if(out.hReal!==undefined)out.hReal=cleanRotaRealHora(out.hReal);
+    return out;
+  });
+}
+
+function saveRouteDayLocally(day){
+  if(!day||!day.date)return false;
+  day.rotas=completeRotasForStorage(day);
+  const idx=db.days.findIndex(d=>d&&d.date===day.date);
+  if(idx>=0)db.days[idx]=mergeDayRecords(db.days[idx],day);
+  else db.days.push(stripTransientDayFlags(day));
+  db.days.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  saveNightDayDraft(getDay(day.date)||day);
+  saveLocalDb(db);
+  return true;
+}
+
+function queueRouteCloudSave(day){
+  if(!day||!day.date)return;
+  pendingCloudSave=true;
+  const date=day.date;
+  clearTimeout(routeCloudSaveTimer);
+  routeCloudSaveTimer=setTimeout(()=>{
+    const latest=getDay(date)||day;
+    const payloadDay={...latest,rotas:completeRotasForStorage(latest),_updatedAt:+latest._updatedAt||Date.now()};
+    fbRestWriteRotasShadow({days:[payloadDay],savedAt:Date.now()}).catch(()=>{});
+    saveToFirebaseRest(false).catch(()=>{});
+    setTimeout(()=>{if(typeof sbSave==='function')sbSave(false).catch(()=>{});},350);
+  },180);
 }
 
 function saveRotaField(cod,field,val){
@@ -13532,14 +13579,8 @@ function saveRotaField(cod,field,val){
   day._updatedAt=ts;
   if(!Object.keys(r._fieldUpdatedAt).length)delete r._fieldUpdatedAt;
   if(!Object.keys(r._fieldClearedAt).length)delete r._fieldClearedAt;
-  const saved=save();
-  if(saved!==false){
-    pendingCloudSave=true;
-    const persistedDay=getDay(day.date)||day;
-    fbRestWriteRotasShadow({days:[persistedDay],savedAt:Date.now()}).catch(()=>{});
-    setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),120);
-    setTimeout(()=>{if(typeof sbSave==='function')sbSave(false).catch(()=>{});},350);
-  }
+  saveRouteDayLocally(day);
+  queueRouteCloudSave(getDay(day.date)||day);
   const renderDay=getDay(day.date)||day;
   updateRotasKPIs(renderDay);
   renderRotasTbl(renderDay,'rotasTbl');
