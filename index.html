@@ -3075,6 +3075,19 @@ function prodFieldHasValue(value){
   if(value===null||value===undefined||value==='')return false;
   return Number.isFinite(+value);
 }
+function prodFieldUpdatedStamp(row,field){
+  return +(row&&row._fieldUpdatedAt&&row._fieldUpdatedAt[field])||0;
+}
+function prodFieldClearedStamp(row,field){
+  return +(row&&row._fieldClearedAt&&row._fieldClearedAt[field])||0;
+}
+function prodFieldEffectiveStamp(row,field){
+  return Math.max(prodFieldUpdatedStamp(row,field),prodFieldClearedStamp(row,field));
+}
+function prodFieldWasCleared(row,field){
+  const cleared=prodFieldClearedStamp(row,field);
+  return cleared>0&&cleared>=prodFieldUpdatedStamp(row,field);
+}
 
 function mergeProdRow(current,next){
   const a=current||{};
@@ -3082,14 +3095,16 @@ function mergeProdRow(current,next){
   const out={...a,...b};
   PROD_DATA_FIELDS.forEach(field=>{
     const av=a[field],bv=b[field];
-    const aTs=+(a._fieldUpdatedAt&&a._fieldUpdatedAt[field])||0;
-    const bTs=+(b._fieldUpdatedAt&&b._fieldUpdatedAt[field])||0;
+    const aTs=prodFieldEffectiveStamp(a,field);
+    const bTs=prodFieldEffectiveStamp(b,field);
     const hasA=prodFieldHasValue(av);
     const hasB=prodFieldHasValue(bv);
+    const aCleared=prodFieldWasCleared(a,field);
+    const bCleared=prodFieldWasCleared(b,field);
     if(aTs||bTs){
-      if(bTs>aTs)out[field]=(hasB||!hasA)?bv:av;
-      else if(aTs>bTs)out[field]=(hasA||!hasB)?av:bv;
-      else out[field]=hasB?bv:av;
+      if(bTs>aTs)out[field]=bCleared?'':bv;
+      else if(aTs>bTs)out[field]=aCleared?'':av;
+      else out[field]=bCleared?'':(aCleared?'':(hasB?bv:av));
       return;
     }
     if(hasA&&hasB)out[field]=bv;
@@ -3103,6 +3118,15 @@ function mergeProdRow(current,next){
   });
   if(Object.keys(fieldUpdatedAt).length)out._fieldUpdatedAt=fieldUpdatedAt;
   else delete out._fieldUpdatedAt;
+  const fieldClearedAt={...(a._fieldClearedAt||{})};
+  Object.entries(b._fieldClearedAt||{}).forEach(([field,ts])=>{
+    fieldClearedAt[field]=Math.max(+fieldClearedAt[field]||0,+ts||0);
+  });
+  Object.keys(fieldClearedAt).forEach(field=>{
+    if((+fieldUpdatedAt[field]||0)>(+fieldClearedAt[field]||0))delete fieldClearedAt[field];
+  });
+  if(Object.keys(fieldClearedAt).length)out._fieldClearedAt=fieldClearedAt;
+  else delete out._fieldClearedAt;
   return out;
 }
 
@@ -5089,7 +5113,13 @@ function ensureProdSetores(day){
     if(!Array.isArray(data.bySection[sec]))data.bySection[sec]=[];
     for(let i=0;i<PROD_SETORES_HOURS.length;i++){
       const row=data.bySection[sec][i]||{};
-      data.bySection[sec][i]={caixa:row.caixa??'',acesso:row.acesso??'',tempo:row.tempo??'',...(row._fieldUpdatedAt?{_fieldUpdatedAt:row._fieldUpdatedAt}:{})};
+      data.bySection[sec][i]={
+        caixa:row.caixa??'',
+        acesso:row.acesso??'',
+        tempo:row.tempo??'',
+        ...(row._fieldUpdatedAt?{_fieldUpdatedAt:row._fieldUpdatedAt}:{}),
+        ...(row._fieldClearedAt?{_fieldClearedAt:row._fieldClearedAt}:{})
+      };
     }
   });
   return data;
@@ -5129,27 +5159,46 @@ function prodSetoresValue(sec,hour,field){
 }
 
 function saveProdSetoresField(sec,hour,field,value){
+  markLocalUserEdit();
   let day=getDay(curDate);
+  let wasNew=false;
   if(!day){
     day=emptyDay(curDate||today());
     db.days.push(day);
     db.days.sort((a,b)=>a.date.localeCompare(b.date));
     setCurrentDate(day.date);
-    buildDayNav();
+    wasNew=true;
   }
   const data=ensureProdSetores(day);
   const row=data.bySection[sec][hour];
   const ts=Date.now();
-  row[field]=value===''?'':+value||0;
-  row._fieldUpdatedAt={...(row._fieldUpdatedAt||{}),[field]:ts};
+  const cleanValue=String(value??'').trim()===''?'':(+value||0);
+  row[field]=cleanValue;
+  row._fieldUpdatedAt={...(row._fieldUpdatedAt||{})};
+  row._fieldClearedAt={...(row._fieldClearedAt||{})};
+  if(prodFieldHasValue(cleanValue)){
+    row._fieldUpdatedAt[field]=ts;
+    delete row._fieldClearedAt[field];
+  }else{
+    delete row._fieldUpdatedAt[field];
+    row._fieldClearedAt[field]=ts;
+  }
+  if(!Object.keys(row._fieldUpdatedAt).length)delete row._fieldUpdatedAt;
+  if(!Object.keys(row._fieldClearedAt).length)delete row._fieldClearedAt;
   day._updatedAt=ts;
   setCurrentDate(day.date);
   saveNightDayDraft(day);
-  save();
+  saveLocalDb(db);
+  pendingCloudSave=true;
+  setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),40);
+  setTimeout(()=>{if(typeof sbSave==='function')sbSave(false).catch(()=>{});},120);
   renderProdSetoresRowCalcs(sec,hour);
-  renderProdSetoresChart();
-  renderProdSetoresDash(day);
-  buildDayNav();
+  clearTimeout(window.__prodSetoresChartTimer);
+  window.__prodSetoresChartTimer=setTimeout(()=>{
+    renderProdSetoresChart();
+    if(activeTab()==='proddash')renderProdSetoresDash(getDay(day.date)||day);
+  },300);
+  if(wasNew)buildDayNav();
 }
 
 function prodSetoresRatios(sec,hour){
@@ -13239,7 +13288,7 @@ function autoSave(){
 
 let nightImmediateSaveTimer=null;
 function isNightPersistentTarget(el){
-  return !!(el&&['INPUT','TEXTAREA','SELECT'].includes(el.tagName)&&el.type!=='file'&&el.closest('#tb-adm,#tb-preench,#tb-prodsetores'));
+  return !!(el&&['INPUT','TEXTAREA','SELECT'].includes(el.tagName)&&el.type!=='file'&&el.closest('#tb-adm,#tb-preench'));
 }
 function saveNightImmediately(){
   clearTimeout(autoSaveTimer);
