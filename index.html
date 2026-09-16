@@ -4892,7 +4892,8 @@ function sumHoraInput(metric){
 function openAdmin(){if(adminOk){applyAreaTabs('noturno');switchTab('adm');}}
 
 // ── LIVE UPDATE ───────────────────────────────────────────
-function liveUpdate(){
+function liveUpdate(opts){
+  const skipAutoSave=!!(opts&&opts.skipAutoSave);
   clearTimeout(liveTimer);
   liveTimer=setTimeout(()=>{
     updateRealAuto();
@@ -4907,7 +4908,7 @@ function liveUpdate(){
         renderDashTables(day);
       }
       refreshOpenPrevisaoEncerramento(day);
-      autoSave();
+      if(!skipAutoSave&&!isEditingDataField())autoSave();
     }
   },300);
 }
@@ -5134,7 +5135,7 @@ function activeTab(){
 
 function isEditingDataField(){
   const el=document.activeElement;
-  return !!(el&&['INPUT','TEXTAREA','SELECT'].includes(el.tagName)&&el.closest('#tb-adm,#tb-preench,#tb-rotas,#tb-proddash,#tb-prodsetores,#tb-previsaoenc,#tb-proddashdia,#tb-proddia,#tb-recebarm'));
+  return !!(el&&['INPUT','TEXTAREA','SELECT'].includes(el.tagName)&&el.closest('#tb-adm,#tb-preench,#tb-rotas,#tb-proddash,#tb-prodsetores,#tb-previsaoenc,#tb-proddashdia,#tb-proddia,#tb-recebarm,#tb-boletim,#tb-devolucao,#tb-inventario,#tb-fluxogramas'));
 }
 
 function refreshFromDb(){
@@ -12855,9 +12856,9 @@ function buildHoraTable(hd){
         const periodTarget=cap?capForHour(m,cap,i,formDate):null;
         const targetTitle=periodTarget?`${isInv?'Limite':'Meta'} do período: ${periodTarget.toLocaleString('pt-BR')}`:'';
         html+=`<td class="hora-cell" style="${bg};${extraStyle}" title="${[isExtra?'⚡ Hora extra':'',targetTitle,isRoute?'Realizado acumulado = total atualizado - pendente':useDelta?'Resultado da hora = acumulado atual - acumulado anterior':''].filter(Boolean).join(' | ')}">
-          ${isRoute?`<span class="route-hour-label">Total atualizado</span><input class="route-total-hour-input" type="number" min="0" data-m="${routeTotalMetricKey(route)}" data-i="${i}" data-route-total="1" value="${rawTotals[i]??''}" placeholder="total" oninput="onHoraInput(this);persistDayNow();liveUpdate()"/><span class="route-hour-label">Pendente</span>`:''}
+          ${isRoute?`<span class="route-hour-label">Total atualizado</span><input class="route-total-hour-input" type="number" min="0" data-m="${routeTotalMetricKey(route)}" data-i="${i}" data-route-total="1" value="${rawTotals[i]??''}" placeholder="total" oninput="onHoraInput(this);persistHoraInputNow(this);liveUpdate({skipAutoSave:true})"/><span class="route-hour-label">Pendente</span>`:''}
           <input class="${isRoute?'hora-acum-input route-pending-input':useDelta?'hora-acum-input':''}" type="number" min="0" data-m="${m}" data-i="${i}" data-use-delta="${useDelta?1:0}" data-route-pending="${isRoute?1:0}" value="${vDisplay}" placeholder="${isRoute?'pendente':'-'}"
-            oninput="onHoraInput(this);persistDayNow();liveUpdate()"
+            oninput="onHoraInput(this);persistHoraInputNow(this);liveUpdate({skipAutoSave:true})"
             style="${isExtra?'opacity:0.75':''}"/>
           ${deltaHint}
         </td>`;
@@ -12998,6 +12999,62 @@ function syncComparableValue(value){
   return JSON.stringify(value);
 }
 
+let nightFieldCloudSaveTimer=null;
+function queueNightFieldCloudSave(delay=80){
+  pendingCloudSave=true;
+  clearTimeout(nightFieldCloudSaveTimer);
+  nightFieldCloudSaveTimer=setTimeout(()=>{
+    saveToFirebaseRest(false).catch(()=>{});
+    setTimeout(()=>{if(typeof sbSave==='function')sbSave(false).catch(()=>{});},80);
+  },delay);
+}
+
+function persistHoraInputNow(inp){
+  if(!inp||!inp.dataset||inp.dataset.m===undefined||inp.dataset.i===undefined)return null;
+  markLocalUserEdit(300000);
+  rememberNightEditedHourCell(inp);
+  const dt=currentFormDate();
+  let day=getDay(dt);
+  if(!day){
+    day=emptyDay(dt);
+    db.days.push(day);
+  }
+  const m=inp.dataset.m;
+  const changedIndex=+inp.dataset.i;
+  const ts=Date.now();
+  const route=routeFromAnyMetric(m);
+  if(route){
+    const baseMetric=routeMetricKey(route);
+    const totalMetric=routeTotalMetricKey(route);
+    const row=inp.closest('tr')||document;
+    const inputs=[...row.querySelectorAll(`input[data-m="${baseMetric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
+    const totalInputs=[...row.querySelectorAll(`input[data-m="${totalMetric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
+    const pending=inputs.map(el=>el.value!==''?+el.value:'');
+    const totals=totalInputs.map(el=>el.value!==''?+el.value:'');
+    const done=routePendingToDone(pending,totals,routeInitialTotal(day,baseMetric));
+    for(let i=0;i<HOURS.length;i++){
+      setDayHdCell(day,totalMetric,i,totals[i],ts,m===totalMetric&&i===changedIndex);
+      setDayHdCell(day,baseMetric,i,done[i],ts,m===baseMetric&&i===changedIndex);
+    }
+    const latestTotal=[...totals].reverse().find(v=>v!==''&&v!==null&&v!==undefined);
+    if(latestTotal!==undefined)syncRouteCurrentTotal(route.cod,latestTotal,{fromUser:true});
+  }else if(isDeltaMetric(m,dt)){
+    const row=inp.closest('tr')||document;
+    const inputs=[...row.querySelectorAll(`input[data-m="${m}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
+    const acums=inputs.map(el=>el.value!==''?+el.value:'');
+    const stored=acumToDeltas(acums);
+    for(let i=0;i<HOURS.length;i++)setDayHdCell(day,m,i,stored[i],ts,i===changedIndex);
+  }else if(!isRouteTotalMetric(m)){
+    setDayHdCell(day,m,changedIndex,inp.value!==''?+inp.value:'',ts,true);
+  }
+  day._updatedAt=ts;
+  setCurrentDate(day.date);
+  saveNightDayDraft(day);
+  saveLocalDb(db);
+  queueNightFieldCloudSave(60);
+  return day;
+}
+
 let nightEditedFieldIds=new Set();
 let nightEditedHourCells=new Set();
 const NIGHT_INPUT_FIELD_KEYS={
@@ -13085,9 +13142,7 @@ function persistNightSingleFieldNow(el){
   setCurrentDate(dt);
   saveNightDayDraft(day);
   saveLocalDb(db);
-  pendingCloudSave=true;
-  setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),40);
-  setTimeout(()=>{if(typeof sbSave==='function')sbSave(false).catch(()=>{});},120);
+  queueNightFieldCloudSave(60);
 }
 
 function markNightFormUpdateStamps(existing,day){
@@ -13411,11 +13466,12 @@ function scheduleNightImmediateSave(event){
   if(!isNightPersistentTarget(el))return;
   rememberNightEditedField(el);
   rememberNightEditedHourCell(el);
-  if(!event||event.isTrusted!==false)markLocalUserEdit();
+  if(!event||event.isTrusted!==false)markLocalUserEdit(300000);
   if(el.id==='iData')rememberCurrentDate(el.value);
   persistNightSingleFieldNow(el);
+  if(el.closest('#hTblBody,#preenchBody')||(el.id&&NIGHT_INPUT_FIELD_KEYS[el.id]))return;
   clearTimeout(nightImmediateSaveTimer);
-  nightImmediateSaveTimer=setTimeout(()=>saveNightImmediately(),30);
+  nightImmediateSaveTimer=setTimeout(()=>saveNightImmediately(),400);
 }
 function installNightImmediatePersistence(){
   if(window.__nightImmediatePersistenceReady)return;
