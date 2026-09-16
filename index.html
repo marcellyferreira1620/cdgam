@@ -13782,30 +13782,30 @@ function renderRotasTbl(day,tblId){
       <td class="td-cidade">${r.cidade}</td>
       <td style="text-align:center">
         ${editable
-          ?`<input type="text" value="${escAttr(r.placa)}" oninput="this.value=this.value.toUpperCase();saveRotaField('${r.cod}','placa',this.value)" onchange="renderRotasTblFull(getDay(curDate))" style="${inpS};text-transform:uppercase;text-align:center" placeholder="PLACA"/>`
+          ?`<input type="text" value="${escAttr(r.placa)}" oninput="this.value=this.value.toUpperCase();saveRotaField('${r.cod}','placa',this.value)" style="${inpS};text-transform:uppercase;text-align:center" placeholder="PLACA"/>`
           :`<span style="font-family:monospace;color:#c0d8f0">${r.placa||'—'}</span>`}
       </td>
       <td style="text-align:center">
         ${editable
-          ?`<input type="number" value="${r.vol||''}" oninput="saveRotaField('${r.cod}','vol',this.value)" onchange="renderRotasTblFull(getDay(curDate))" style="${inpS};text-align:center" placeholder="0"/>`
+          ?`<input type="number" value="${r.vol||''}" oninput="saveRotaField('${r.cod}','vol',this.value)" style="${inpS};text-align:center" placeholder="0"/>`
           :`<span style="font-weight:bold">${r.vol?r.vol.toLocaleString('pt-BR'):'—'}</span>`}
       </td>
       <td style="text-align:center">
         ${editable
-          ?`<input type="number" value="${r.paletes||''}" oninput="saveRotaField('${r.cod}','paletes',this.value)" onchange="renderRotasTblFull(getDay(curDate))" style="${inpS};text-align:center" placeholder="0"/>`
+          ?`<input type="number" value="${r.paletes||''}" oninput="saveRotaField('${r.cod}','paletes',this.value)" style="${inpS};text-align:center" placeholder="0"/>`
           :`${r.paletes||'—'}`}
       </td>
       <td style="color:#ffd700;font-weight:bold;text-align:center">${r.hPrev}</td>
       <td style="text-align:center">
         ${editable
-          ?`<input type="text" value="${escAttr(hReal)}" inputmode="numeric" maxlength="5" oninput="saveRotaTimeDraft('${r.cod}',this)" onchange="saveRotaField('${r.cod}','hReal',this.value);renderRotasTblFull(getDay(curDate))" onblur="saveRotaField('${r.cod}','hReal',this.value);renderRotasTblFull(getDay(curDate))" style="${inpSG};text-align:center" placeholder="--:--"/>`
+          ?`<input type="text" value="${escAttr(hReal)}" inputmode="numeric" maxlength="5" oninput="saveRotaTimeDraft('${r.cod}',this)" onchange="saveRotaField('${r.cod}','hReal',this.value)" onblur="saveRotaField('${r.cod}','hReal',this.value)" style="${inpSG};text-align:center" placeholder="--:--"/>`
           :`<span style="color:#00e676;font-weight:bold">${hReal||'-'}</span>`}
       </td>
       <td style="text-align:center;color:${atrColor};font-weight:bold">${fmtAtraso(atr)}</td>
       <td style="text-align:center"><span class="${stClass}">${stLabel}</span></td>
       <td style="text-align:left">
         ${editable
-          ?`<input type="text" value="${escAttr(r.obs||'')}" oninput="saveRotaField('${r.cod}','obs',this.value)" onchange="renderRotasTblFull(getDay(curDate))" style="${inpS}" placeholder="Observação..."/>${expNote}`
+          ?`<input type="text" value="${escAttr(r.obs||'')}" oninput="saveRotaField('${r.cod}','obs',this.value)" style="${inpS}" placeholder="Observação..."/>${expNote}`
           :`<span style="color:#89b4d4;font-size:10px">${r.obs||''}</span>${expNote}`}
       </td>
     </tr>`;
