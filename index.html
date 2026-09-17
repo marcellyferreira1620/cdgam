@@ -1862,8 +1862,9 @@ const MEDIA_HORA_AUTO=[
 
 const SK='cdgam_v6';
 const SK_BACKUPS='cdgam_v6_backups';
-const LOCAL_CACHE_DAYS=180;
-const LOCAL_CACHE_FALLBACK_DAYS=90;
+const LOCAL_CACHE_DAYS=60;
+const LOCAL_CACHE_FALLBACK_DAYS=20;
+const LOCAL_CACHE_RETRY_DAYS=[60,45,30,20,10,5,1];
 const LOCAL_BACKUP_DAYS=10;
 const PWD='gam2025';
 const NEW_RULES_FROM='2026-06-02';
@@ -2395,20 +2396,23 @@ function saveLocalDb(snapshot=db){
     }
   };
   try{
-    writeCompact(LOCAL_CACHE_DAYS);
-    return true;
-  }catch(e){
-    try{
-      localStorage.removeItem(SK_BACKUPS);
-      writeCompact(LOCAL_CACHE_FALLBACK_DAYS);
-      console.warn('Backups locais limpos para liberar espaco:',e.message);
-      return true;
-    }catch(e2){
-      try{localStorage.removeItem(SK);}catch(_){}
-      console.error('Falha ao salvar cache local:',e2);
-      showSyncStatus('Nuvem ativa - cache local cheio',false);
-      return false;
+    let firstError=null;
+    const retryDays=[...new Set([LOCAL_CACHE_DAYS,...LOCAL_CACHE_RETRY_DAYS,LOCAL_CACHE_FALLBACK_DAYS])].filter(v=>v>0);
+    for(const limit of retryDays){
+      try{
+        writeCompact(limit);
+        return true;
+      }catch(e){
+        firstError=firstError||e;
+        try{localStorage.removeItem(SK_BACKUPS);}catch(_){}
+      }
     }
+    throw firstError||new Error('cache local cheio');
+  }catch(e){
+    try{localStorage.removeItem(SK);}catch(_){}
+    console.error('Falha ao salvar cache local:',e);
+    showSyncStatus('Nuvem ativa - cache local cheio',false);
+    return false;
   }
 }
 
@@ -2700,9 +2704,11 @@ function mergeHourData(current,next,chosen){
       const aCleared=hourCellWasCleared(current,metric,i);
       const bCleared=hourCellWasCleared(next,metric,i);
       if(ats||bts){
-        if(bts>ats)return bCleared?'':bv;
-        if(ats>bts)return aCleared?'':av;
+        if(bts>ats)return bCleared?'':(next&&next._nightPartialSave&&!hasB&&hasA?av:bv);
+        if(ats>bts)return aCleared?'':(current&&current._nightPartialSave&&!hasA&&hasB?bv:av);
         if(bCleared||aCleared)return '';
+        if(next&&next._nightPartialSave&&!hasB&&hasA)return av;
+        if(current&&current._nightPartialSave&&!hasA&&hasB)return bv;
         return cv!==undefined?cv:(bv!==undefined?bv:av);
       }
       if(current&&current._nightPartialSave&&hasB)return bv;
@@ -2733,9 +2739,15 @@ function mergeDayRootFields(current,next,chosen){
     const bts=Math.max(+bft[key]||0,+bcf[key]||0);
     const hasA=dayFieldHasValue(av);
     const hasB=dayFieldHasValue(bv);
+    const aCleared=(+acf[key]||0)>0&&(+acf[key]||0)>=(+aft[key]||0);
+    const bCleared=(+bcf[key]||0)>0&&(+bcf[key]||0)>=(+bft[key]||0);
     if(ats||bts){
-      if(bts>ats)out[key]=bv;
-      else if(ats>bts)out[key]=av;
+      if(bts>ats)out[key]=bCleared?bv:(next&&next._nightPartialSave&&!hasB&&hasA?av:bv);
+      else if(ats>bts)out[key]=aCleared?av:(current&&current._nightPartialSave&&!hasA&&hasB?bv:av);
+      else if(bCleared)out[key]=bv;
+      else if(aCleared)out[key]=av;
+      else if(next&&next._nightPartialSave&&!hasB&&hasA)out[key]=av;
+      else if(current&&current._nightPartialSave&&!hasA&&hasB)out[key]=bv;
       else out[key]=cv!==undefined?cv:bv;
       return;
     }
@@ -3070,9 +3082,9 @@ function mergeRouteRecords(current,next){
     if(field==='hReal'){
       const ah=cleanRotaRealHora(av),bh=cleanRotaRealHora(bv);
       if(aFieldTs||bFieldTs){
-        if(bFieldTs>aFieldTs)out[field]=bCleared?'':bh;
-        else if(aFieldTs>bFieldTs)out[field]=aCleared?'':ah;
-        else out[field]=bCleared?'':(aCleared?'':(field in b?bh:ah));
+        if(bFieldTs>aFieldTs)out[field]=bCleared?'':(bh||ah);
+        else if(aFieldTs>bFieldTs)out[field]=aCleared?'':(ah||bh);
+        else out[field]=bCleared?'':(aCleared?'':(bh||ah));
         return;
       }
       if(ah&&bh)out[field]=(aFieldTs||bFieldTs)?(bFieldTs>=aFieldTs?bh:ah):((aTs||bTs)?(bTs>=aTs?bh:ah):bh);
@@ -3082,9 +3094,9 @@ function mergeRouteRecords(current,next){
       return;
     }
     if(aFieldTs||bFieldTs){
-      if(bFieldTs>aFieldTs)out[field]=bCleared?'':bv;
-      else if(aFieldTs>bFieldTs)out[field]=aCleared?'':av;
-      else out[field]=bCleared?'':(aCleared?'':(field in b?bv:av));
+      if(bFieldTs>aFieldTs)out[field]=bCleared?'':(hasB?bv:(hasA?av:bv));
+      else if(aFieldTs>bFieldTs)out[field]=aCleared?'':(hasA?av:(hasB?bv:av));
+      else out[field]=bCleared?'':(aCleared?'':(hasB?bv:(hasA?av:(field in b?bv:av))));
       return;
     }
     if(hasA&&hasB){
@@ -3374,9 +3386,9 @@ function mergeBoletim(current,next){
     const hasA=moduleFieldHasValue(av);
     const hasB=moduleFieldHasValue(bv);
     if(ats||bts){
-      if(bts>ats)out[key]=bv;
-      else if(ats>bts)out[key]=av;
-      else out[key]=key in b?bv:av;
+      if(bts>ats)out[key]=(hasB||!hasA)?bv:av;
+      else if(ats>bts)out[key]=(hasA||!hasB)?av:bv;
+      else out[key]=hasB?bv:av;
       return;
     }
     if(hasB)out[key]=bv;
@@ -3839,14 +3851,16 @@ function mergeRouteRecordsKeepFilled(current,next){
     const bts=hasFieldStamp?bEff:(+b._updatedAt||0);
     const aCleared=routeFieldWasCleared(a,field);
     const bCleared=routeFieldWasCleared(b,field);
-    if(ats||bts){
-      if(bts>ats)out[field]=bCleared?'':(field==='hReal'?cleanRotaRealHora(bv):bv);
-      else if(ats>bts)out[field]=aCleared?'':(field==='hReal'?cleanRotaRealHora(av):av);
-      else out[field]=bCleared?'':(aCleared?'':(field in b?(field==='hReal'?cleanRotaRealHora(bv):bv):(field==='hReal'?cleanRotaRealHora(av):av)));
-      return;
-    }
     const hasA=routeFieldHasValue(field,av);
     const hasB=routeFieldHasValue(field,bv);
+    const aVal=field==='hReal'?cleanRotaRealHora(av):av;
+    const bVal=field==='hReal'?cleanRotaRealHora(bv):bv;
+    if(ats||bts){
+      if(bts>ats)out[field]=bCleared?'':(hasB?bVal:(hasA?aVal:bVal));
+      else if(ats>bts)out[field]=aCleared?'':(hasA?aVal:(hasB?bVal:aVal));
+      else out[field]=bCleared?'':(aCleared?'':(hasB?bVal:(hasA?aVal:(field in b?bVal:aVal))));
+      return;
+    }
     if(hasA&&!hasB)out[field]=av;
     else if(hasB&&!hasA)out[field]=bv;
     else if(hasA&&hasB){
