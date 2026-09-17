@@ -5006,9 +5006,17 @@ const TAB_ID_BY_BODY={
   inventario:'tabInventario',
   fluxogramas:'tabFluxogramas'
 };
+function roleAllowedTabIds(){
+  const r=currentUser&&currentUser.role;
+  if(r==='admin')return new Set(['tabDash','tabHist','tabComp','tabRotas','tabAdm','tabProdDash','tabProdSetores','tabPrevisaoEnc','tabProdDashDia','tabProdDia','tabRecebArm','tabBoletim','tabDevolucao','tabInventario','tabFluxogramas']);
+  if(r==='supervisor')return new Set(['tabDash','tabHist','tabComp','tabRotas','tabProdDash','tabProdSetores','tabPrevisaoEnc','tabProdDashDia','tabProdDia','tabRecebArm','tabBoletim','tabDevolucao','tabInventario','tabFluxogramas']);
+  if(r==='operador')return new Set(['tabPreench','tabAdm','tabProdDash','tabProdSetores','tabPrevisaoEnc','tabProdDashDia','tabProdDia','tabRecebArm','tabBoletim','tabDevolucao','tabInventario']);
+  return new Set(['tabDash','tabHist','tabComp','tabRotas']);
+}
 function captureRoleTabs(){
+  const allowedTabs=roleAllowedTabIds();
   document.querySelectorAll('.tab').forEach(tab=>{
-    tab.dataset.roleAllowed=(tab.style.display==='none'&&tab.id!=='tabAreas')?'0':'1';
+    tab.dataset.roleAllowed=(tab.id==='tabAreas'||allowedTabs.has(tab.id))?'1':'0';
   });
 }
 function applyAreaTabs(area){
