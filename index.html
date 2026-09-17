@@ -2201,6 +2201,7 @@ let fbRestSaveQueued=false;
 let fbRestReplaceQueued=false;
 let pendingCloudSave=false;
 let cloudMirrorRunning=false;
+const CLOUD_MIN_DAYS_GUARD_KEY='gam_cloud_min_days_seen_v2';
 
 function load(){
   try{
@@ -3722,6 +3723,51 @@ function cloudPayloadHash(payload){
   return simpleHash(JSON.stringify({days:(safe&&safe.days)||[],users:(safe&&safe.users)||{},fluxogramas:(safe&&safe.fluxogramas)||null}));
 }
 
+function uniqueSavedDayCount(days){
+  return new Set((Array.isArray(days)?days:[]).map(day=>day&&day.date).filter(Boolean)).size;
+}
+
+function rememberCloudDayCount(days){
+  const count=uniqueSavedDayCount(days);
+  if(!count)return 0;
+  try{
+    const current=+localStorage.getItem(CLOUD_MIN_DAYS_GUARD_KEY)||0;
+    if(count>current)localStorage.setItem(CLOUD_MIN_DAYS_GUARD_KEY,String(count));
+  }catch(_){}
+  return count;
+}
+
+function knownCloudDayCount(){
+  try{return +localStorage.getItem(CLOUD_MIN_DAYS_GUARD_KEY)||0;}catch(_){return 0;}
+}
+
+function shouldBlockPartialCloudWrite(existingDays,nextDays,source){
+  const existingCount=uniqueSavedDayCount(existingDays);
+  const nextCount=uniqueSavedDayCount(nextDays);
+  const guard=Math.max(existingCount,knownCloudDayCount());
+  if(guard)rememberCloudDayCount(existingDays);
+  if(!guard||nextCount>=guard)return false;
+  console.warn('Gravacao parcial bloqueada:',source,{guard,nextCount,existingCount});
+  showSyncStatus('Protecao ativa: base parcial nao foi enviada',null);
+  return true;
+}
+
+function mergePayloadForCloudWrite(existing,payload,ts=Date.now()){
+  const base=existing&&typeof existing==='object'?existing:{};
+  const incoming=payload&&typeof payload==='object'?payload:{};
+  const days=mergeDays(Array.isArray(base.days)?base.days:[],Array.isArray(incoming.days)?incoming.days:[]);
+  rememberCloudDayCount(base.days);
+  rememberCloudDayCount(days);
+  return{
+    ...base,
+    ...incoming,
+    days,
+    users:mergeUsersList(base.users,incoming.users,getLocalUsersCache()),
+    fluxogramas:mergeFluxogramas(base.fluxogramas,incoming.fluxogramas),
+    savedAt:Math.max(+base.savedAt||0,+incoming.savedAt||0,+ts||Date.now())
+  };
+}
+
 function decodeFirebasePayload(raw){
   if(!raw)return null;
   if(typeof raw.payload==='string'){
@@ -3751,6 +3797,7 @@ async function fbRestReadPayload(){
   payload=await hydratePayloadRotasFromShadow(payload).catch(()=>payload);
   payload=await hydratePayloadRecebArm997FromShadow(payload).catch(()=>payload);
   payload=await hydratePayloadInventarioFromShadow(payload).catch(()=>payload);
+  if(payload&&Array.isArray(payload.days))rememberCloudDayCount(payload.days);
   return payload;
 }
 
@@ -4091,7 +4138,10 @@ async function mirrorPayloadToFirebaseRest(payload){
   if(cloudMirrorRunning||!payload)return false;
   cloudMirrorRunning=true;
   try{
-    await fbRestWritePayload({...payload,savedAt:payload.savedAt||Date.now()});
+    const remote=await fbRestReadPayload().catch(()=>({}));
+    const merged=mergePayloadForCloudWrite(remote,payload,payload.savedAt||Date.now());
+    if(shouldBlockPartialCloudWrite(remote&&remote.days,merged.days,'mirror-firebase'))return false;
+    await fbRestWritePayload(merged);
     return true;
   }catch(e){
     console.warn('Firebase mirror failed:',e);
@@ -4106,7 +4156,10 @@ async function mirrorPayloadToSupabase(payload){
   cloudMirrorRunning=true;
   try{
     const ts=payload.savedAt||Date.now();
-    const r=await sbWritePayload({...payload,savedAt:ts},ts);
+    const remote=await sbReadPayload().catch(()=>({}));
+    const merged=mergePayloadForCloudWrite(remote,payload,ts);
+    if(shouldBlockPartialCloudWrite(remote&&remote.days,merged.days,'mirror-supabase'))return false;
+    const r=await sbWritePayload(merged,ts);
     return !!(r&&r.ok);
   }catch(e){
     console.warn('Supabase mirror failed:',e);
@@ -4134,13 +4187,15 @@ async function confirmFirebaseRestSave(payload){
   await new Promise(r=>setTimeout(r,250));
   const remote=await fbRestReadPayload().catch(()=>null);
   if(!remote||!Array.isArray(remote.days))return payload;
-  const mergedDays=mergeDays(remote.days,payload.days);
-  const mergedFluxogramas=mergeFluxogramas(remote.fluxogramas,payload.fluxogramas);
+  const mergedPayload=mergePayloadForCloudWrite(remote,payload);
+  const mergedDays=mergedPayload.days;
+  const mergedFluxogramas=mergedPayload.fluxogramas;
   if(payloadDaysHash(mergedDays)!==payloadDaysHash(remote.days)||simpleHash(JSON.stringify(mergedFluxogramas))!==simpleHash(JSON.stringify(remote.fluxogramas||null))){
     const ts=Date.now();
-    const mergedPayload={...remote,days:mergedDays,users:remote.users||payload.users||getLocalUsersCache(),fluxogramas:mergedFluxogramas,savedAt:ts};
-    await fbRestWritePayload(mergedPayload);
-    return mergedPayload;
+    const confirmedPayload={...mergedPayload,savedAt:Math.max(+mergedPayload.savedAt||0,ts)};
+    if(shouldBlockPartialCloudWrite(remote.days,confirmedPayload.days,'confirm-firebase'))return remote;
+    await fbRestWritePayload(confirmedPayload);
+    return confirmedPayload;
   }
   return remote;
 }
@@ -4164,6 +4219,12 @@ async function saveToFirebaseRest(replaceDays=false){
       }
       const daysToSave=mergeDaysForCloudSave(remote.days,db.days);
       const fluxogramasToSave=mergeFluxogramas(remote.fluxogramas,db.fluxogramas);
+      if(shouldBlockPartialCloudWrite(remote.days,daysToSave,'save-firebase-rest')){
+        fbConnected=true;
+        cloudConnecting=false;
+        pendingCloudSave=false;
+        return;
+      }
       const payload={
         ...remote,
         days:daysToSave,
@@ -4266,6 +4327,10 @@ async function saveToFirebase(replaceDays=false){
   const remote=decodeFirebasePayload(snap?snap.val():null);
   let daysToSave=mergeDaysForCloudSave(remote&&remote.days,db.days);
   let fluxogramasToSave=mergeFluxogramas(remote&&remote.fluxogramas,db.fluxogramas);
+  if(shouldBlockPartialCloudWrite(remote&&remote.days,daysToSave,'save-firebase-sdk')){
+    isSaving=false;
+    return false;
+  }
   db.days=daysToSave;
   db.fluxogramas=fluxogramasToSave;
   saveLocalDb(db);
@@ -14007,7 +14072,9 @@ async function sbReadPayload(){
   if(!r.ok)throw new Error(`Supabase HTTP ${r.status}`);
   const rows=await r.json();
   if(!rows||!rows.length||!rows[0].payload)return null;
-  return typeof rows[0].payload==='string'?JSON.parse(rows[0].payload):rows[0].payload;
+  const payload=typeof rows[0].payload==='string'?JSON.parse(rows[0].payload):rows[0].payload;
+  if(payload&&Array.isArray(payload.days))rememberCloudDayCount(payload.days);
+  return payload;
 }
 
 async function sbWritePayload(payload,ts){
@@ -14024,13 +14091,15 @@ async function confirmSupabaseSave(payload){
   await new Promise(r=>setTimeout(r,250));
   const remote=await sbReadPayload().catch(()=>null);
   if(!remote||!Array.isArray(remote.days))return payload;
-  const mergedDays=mergeDays(remote.days,payload.days);
-  const mergedFluxogramas=mergeFluxogramas(remote.fluxogramas,payload.fluxogramas);
+  const mergedPayload=mergePayloadForCloudWrite(remote,payload);
+  const mergedDays=mergedPayload.days;
+  const mergedFluxogramas=mergedPayload.fluxogramas;
   if(payloadDaysHash(mergedDays)!==payloadDaysHash(remote.days)||simpleHash(JSON.stringify(mergedFluxogramas))!==simpleHash(JSON.stringify(remote.fluxogramas||null))){
     const ts=Date.now();
-    const mergedPayload={...remote,days:mergedDays,users:remote.users||payload.users||getLocalUsersCache(),fluxogramas:mergedFluxogramas,savedAt:ts};
-    const r=await sbWritePayload(mergedPayload,ts);
-    if(r.ok)return mergedPayload;
+    const confirmedPayload={...mergedPayload,savedAt:Math.max(+mergedPayload.savedAt||0,ts)};
+    if(shouldBlockPartialCloudWrite(remote.days,confirmedPayload.days,'confirm-supabase'))return remote;
+    const r=await sbWritePayload(confirmedPayload,ts);
+    if(r.ok)return confirmedPayload;
   }
   return remote;
 }
@@ -14050,9 +14119,15 @@ async function sbSave(replaceDays=false){
       sbLastTs=ts;
       try{
         const remote=await sbReadPayload()||{};
+        const daysToSave=mergeDaysForCloudSave(remote.days,db.days);
+        if(shouldBlockPartialCloudWrite(remote.days,daysToSave,'save-supabase')){
+          sbConnected=true;
+          pendingCloudSave=false;
+          return;
+        }
         const payload={
           ...remote,
-          days:mergeDays(remote.days,db.days),
+          days:daysToSave,
           users:remote.users||getLocalUsersCache(),
           fluxogramas:mergeFluxogramas(remote.fluxogramas,db.fluxogramas),
           savedAt:ts
@@ -14167,9 +14242,11 @@ async function sbSaveUsers(users){
   const ts=Date.now();
   try{
     const remote=await sbReadPayload()||{};
+    const daysToSave=mergeDaysForCloudSave(remote.days,db.days);
+    if(shouldBlockPartialCloudWrite(remote.days,daysToSave,'save-users-supabase'))return false;
     const payload={
       ...remote,
-      days:mergeDays(remote.days,db.days),
+      days:daysToSave,
       users:{...(users||{})},
       savedAt:ts
     };
