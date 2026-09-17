@@ -3548,7 +3548,7 @@ function mergeDaysForCloudSave(remoteDays,localDays){
     : mergeCloudIncomingDays(localDays,remoteDays);
 }
 
-const CLOUD_PULL_ROOT_SKIP=new Set(['date','_updatedAt','_fieldUpdatedAt','_fieldClearedAt','_hdUpdatedAt','_hdClearedAt','_nightPartialSave','rotas']);
+const CLOUD_PULL_ROOT_SKIP=new Set(['date','_updatedAt','_fieldUpdatedAt','_fieldClearedAt','_hdUpdatedAt','_hdClearedAt','_nightPartialSave','rotas','hd','prodSetores','prodDiurno','previsaoEncerramento','recebArm','boletim','devolucao','inventario']);
 
 function cloneData(value){
   return value===undefined?undefined:JSON.parse(JSON.stringify(value));
@@ -3597,9 +3597,11 @@ function preferCloudFilledDay(localDay,remoteDay,forceCloudFilled=false){
   const out=cloneData(merged)||{};
   Object.keys(remote).forEach(key=>{
     if(CLOUD_PULL_ROOT_SKIP.has(key))return;
+    const localStamp=Math.max(+(local&&local._fieldUpdatedAt&&local._fieldUpdatedAt[key])||0,+(local&&local._fieldClearedAt&&local._fieldClearedAt[key])||0);
+    const remoteStamp=Math.max(+(remote&&remote._fieldUpdatedAt&&remote._fieldUpdatedAt[key])||0,+(remote&&remote._fieldClearedAt&&remote._fieldClearedAt[key])||0);
+    if(localStamp>remoteStamp)return;
     if(cloudValueFilled(remote[key]))out[key]=overlayCloudFilledValue(out[key],remote[key]);
   });
-  if(remote.hd&&cloudValueFilled(remote.hd))out.hd=overlayCloudFilledValue(out.hd,remote.hd);
   out.date=remote.date||out.date;
   out._fieldUpdatedAt={...((local&&local._fieldUpdatedAt)||{}),...((remote&&remote._fieldUpdatedAt)||{})};
   out._hdUpdatedAt=mergeHourUpdatedAt(local,remote)||out._hdUpdatedAt;
@@ -4164,7 +4166,7 @@ async function saveToFirebaseRest(replaceDays=false){
       };
       await fbRestWritePayload(payload);
       const confirmed=await confirmFirebaseRestSave(payload);
-      db.days=Array.isArray(confirmed.days)?confirmed.days:daysToSave;
+      db.days=mergeDays(Array.isArray(confirmed.days)?confirmed.days:daysToSave,db.days);
       db.fluxogramas=normalizeFluxogramas(confirmed.fluxogramas||fluxogramasToSave);
       saveLocalDb(db);
       mirrorPayloadToSupabase(confirmed).catch(()=>{});
@@ -4265,7 +4267,7 @@ async function saveToFirebase(replaceDays=false){
     .then(async()=>{
       await Promise.allSettled([fbRestWriteRotasShadow(payload),fbRestWriteRecebArm997Shadow(payload),fbRestWriteInventarioShadow(payload)]);
       const confirmed=await confirmFirebaseRestSave(payload).catch(()=>payload);
-      db.days=Array.isArray(confirmed.days)?confirmed.days:daysToSave;
+      db.days=mergeDays(Array.isArray(confirmed.days)?confirmed.days:daysToSave,db.days);
       db.fluxogramas=normalizeFluxogramas(confirmed.fluxogramas||fluxogramasToSave);
       saveLocalDb(db);
       fbConnected=true;
@@ -5240,7 +5242,7 @@ function prodSetoresValue(sec,hour,field){
 }
 
 function saveProdSetoresField(sec,hour,field,value){
-  markLocalUserEdit();
+  markLocalUserEdit(300000);
   let day=getDay(curDate);
   let wasNew=false;
   if(!day){
@@ -14044,7 +14046,7 @@ async function sbSave(replaceDays=false){
         const r=await sbWritePayload(payload,ts);
         if(r.ok){
           const confirmed=await confirmSupabaseSave(payload);
-          db.days=Array.isArray(confirmed.days)?confirmed.days:payload.days;
+          db.days=mergeDays(Array.isArray(confirmed.days)?confirmed.days:payload.days,db.days);
           db.fluxogramas=normalizeFluxogramas(confirmed.fluxogramas||payload.fluxogramas);
           saveLocalDb(db);
           mirrorPayloadToFirebaseRest(confirmed).catch(()=>{});
@@ -14451,7 +14453,7 @@ function savePrevisaoEncField(key,value){
   data._fieldUpdatedAt[key]=ts;
   data._updatedAt=ts;
   day._updatedAt=ts;
-  if(typeof markLocalUserEdit==='function')markLocalUserEdit();
+  if(typeof markLocalUserEdit==='function')markLocalUserEdit(300000);
   save();
   renderPrevisaoEncProcessRows(day);
 }
