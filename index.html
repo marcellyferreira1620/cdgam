@@ -14462,13 +14462,13 @@ const PREV_ENC_INDICADORES=[
 ];
 
 const PREV_ENC_PROCESSOS=[
-  {nome:'CORREIA PERFUMARIA',resultado:'vendaLinhasPerfumaria',cap:'capLP',capDefault:3000,realizado:'cPerFim'},
-  {nome:'CORREIA MEDICAMENTOS',resultado:'vendaLinhasMedicamentos',cap:'capLM',capDefault:3500,realizado:'cMedFim'},
-  {nome:'CHECK-OUT',resultado:'vendaCaixasCheckout',cap:'capVC',capDefault:1280,realizado:'ckOutFim'},
-  {nome:'ESPECIAL',resultado:'vendaEspecialCaixas',cap:'capEsp',capDefault:340,realizado:'espFim'},
-  {nome:'FRALDA FECHADO',resultado:'vendaFraldaFechadoFardos',cap:'capFrF',capDefault:100,realizado:'frFFim'},
-  {nome:'FRALDA FRACIONADO',resultado:'vendaFraldaFracionadoCaixas',cap:'capFrFc',capDefault:89,realizado:'frFcFim'},
-  {nome:'EXPEDICAO',resultado:'volumesExpedicao',cap:'capVE',capDefault:1303,realizado:'expFim'}
+  {nome:'CORREIA PERFUMARIA',resultado:'vendaLinhasPerfumaria',cap:'capLP',capDefault:3000,previsto:'prevHoraCPer',realizado:'realHoraCPer'},
+  {nome:'CORREIA MEDICAMENTOS',resultado:'vendaLinhasMedicamentos',cap:'capLM',capDefault:3500,previsto:'prevHoraCMed',realizado:'realHoraCMed'},
+  {nome:'CHECK-OUT',resultado:'vendaCaixasCheckout',cap:'capVC',capDefault:1280,previsto:'prevHoraCkOut',realizado:'realHoraCkOut'},
+  {nome:'ESPECIAL',resultado:'vendaEspecialCaixas',cap:'capEsp',capDefault:340,previsto:'prevHoraEsp',realizado:'realHoraEsp'},
+  {nome:'FRALDA FECHADO',resultado:'vendaFraldaFechadoFardos',cap:'capFrF',capDefault:100,previsto:'prevHoraFrF',realizado:'realHoraFrF'},
+  {nome:'FRALDA FRACIONADO',resultado:'vendaFraldaFracionadoCaixas',cap:'capFrFc',capDefault:89,previsto:'prevHoraFrFc',realizado:'realHoraFrFc'},
+  {nome:'EXPEDICAO',resultado:'volumesExpedicao',cap:'capVE',capDefault:1303,previsto:'prevHoraExp',realizado:'realHoraExp'}
 ];
 
 function ensurePrevisaoEncerramento(day){
@@ -14522,14 +14522,15 @@ function previsaoEncEfficiencyClass(pct){
 
 function previsaoEncProcessCalc(day,row){
   const total=previsaoEncRawNumber(previsaoEncGetResult(day,row.resultado));
+  const data=day&&day.previsaoEncerramento?day.previsaoEncerramento:{};
   const cap=+(day&&day[row.cap])||row.capDefault||0;
-  const previsto=previsaoEncExpectedTime(total,cap);
-  const realizado=day&&day[row.realizado]?day[row.realizado]:'-';
-  const realMin=previsaoEncTimeToMinutes(realizado);
-  const targetHours=total&&cap?total/cap:null;
-  const actualHours=realMin!==null?(realMin-previsaoEncStartMinutes())/60:null;
-  const eficiencia=targetHours&&actualHours&&actualHours>0?Math.round((targetHours/actualHours)*100):null;
-  return{resultado:total?prodFmt(total,0):'-',cap:cap?prodFmt(cap,0):'-',previsto,realizado:realizado||'-',eficiencia};
+  const previsto=cleanHora(data[row.previsto]||'');
+  const realizado=cleanHora(data[row.realizado]||'');
+  const finalizacao=realizado||previsto;
+  const finalMin=previsaoEncTimeToMinutes(finalizacao);
+  const plannedHours=cap&&finalMin!==null?(finalMin-previsaoEncStartMinutes())/60:null;
+  const eficiencia=total&&cap&&plannedHours&&plannedHours>0?Math.round((total/(cap*plannedHours))*100):null;
+  return{resultado:total?prodFmt(total,0):'-',cap:cap?prodFmt(cap,0):'-',previsto,realizado,eficiencia};
 }
 
 function savePrevisaoEncField(key,value){
@@ -14552,6 +14553,7 @@ function savePrevisaoEncField(key,value){
 function renderPrevisaoEncProcessRows(day){
   const tbody=document.getElementById('prevEncProcessRows');
   if(!tbody)return;
+  const data=ensurePrevisaoEncerramento(day);
   tbody.innerHTML=PREV_ENC_PROCESSOS.map(row=>{
     const calc=previsaoEncProcessCalc(day,row);
     const eff=calc.eficiencia===null?'-':calc.eficiencia+'%';
@@ -14561,8 +14563,8 @@ function renderPrevisaoEncProcessRows(day){
       <td class="prev-enc-auto">${excelText(calc.resultado)}</td>
       <td class="prev-enc-auto">${excelText(calc.cap)}</td>
       <td class="prev-enc-auto ${previsaoEncEfficiencyClass(calc.eficiencia)}">${excelText(eff)}</td>
-      <td class="prev-enc-auto">${excelText(calc.previsto)}</td>
-      <td class="prev-enc-auto">${excelText(calc.realizado)}</td>
+      <td><input class="prev-enc-input prev-enc-time-input" type="time" value="${attrText(data[row.previsto]!==undefined?data[row.previsto]:'')}" onchange="savePrevisaoEncField('${row.previsto}',this.value)" onblur="savePrevisaoEncField('${row.previsto}',this.value)" placeholder="-"/></td>
+      <td><input class="prev-enc-input prev-enc-time-input" type="time" value="${attrText(data[row.realizado]!==undefined?data[row.realizado]:'')}" onchange="savePrevisaoEncField('${row.realizado}',this.value)" onblur="savePrevisaoEncField('${row.realizado}',this.value)" placeholder="-"/></td>
     </tr>`;
   }).join('');
 }
@@ -14592,7 +14594,7 @@ function renderPrevisaoEncTab(){
       </tbody>
       <tbody id="prevEncProcessRows"></tbody>
     </table>
-    <div class="prev-enc-note">Resultados sao preenchidos manualmente por dia. Horario previsto = resultado dividido pela meta/h, a partir de 17:30. Horario realizado puxa automaticamente dos campos finais do Editar Dados.</div>
+    <div class="prev-enc-note">Resultados, horario previsto e horario realizado sao preenchidos manualmente por dia. % eficiencia = resultado dividido por (meta/h vezes o tempo ate a finalizacao preenchida). Quando houver horario realizado, ele e usado; se estiver vazio, usa o horario previsto.</div>
   </div>`;
   renderPrevisaoEncProcessRows(day);
 }
