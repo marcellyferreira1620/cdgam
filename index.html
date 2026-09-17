@@ -2939,6 +2939,13 @@ function runNightOperationFormulaGuard(){
       if(mergedRouteHour.hReal!=='19:30'||calcAtraso('19:15','100%')!==null){
         errors.push('horario realizado da rota nao pode aceitar percentual');
       }
+      const clearedRoute=mergeRouteRecordsKeepFilled(
+        {cod:route.cod,placa:'TST01',vol:700,paletes:2,hReal:'19:10',obs:'antigo',_fieldUpdatedAt:{placa:100,vol:100,paletes:100,hReal:100,obs:100},_updatedAt:100},
+        {cod:route.cod,placa:'',vol:'',paletes:'',hReal:'',obs:'',_fieldClearedAt:{placa:200,vol:200,paletes:200,hReal:200,obs:200},_updatedAt:200}
+      );
+      if(clearedRoute.placa!==''||clearedRoute.vol!==''||clearedRoute.paletes!==''||clearedRoute.hReal!==''||clearedRoute.obs!==''){
+        errors.push('rota apagada pelo usuario nao pode voltar com valor antigo');
+      }
     }
 
     const closingBase=normalizeNightClosingBases({
@@ -13600,10 +13607,17 @@ function completeRotasForStorage(day){
 
 function saveRouteDayLocally(day){
   if(!day||!day.date)return false;
-  day.rotas=completeRotasForStorage(day);
+  const editedRotas=completeRotasForStorage(day);
+  day.rotas=editedRotas;
   const idx=db.days.findIndex(d=>d&&d.date===day.date);
-  if(idx>=0)db.days[idx]=mergeDayRecords(db.days[idx],day);
-  else db.days.push(stripTransientDayFlags(day));
+  if(idx>=0){
+    const merged=mergeDayRecords(db.days[idx],day);
+    // A digitacao/apagamento feito na aba Rotas deve vencer a copia antiga local.
+    // Sem isso, um merge com dado preenchido antigo podia ressuscitar placa/horario
+    // depois do F5 quando o operador tinha acabado de apagar o campo.
+    merged.rotas=editedRotas;
+    db.days[idx]=stripTransientDayFlags(merged);
+  }else db.days.push(stripTransientDayFlags(day));
   db.days.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   saveNightDayDraft(getDay(day.date)||day);
   saveLocalDb(db);
