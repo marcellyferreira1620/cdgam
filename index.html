@@ -1217,11 +1217,6 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
     <div class="chart-box"><div class="chart-ttl">Checkout Unidade — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompCheckoutUnid" role="img" aria-label="Media hora unidade checkout por dia"></canvas></div></div>
     <div class="chart-box"><div class="chart-ttl">Checkout Psico — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompCheckoutPsico" role="img" aria-label="Media hora checkout psico por dia"></canvas></div></div>
     <div class="chart-box"><div class="chart-ttl">Especial — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompEspecial" role="img" aria-label="Media hora especial por dia"></canvas></div></div>
-    <div class="chart-box"><div class="chart-ttl">Especial Fracionado - media/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompEspFrac" role="img" aria-label="Media hora especial fracionado por dia"></canvas></div></div>
-    <div class="chart-box"><div class="chart-ttl">Especial Medicamento - media/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompEspMed" role="img" aria-label="Media hora especial medicamento por dia"></canvas></div></div>
-    <div class="chart-box"><div class="chart-ttl">Especial Perfumaria - media/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompEspPerf" role="img" aria-label="Media hora especial perfumaria por dia"></canvas></div></div>
-    <div class="chart-box"><div class="chart-ttl">Fraldas Cx Fechada - media/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompFraldaFechada" role="img" aria-label="Media hora fraldas caixa fechada por dia"></canvas></div></div>
-    <div class="chart-box"><div class="chart-ttl">Fralda Fracionada - media/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompFraldaFrac" role="img" aria-label="Media hora fralda fracionada por dia"></canvas></div></div>
     <div class="chart-box"><div class="chart-ttl">Expedição — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompExpedicao" role="img" aria-label="Media hora expedicao por dia"></canvas></div></div>
     <div class="chart-box"><div class="chart-ttl">EPM — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompEpm" role="img" aria-label="Media hora EPM por dia"></canvas></div></div>
     <div class="chart-box"><div class="chart-ttl">Vale — média/h por dia</div><div style="position:relative;height:230px"><canvas id="cCompVale" role="img" aria-label="Media hora vale por dia"></canvas></div></div>
@@ -1586,21 +1581,21 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
           <h4 style="color:#ff9500;font-size:10px;margin-bottom:6px">Correia</h4>
           <div class="adm-row"><label>Linha Medicamento</label><input type="number" id="iSysLineMed" placeholder="0" oninput="liveUpdate()"/></div>
           <div class="adm-row"><label>Unidade Medicamento</label><input type="number" id="iSysUnitMed" placeholder="0" oninput="liveUpdate()"/></div>
-          <div class="adm-row"><label>Volume Medicamento</label><input type="number" id="iSysVolMed" placeholder="0" oninput="liveUpdate()" readonly/></div>
+          <div class="adm-row"><label>Volume Medicamento</label><input type="text" inputmode="numeric" id="iSysVolMed" placeholder="0" oninput="liveUpdate()" readonly/></div>
           <div class="adm-row"><label>Linha Perfumaria</label><input type="number" id="iSysLinePerf" placeholder="0" oninput="liveUpdate()"/></div>
           <div class="adm-row"><label>Unidade Perfumaria</label><input type="number" id="iSysUnitPerf" placeholder="0" oninput="liveUpdate()"/></div>
-          <div class="adm-row"><label>Volume Perfumaria</label><input type="number" id="iSysVolPerf" placeholder="0" oninput="liveUpdate()" readonly/></div>
+          <div class="adm-row"><label>Volume Perfumaria</label><input type="text" inputmode="numeric" id="iSysVolPerf" placeholder="0" oninput="liveUpdate()" readonly/></div>
           <h4 style="color:#00e5ff;font-size:10px;margin:8px 0 6px">Checkout</h4>
-          <div class="adm-row"><label>Volume Checkout</label><input type="number" id="iSysVolCheckout" placeholder="0" oninput="liveUpdate()" readonly/></div>
+          <div class="adm-row"><label>Volume Checkout</label><input type="text" inputmode="numeric" id="iSysVolCheckout" placeholder="0" oninput="liveUpdate()" readonly/></div>
           <div class="adm-row"><label>Unidade Checkout</label><input type="number" id="iSysUnitCheckout" placeholder="0" oninput="liveUpdate()"/></div>
-          <div class="adm-row"><label>Volume Checkout Psico</label><input type="number" id="iSysVolCheckoutPsico" placeholder="0" oninput="liveUpdate()" readonly/></div>
+          <div class="adm-row"><label>Volume Checkout Psico</label><input type="text" inputmode="numeric" id="iSysVolCheckoutPsico" placeholder="0" oninput="liveUpdate()" readonly/></div>
           <div class="adm-row"><label>Unidade Checkout Psico</label><input type="number" id="iSysUnitCheckoutPsico" placeholder="0" oninput="liveUpdate()"/></div>
           <h4 style="color:#00e676;font-size:10px;margin:8px 0 6px">Expedição</h4>
-          <div class="adm-row"><label>Volume Geladeira</label><input type="number" id="iSysVolGeladeira" placeholder="0" oninput="liveUpdate()" readonly/></div>
-          <div class="adm-row"><label>Volumes Especial</label><input type="number" id="iSysVolEspecial" placeholder="0" oninput="liveUpdate()" readonly/></div>
-          <div class="adm-row"><label>Fralda Fechado Unidades</label><input type="number" id="iSysFraldaFechado" placeholder="0" oninput="liveUpdate()" readonly/></div>
-          <div class="adm-row"><label>Fralda Fracionada Volumes</label><input type="number" id="iSysFraldaFrac" placeholder="0" oninput="liveUpdate()" readonly/></div>
-          <div class="adm-row"><label>Expedição Volumes (Doca)</label><input type="number" id="iSysVolDoca" placeholder="0" readonly/></div>
+          <div class="adm-row"><label>Volume Geladeira</label><input type="text" inputmode="numeric" id="iSysVolGeladeira" placeholder="0" oninput="liveUpdate()" readonly/></div>
+          <div class="adm-row"><label>Volumes Especial</label><input type="text" inputmode="numeric" id="iSysVolEspecial" placeholder="0" oninput="liveUpdate()" readonly/></div>
+          <div class="adm-row"><label>Fralda Fechado Unidades</label><input type="text" inputmode="numeric" id="iSysFraldaFechado" placeholder="0" oninput="liveUpdate()" readonly/></div>
+          <div class="adm-row"><label>Fralda Fracionada Volumes</label><input type="text" inputmode="numeric" id="iSysFraldaFrac" placeholder="0" oninput="liveUpdate()" readonly/></div>
+          <div class="adm-row"><label>Expedição Volumes (Doca)</label><input type="text" inputmode="numeric" id="iSysVolDoca" placeholder="0" readonly/></div>
         </div>
       </div>
 
@@ -1865,9 +1860,8 @@ const MEDIA_HORA_AUTO=[
 
 const SK='cdgam_v6';
 const SK_BACKUPS='cdgam_v6_backups';
-const LOCAL_CACHE_DAYS=60;
-const LOCAL_CACHE_FALLBACK_DAYS=20;
-const LOCAL_CACHE_RETRY_DAYS=[60,45,30,20,10,5,1];
+const LOCAL_CACHE_DAYS=180;
+const LOCAL_CACHE_FALLBACK_DAYS=90;
 const LOCAL_BACKUP_DAYS=10;
 const PWD='gam2025';
 const NEW_RULES_FROM='2026-06-02';
@@ -2207,7 +2201,6 @@ let fbRestSaveQueued=false;
 let fbRestReplaceQueued=false;
 let pendingCloudSave=false;
 let cloudMirrorRunning=false;
-const CLOUD_MIN_DAYS_GUARD_KEY='gam_cloud_min_days_seen_v2';
 
 function load(){
   try{
@@ -2399,23 +2392,20 @@ function saveLocalDb(snapshot=db){
     }
   };
   try{
-    let firstError=null;
-    const retryDays=[...new Set([LOCAL_CACHE_DAYS,...LOCAL_CACHE_RETRY_DAYS,LOCAL_CACHE_FALLBACK_DAYS])].filter(v=>v>0);
-    for(const limit of retryDays){
-      try{
-        writeCompact(limit);
-        return true;
-      }catch(e){
-        firstError=firstError||e;
-        try{localStorage.removeItem(SK_BACKUPS);}catch(_){}
-      }
-    }
-    throw firstError||new Error('cache local cheio');
+    writeCompact(LOCAL_CACHE_DAYS);
+    return true;
   }catch(e){
-    try{localStorage.removeItem(SK);}catch(_){}
-    console.error('Falha ao salvar cache local:',e);
-    showSyncStatus('Nuvem ativa - cache local cheio',false);
-    return false;
+    try{
+      localStorage.removeItem(SK_BACKUPS);
+      writeCompact(LOCAL_CACHE_FALLBACK_DAYS);
+      console.warn('Backups locais limpos para liberar espaco:',e.message);
+      return true;
+    }catch(e2){
+      try{localStorage.removeItem(SK);}catch(_){}
+      console.error('Falha ao salvar cache local:',e2);
+      showSyncStatus('Nuvem ativa - cache local cheio',false);
+      return false;
+    }
   }
 }
 
@@ -2707,11 +2697,9 @@ function mergeHourData(current,next,chosen){
       const aCleared=hourCellWasCleared(current,metric,i);
       const bCleared=hourCellWasCleared(next,metric,i);
       if(ats||bts){
-        if(bts>ats)return bCleared?'':(next&&next._nightPartialSave&&!hasB&&hasA?av:bv);
-        if(ats>bts)return aCleared?'':(current&&current._nightPartialSave&&!hasA&&hasB?bv:av);
+        if(bts>ats)return bCleared?'':bv;
+        if(ats>bts)return aCleared?'':av;
         if(bCleared||aCleared)return '';
-        if(next&&next._nightPartialSave&&!hasB&&hasA)return av;
-        if(current&&current._nightPartialSave&&!hasA&&hasB)return bv;
         return cv!==undefined?cv:(bv!==undefined?bv:av);
       }
       if(current&&current._nightPartialSave&&hasB)return bv;
@@ -2742,15 +2730,9 @@ function mergeDayRootFields(current,next,chosen){
     const bts=Math.max(+bft[key]||0,+bcf[key]||0);
     const hasA=dayFieldHasValue(av);
     const hasB=dayFieldHasValue(bv);
-    const aCleared=(+acf[key]||0)>0&&(+acf[key]||0)>=(+aft[key]||0);
-    const bCleared=(+bcf[key]||0)>0&&(+bcf[key]||0)>=(+bft[key]||0);
     if(ats||bts){
-      if(bts>ats)out[key]=bCleared?bv:(next&&next._nightPartialSave&&!hasB&&hasA?av:bv);
-      else if(ats>bts)out[key]=aCleared?av:(current&&current._nightPartialSave&&!hasA&&hasB?bv:av);
-      else if(bCleared)out[key]=bv;
-      else if(aCleared)out[key]=av;
-      else if(next&&next._nightPartialSave&&!hasB&&hasA)out[key]=av;
-      else if(current&&current._nightPartialSave&&!hasA&&hasB)out[key]=bv;
+      if(bts>ats)out[key]=bv;
+      else if(ats>bts)out[key]=av;
       else out[key]=cv!==undefined?cv:bv;
       return;
     }
@@ -3085,9 +3067,9 @@ function mergeRouteRecords(current,next){
     if(field==='hReal'){
       const ah=cleanRotaRealHora(av),bh=cleanRotaRealHora(bv);
       if(aFieldTs||bFieldTs){
-        if(bFieldTs>aFieldTs)out[field]=bCleared?'':(bh||ah);
-        else if(aFieldTs>bFieldTs)out[field]=aCleared?'':(ah||bh);
-        else out[field]=bCleared?'':(aCleared?'':(bh||ah));
+        if(bFieldTs>aFieldTs)out[field]=bCleared?'':bh;
+        else if(aFieldTs>bFieldTs)out[field]=aCleared?'':ah;
+        else out[field]=bCleared?'':(aCleared?'':(field in b?bh:ah));
         return;
       }
       if(ah&&bh)out[field]=(aFieldTs||bFieldTs)?(bFieldTs>=aFieldTs?bh:ah):((aTs||bTs)?(bTs>=aTs?bh:ah):bh);
@@ -3097,9 +3079,9 @@ function mergeRouteRecords(current,next){
       return;
     }
     if(aFieldTs||bFieldTs){
-      if(bFieldTs>aFieldTs)out[field]=bCleared?'':(hasB?bv:(hasA?av:bv));
-      else if(aFieldTs>bFieldTs)out[field]=aCleared?'':(hasA?av:(hasB?bv:av));
-      else out[field]=bCleared?'':(aCleared?'':(hasB?bv:(hasA?av:(field in b?bv:av))));
+      if(bFieldTs>aFieldTs)out[field]=bCleared?'':bv;
+      else if(aFieldTs>bFieldTs)out[field]=aCleared?'':av;
+      else out[field]=bCleared?'':(aCleared?'':(field in b?bv:av));
       return;
     }
     if(hasA&&hasB){
@@ -3389,9 +3371,9 @@ function mergeBoletim(current,next){
     const hasA=moduleFieldHasValue(av);
     const hasB=moduleFieldHasValue(bv);
     if(ats||bts){
-      if(bts>ats)out[key]=(hasB||!hasA)?bv:av;
-      else if(ats>bts)out[key]=(hasA||!hasB)?av:bv;
-      else out[key]=hasB?bv:av;
+      if(bts>ats)out[key]=bv;
+      else if(ats>bts)out[key]=av;
+      else out[key]=key in b?bv:av;
       return;
     }
     if(hasB)out[key]=bv;
@@ -3740,51 +3722,6 @@ function cloudPayloadHash(payload){
   return simpleHash(JSON.stringify({days:(safe&&safe.days)||[],users:(safe&&safe.users)||{},fluxogramas:(safe&&safe.fluxogramas)||null}));
 }
 
-function uniqueSavedDayCount(days){
-  return new Set((Array.isArray(days)?days:[]).map(day=>day&&day.date).filter(Boolean)).size;
-}
-
-function rememberCloudDayCount(days){
-  const count=uniqueSavedDayCount(days);
-  if(!count)return 0;
-  try{
-    const current=+localStorage.getItem(CLOUD_MIN_DAYS_GUARD_KEY)||0;
-    if(count>current)localStorage.setItem(CLOUD_MIN_DAYS_GUARD_KEY,String(count));
-  }catch(_){}
-  return count;
-}
-
-function knownCloudDayCount(){
-  try{return +localStorage.getItem(CLOUD_MIN_DAYS_GUARD_KEY)||0;}catch(_){return 0;}
-}
-
-function shouldBlockPartialCloudWrite(existingDays,nextDays,source){
-  const existingCount=uniqueSavedDayCount(existingDays);
-  const nextCount=uniqueSavedDayCount(nextDays);
-  const guard=Math.max(existingCount,knownCloudDayCount());
-  if(guard)rememberCloudDayCount(existingDays);
-  if(!guard||nextCount>=guard)return false;
-  console.warn('Gravacao parcial bloqueada:',source,{guard,nextCount,existingCount});
-  showSyncStatus('Protecao ativa: base parcial nao foi enviada',null);
-  return true;
-}
-
-function mergePayloadForCloudWrite(existing,payload,ts=Date.now()){
-  const base=existing&&typeof existing==='object'?existing:{};
-  const incoming=payload&&typeof payload==='object'?payload:{};
-  const days=mergeDays(Array.isArray(base.days)?base.days:[],Array.isArray(incoming.days)?incoming.days:[]);
-  rememberCloudDayCount(base.days);
-  rememberCloudDayCount(days);
-  return{
-    ...base,
-    ...incoming,
-    days,
-    users:mergeUsersList(base.users,incoming.users,getLocalUsersCache()),
-    fluxogramas:mergeFluxogramas(base.fluxogramas,incoming.fluxogramas),
-    savedAt:Math.max(+base.savedAt||0,+incoming.savedAt||0,+ts||Date.now())
-  };
-}
-
 function decodeFirebasePayload(raw){
   if(!raw)return null;
   if(typeof raw.payload==='string'){
@@ -3814,7 +3751,6 @@ async function fbRestReadPayload(){
   payload=await hydratePayloadRotasFromShadow(payload).catch(()=>payload);
   payload=await hydratePayloadRecebArm997FromShadow(payload).catch(()=>payload);
   payload=await hydratePayloadInventarioFromShadow(payload).catch(()=>payload);
-  if(payload&&Array.isArray(payload.days))rememberCloudDayCount(payload.days);
   return payload;
 }
 
@@ -3854,16 +3790,14 @@ function mergeRouteRecordsKeepFilled(current,next){
     const bts=hasFieldStamp?bEff:(+b._updatedAt||0);
     const aCleared=routeFieldWasCleared(a,field);
     const bCleared=routeFieldWasCleared(b,field);
-    const hasA=routeFieldHasValue(field,av);
-    const hasB=routeFieldHasValue(field,bv);
-    const aVal=field==='hReal'?cleanRotaRealHora(av):av;
-    const bVal=field==='hReal'?cleanRotaRealHora(bv):bv;
     if(ats||bts){
-      if(bts>ats)out[field]=bCleared?'':(hasB?bVal:(hasA?aVal:bVal));
-      else if(ats>bts)out[field]=aCleared?'':(hasA?aVal:(hasB?bVal:aVal));
-      else out[field]=bCleared?'':(aCleared?'':(hasB?bVal:(hasA?aVal:(field in b?bVal:aVal))));
+      if(bts>ats)out[field]=bCleared?'':(field==='hReal'?cleanRotaRealHora(bv):bv);
+      else if(ats>bts)out[field]=aCleared?'':(field==='hReal'?cleanRotaRealHora(av):av);
+      else out[field]=bCleared?'':(aCleared?'':(field in b?(field==='hReal'?cleanRotaRealHora(bv):bv):(field==='hReal'?cleanRotaRealHora(av):av)));
       return;
     }
+    const hasA=routeFieldHasValue(field,av);
+    const hasB=routeFieldHasValue(field,bv);
     if(hasA&&!hasB)out[field]=av;
     else if(hasB&&!hasA)out[field]=bv;
     else if(hasA&&hasB){
@@ -4157,10 +4091,7 @@ async function mirrorPayloadToFirebaseRest(payload){
   if(cloudMirrorRunning||!payload)return false;
   cloudMirrorRunning=true;
   try{
-    const remote=await fbRestReadPayload().catch(()=>({}));
-    const merged=mergePayloadForCloudWrite(remote,payload,payload.savedAt||Date.now());
-    if(shouldBlockPartialCloudWrite(remote&&remote.days,merged.days,'mirror-firebase'))return false;
-    await fbRestWritePayload(merged);
+    await fbRestWritePayload({...payload,savedAt:payload.savedAt||Date.now()});
     return true;
   }catch(e){
     console.warn('Firebase mirror failed:',e);
@@ -4175,10 +4106,7 @@ async function mirrorPayloadToSupabase(payload){
   cloudMirrorRunning=true;
   try{
     const ts=payload.savedAt||Date.now();
-    const remote=await sbReadPayload().catch(()=>({}));
-    const merged=mergePayloadForCloudWrite(remote,payload,ts);
-    if(shouldBlockPartialCloudWrite(remote&&remote.days,merged.days,'mirror-supabase'))return false;
-    const r=await sbWritePayload(merged,ts);
+    const r=await sbWritePayload({...payload,savedAt:ts},ts);
     return !!(r&&r.ok);
   }catch(e){
     console.warn('Supabase mirror failed:',e);
@@ -4206,15 +4134,13 @@ async function confirmFirebaseRestSave(payload){
   await new Promise(r=>setTimeout(r,250));
   const remote=await fbRestReadPayload().catch(()=>null);
   if(!remote||!Array.isArray(remote.days))return payload;
-  const mergedPayload=mergePayloadForCloudWrite(remote,payload);
-  const mergedDays=mergedPayload.days;
-  const mergedFluxogramas=mergedPayload.fluxogramas;
+  const mergedDays=mergeDays(remote.days,payload.days);
+  const mergedFluxogramas=mergeFluxogramas(remote.fluxogramas,payload.fluxogramas);
   if(payloadDaysHash(mergedDays)!==payloadDaysHash(remote.days)||simpleHash(JSON.stringify(mergedFluxogramas))!==simpleHash(JSON.stringify(remote.fluxogramas||null))){
     const ts=Date.now();
-    const confirmedPayload={...mergedPayload,savedAt:Math.max(+mergedPayload.savedAt||0,ts)};
-    if(shouldBlockPartialCloudWrite(remote.days,confirmedPayload.days,'confirm-firebase'))return remote;
-    await fbRestWritePayload(confirmedPayload);
-    return confirmedPayload;
+    const mergedPayload={...remote,days:mergedDays,users:remote.users||payload.users||getLocalUsersCache(),fluxogramas:mergedFluxogramas,savedAt:ts};
+    await fbRestWritePayload(mergedPayload);
+    return mergedPayload;
   }
   return remote;
 }
@@ -4238,12 +4164,6 @@ async function saveToFirebaseRest(replaceDays=false){
       }
       const daysToSave=mergeDaysForCloudSave(remote.days,db.days);
       const fluxogramasToSave=mergeFluxogramas(remote.fluxogramas,db.fluxogramas);
-      if(shouldBlockPartialCloudWrite(remote.days,daysToSave,'save-firebase-rest')){
-        fbConnected=true;
-        cloudConnecting=false;
-        pendingCloudSave=false;
-        return;
-      }
       const payload={
         ...remote,
         days:daysToSave,
@@ -4346,10 +4266,6 @@ async function saveToFirebase(replaceDays=false){
   const remote=decodeFirebasePayload(snap?snap.val():null);
   let daysToSave=mergeDaysForCloudSave(remote&&remote.days,db.days);
   let fluxogramasToSave=mergeFluxogramas(remote&&remote.fluxogramas,db.fluxogramas);
-  if(shouldBlockPartialCloudWrite(remote&&remote.days,daysToSave,'save-firebase-sdk')){
-    isSaving=false;
-    return false;
-  }
   db.days=daysToSave;
   db.fluxogramas=fluxogramasToSave;
   saveLocalDb(db);
@@ -4885,7 +4801,10 @@ function systemForecastTargets(day,opts={}){
   };
   const useOverrides=opts.useOverrides!==false&&useEditableSystemForecast(day.date);
   const pick=(prop,auto)=>{
-    if(useOverrides&&Object.prototype.hasOwnProperty.call(day,prop)&&day[prop]!==''&&day[prop]!==null&&day[prop]!==undefined)return n(day[prop]);
+    if(useOverrides){
+      if(Object.prototype.hasOwnProperty.call(day,prop)&&day[prop]!==''&&day[prop]!==null&&day[prop]!==undefined)return n(day[prop]);
+      return 0;
+    }
     return auto;
   };
   return{
@@ -4922,10 +4841,37 @@ function systemForecastFormSnapshot(){
     sys2130UnitCheckout:v('iSysUnitCheckout'),sys2130UnitCheckoutPsico:v('iSysUnitCheckoutPsico')
   };
 }
+const SYSTEM_FORECAST_AUTO_FIELD_PROPS={
+  iSysVolMed:'sys2130VolMed',
+  iSysVolPerf:'sys2130VolPerf',
+  iSysVolCheckout:'sys2130VolCheckout',
+  iSysVolCheckoutPsico:'sys2130VolCheckoutPsico',
+  iSysVolGeladeira:'sys2130VolGeladeira',
+  iSysVolEspecial:'sys2130VolEspecial',
+  iSysFraldaFechado:'sys2130FraldaFechado',
+  iSysFraldaFrac:'sys2130FraldaFrac',
+  iSysVolDoca:'sys2130VolDoca'
+};
+let nightSystemForecastClearedKeys=new Set();
+function systemForecastManualKey(date,id){
+  return `${date||currentFormDate()||''}@@${id||''}`;
+}
+function rememberSystemForecastManualState(el){
+  if(!el||!el.id||!SYSTEM_FORECAST_AUTO_FIELD_PROPS[el.id])return;
+  const key=systemForecastManualKey(currentFormDate(),el.id);
+  if(el.value===''){
+    nightSystemForecastClearedKeys.add(key);
+    el.dataset.manualCleared='1';
+  }else{
+    nightSystemForecastClearedKeys.delete(key);
+    delete el.dataset.manualCleared;
+  }
+}
 function syncSystemForecastAutoFields(day){
   const source=day||systemForecastFormSnapshot();
   const sys=systemForecastTargets(source,{useOverrides:false});
   const editable=useEditableSystemForecast(source.date);
+  if(editable&&!day)return;
   const fields=[
     ['iSysVolMed','volMed','sys2130VolMed'],
     ['iSysVolPerf','volPerf','sys2130VolPerf'],
@@ -4940,8 +4886,11 @@ function syncSystemForecastAutoFields(day){
   const toInput=v=>v===0?'0':(v||'');
   fields.forEach(([id,key,prop])=>{
     const el=document.getElementById(id);if(!el)return;
-    const autoVal=editable?toInput(sys[key]):(sys[key]||'');
+    const autoVal=editable?'':(sys[key]||'');
+    const manualKey=systemForecastManualKey(source.date,id);
     if(!editable){
+      nightSystemForecastClearedKeys.delete(manualKey);
+      delete el.dataset.manualCleared;
       el.readOnly=true;
       el.value=autoVal;
       el.dataset.autoValue=autoVal;
@@ -4952,12 +4901,32 @@ function syncSystemForecastAutoFields(day){
     el.oninput=liveUpdate;
     el.title='Preenchido automaticamente. Se precisar corrigir, digite outro valor.';
     const hasStored=day&&Object.prototype.hasOwnProperty.call(day,prop)&&day[prop]!==undefined&&day[prop]!==null&&day[prop]!=='';
+    const updatedTs=+(day&&day._fieldUpdatedAt&&day._fieldUpdatedAt[prop])||0;
+    const clearedTs=+(day&&day._fieldClearedAt&&day._fieldClearedAt[prop])||0;
+    const fieldCleared=clearedTs>0&&clearedTs>=updatedTs;
+    if(day){
+      if(fieldCleared){
+        nightSystemForecastClearedKeys.add(manualKey);
+        el.dataset.manualCleared='1';
+      }else if(updatedTs||hasStored){
+        nightSystemForecastClearedKeys.delete(manualKey);
+        delete el.dataset.manualCleared;
+      }
+    }
     const prevAuto=el.dataset.autoValue||'';
     const hasManualValue=el.value!==''&&prevAuto!==''&&el.value!==prevAuto;
-    if(hasStored){
+    const clearedDuringEdit=el.value===''&&prevAuto!=='';
+    if(clearedDuringEdit){
+      nightSystemForecastClearedKeys.add(manualKey);
+      el.dataset.manualCleared='1';
+    }
+    const locallyCleared=nightSystemForecastClearedKeys.has(manualKey)||el.dataset.manualCleared==='1';
+    if(fieldCleared||locallyCleared){
+      el.value='';
+    }else if(hasStored){
       el.value=toInput(day[prop]);
     }else if(!hasManualValue){
-      el.value=autoVal;
+      el.value='';
     }
     el.dataset.autoValue=autoVal;
   });
@@ -12287,11 +12256,6 @@ function compIndicators(){
     {key:'checkoutUnid',label:'Checkout Unidade',short:'CK Unid.',metric:'Unid. Checkout',canvas:'cCompCheckoutUnid',cap:d=>+d.capUC||20800},
     {key:'checkoutPsico',label:'Checkout Psico',short:'CK Psico',metric:'Vol. Checkout Psico',canvas:'cCompCheckoutPsico',cap:d=>checkoutPsicoVolCap(d)},
     {key:'especial',label:'Especial',short:'Especial',metric:'Vol. Especial',canvas:'cCompEspecial',cap:d=>+d.capEsp||340},
-    {key:'espFrac',label:'Especial Fracionado',short:'Esp. Frac.',metric:'Vol. Esp. Frac.',canvas:'cCompEspFrac',cap:d=>+d.capEspFrac||0},
-    {key:'espMed',label:'Especial Medicamento',short:'Esp. Med.',metric:'Vol. Esp. Med.',canvas:'cCompEspMed',cap:d=>useNewRules(d.date)?100:(+d.capEspMed||0)},
-    {key:'espPerf',label:'Especial Perfumaria',short:'Esp. Perf.',metric:'Vol. Esp. Perf.',canvas:'cCompEspPerf',cap:d=>+d.capEspPerf||0},
-    {key:'fraldaFechada',label:'Fraldas Cx Fechada',short:'Fralda Cx Fech.',metric:'Vol. Fraldas Cx Fech.',canvas:'cCompFraldaFechada',cap:d=>useNewRules(d.date)?100:(+d.capFrF||114)},
-    {key:'fraldaFrac',label:'Fralda Fracionada',short:'Fralda Frac.',metric:'Vol. Fraldas Frac.',canvas:'cCompFraldaFrac',cap:d=>+d.capFrFc||89},
     {key:'expedicao',label:'Expedição',short:'Expedição',metric:'Vol. Doca',canvas:'cCompExpedicao',cap:d=>+d.capVE||1303},
     {key:'epm',label:'EPM',short:'EPM',metric:'Erros Sep. Med.',canvas:'cCompEpm',cap:d=>+d.capErros||2500,inverse:true,kind:'epm'},
     {key:'vale',label:'Vale',short:'Vale',metric:'Vales',canvas:'cCompVale',cap:d=>+d.capVales||1,inverse:true}
@@ -12580,7 +12544,7 @@ function compChartOptions({yTitle='Média/h',percent=false,secondAxis=false}={})
   };
 }
 function destroyCompCharts(){
-  ['cPerc','cVA','cOS','cFlt','compResumo','compMed','compPerf','compCheckout','compCheckoutUnid','compCheckoutPsico','compEspecial','compEspFrac','compEspMed','compEspPerf','compFraldaFechada','compFraldaFrac','compExpedicao','compEpm','compVale','compAtrasos','compVolAtraso']
+  ['cPerc','cVA','cOS','cFlt','compResumo','compMed','compPerf','compCheckout','compCheckoutUnid','compCheckoutPsico','compEspecial','compExpedicao','compEpm','compVale','compAtrasos','compVolAtraso']
     .forEach(k=>{if(CH[k]){CH[k].destroy();delete CH[k];}});
   Object.keys(CH).filter(k=>k.startsWith('compRoute_')).forEach(k=>{CH[k].destroy();delete CH[k];});
 }
@@ -13215,7 +13179,8 @@ function clearNightEditTrackers(){
 function nightInputValueForStorage(el,key){
   if(!el)return '';
   if(key==='osProdMedBase'||key==='osProdPerfBase')return parseSumNumber(el.value||0);
-  if(el.type==='number')return el.value===''?0:(+el.value||0);
+  if(el.id&&SYSTEM_FORECAST_AUTO_FIELD_PROPS[el.id])return el.value===''?'':(+el.value||0);
+  if(el.type==='number')return el.value===''?'':(+el.value||0);
   return String(el.value??'');
 }
 function persistNightSingleFieldNow(el){
@@ -13570,6 +13535,7 @@ function saveNightImmediately(){
 function scheduleNightImmediateSave(event){
   const el=event&&event.target;
   if(!isNightPersistentTarget(el))return;
+  rememberSystemForecastManualState(el);
   rememberNightEditedField(el);
   rememberNightEditedHourCell(el);
   if(!event||event.isTrusted!==false)markLocalUserEdit(300000);
@@ -14096,9 +14062,7 @@ async function sbReadPayload(){
   if(!r.ok)throw new Error(`Supabase HTTP ${r.status}`);
   const rows=await r.json();
   if(!rows||!rows.length||!rows[0].payload)return null;
-  const payload=typeof rows[0].payload==='string'?JSON.parse(rows[0].payload):rows[0].payload;
-  if(payload&&Array.isArray(payload.days))rememberCloudDayCount(payload.days);
-  return payload;
+  return typeof rows[0].payload==='string'?JSON.parse(rows[0].payload):rows[0].payload;
 }
 
 async function sbWritePayload(payload,ts){
@@ -14115,15 +14079,13 @@ async function confirmSupabaseSave(payload){
   await new Promise(r=>setTimeout(r,250));
   const remote=await sbReadPayload().catch(()=>null);
   if(!remote||!Array.isArray(remote.days))return payload;
-  const mergedPayload=mergePayloadForCloudWrite(remote,payload);
-  const mergedDays=mergedPayload.days;
-  const mergedFluxogramas=mergedPayload.fluxogramas;
+  const mergedDays=mergeDays(remote.days,payload.days);
+  const mergedFluxogramas=mergeFluxogramas(remote.fluxogramas,payload.fluxogramas);
   if(payloadDaysHash(mergedDays)!==payloadDaysHash(remote.days)||simpleHash(JSON.stringify(mergedFluxogramas))!==simpleHash(JSON.stringify(remote.fluxogramas||null))){
     const ts=Date.now();
-    const confirmedPayload={...mergedPayload,savedAt:Math.max(+mergedPayload.savedAt||0,ts)};
-    if(shouldBlockPartialCloudWrite(remote.days,confirmedPayload.days,'confirm-supabase'))return remote;
-    const r=await sbWritePayload(confirmedPayload,ts);
-    if(r.ok)return confirmedPayload;
+    const mergedPayload={...remote,days:mergedDays,users:remote.users||payload.users||getLocalUsersCache(),fluxogramas:mergedFluxogramas,savedAt:ts};
+    const r=await sbWritePayload(mergedPayload,ts);
+    if(r.ok)return mergedPayload;
   }
   return remote;
 }
@@ -14143,15 +14105,9 @@ async function sbSave(replaceDays=false){
       sbLastTs=ts;
       try{
         const remote=await sbReadPayload()||{};
-        const daysToSave=mergeDaysForCloudSave(remote.days,db.days);
-        if(shouldBlockPartialCloudWrite(remote.days,daysToSave,'save-supabase')){
-          sbConnected=true;
-          pendingCloudSave=false;
-          return;
-        }
         const payload={
           ...remote,
-          days:daysToSave,
+          days:mergeDays(remote.days,db.days),
           users:remote.users||getLocalUsersCache(),
           fluxogramas:mergeFluxogramas(remote.fluxogramas,db.fluxogramas),
           savedAt:ts
@@ -14266,11 +14222,9 @@ async function sbSaveUsers(users){
   const ts=Date.now();
   try{
     const remote=await sbReadPayload()||{};
-    const daysToSave=mergeDaysForCloudSave(remote.days,db.days);
-    if(shouldBlockPartialCloudWrite(remote.days,daysToSave,'save-users-supabase'))return false;
     const payload={
       ...remote,
-      days:daysToSave,
+      days:mergeDays(remote.days,db.days),
       users:{...(users||{})},
       savedAt:ts
     };
@@ -14486,13 +14440,13 @@ const PREV_ENC_INDICADORES=[
 ];
 
 const PREV_ENC_PROCESSOS=[
-  {nome:'CORREIA PERFUMARIA',resultado:'vendaLinhasPerfumaria',cap:'capLP',capDefault:3000,previsto:'prevHoraCPer',realizado:'realHoraCPer'},
-  {nome:'CORREIA MEDICAMENTOS',resultado:'vendaLinhasMedicamentos',cap:'capLM',capDefault:3500,previsto:'prevHoraCMed',realizado:'realHoraCMed'},
-  {nome:'CHECK-OUT',resultado:'vendaCaixasCheckout',cap:'capVC',capDefault:1280,previsto:'prevHoraCkOut',realizado:'realHoraCkOut'},
-  {nome:'ESPECIAL',resultado:'vendaEspecialCaixas',cap:'capEsp',capDefault:340,previsto:'prevHoraEsp',realizado:'realHoraEsp'},
-  {nome:'FRALDA FECHADO',resultado:'vendaFraldaFechadoFardos',cap:'capFrF',capDefault:100,previsto:'prevHoraFrF',realizado:'realHoraFrF'},
-  {nome:'FRALDA FRACIONADO',resultado:'vendaFraldaFracionadoCaixas',cap:'capFrFc',capDefault:89,previsto:'prevHoraFrFc',realizado:'realHoraFrFc'},
-  {nome:'EXPEDICAO',resultado:'volumesExpedicao',cap:'capVE',capDefault:1303,previsto:'prevHoraExp',realizado:'realHoraExp'}
+  {nome:'CORREIA PERFUMARIA',resultado:'vendaLinhasPerfumaria',cap:'capLP',capDefault:3000,realizado:'cPerFim'},
+  {nome:'CORREIA MEDICAMENTOS',resultado:'vendaLinhasMedicamentos',cap:'capLM',capDefault:3500,realizado:'cMedFim'},
+  {nome:'CHECK-OUT',resultado:'vendaCaixasCheckout',cap:'capVC',capDefault:1280,realizado:'ckOutFim'},
+  {nome:'ESPECIAL',resultado:'vendaEspecialCaixas',cap:'capEsp',capDefault:340,realizado:'espFim'},
+  {nome:'FRALDA FECHADO',resultado:'vendaFraldaFechadoFardos',cap:'capFrF',capDefault:100,realizado:'frFFim'},
+  {nome:'FRALDA FRACIONADO',resultado:'vendaFraldaFracionadoCaixas',cap:'capFrFc',capDefault:89,realizado:'frFcFim'},
+  {nome:'EXPEDICAO',resultado:'volumesExpedicao',cap:'capVE',capDefault:1303,realizado:'expFim'}
 ];
 
 function ensurePrevisaoEncerramento(day){
@@ -14546,15 +14500,14 @@ function previsaoEncEfficiencyClass(pct){
 
 function previsaoEncProcessCalc(day,row){
   const total=previsaoEncRawNumber(previsaoEncGetResult(day,row.resultado));
-  const data=day&&day.previsaoEncerramento?day.previsaoEncerramento:{};
   const cap=+(day&&day[row.cap])||row.capDefault||0;
-  const previsto=cleanHora(data[row.previsto]||'');
-  const realizado=cleanHora(data[row.realizado]||'');
-  const finalizacao=realizado||previsto;
-  const finalMin=previsaoEncTimeToMinutes(finalizacao);
-  const plannedHours=cap&&finalMin!==null?(finalMin-previsaoEncStartMinutes())/60:null;
-  const eficiencia=total&&cap&&plannedHours&&plannedHours>0?Math.round((total/(cap*plannedHours))*100):null;
-  return{resultado:total?prodFmt(total,0):'-',cap:cap?prodFmt(cap,0):'-',previsto,realizado,eficiencia};
+  const previsto=previsaoEncExpectedTime(total,cap);
+  const realizado=day&&day[row.realizado]?day[row.realizado]:'-';
+  const realMin=previsaoEncTimeToMinutes(realizado);
+  const targetHours=total&&cap?total/cap:null;
+  const actualHours=realMin!==null?(realMin-previsaoEncStartMinutes())/60:null;
+  const eficiencia=targetHours&&actualHours&&actualHours>0?Math.round((targetHours/actualHours)*100):null;
+  return{resultado:total?prodFmt(total,0):'-',cap:cap?prodFmt(cap,0):'-',previsto,realizado:realizado||'-',eficiencia};
 }
 
 function savePrevisaoEncField(key,value){
@@ -14577,7 +14530,6 @@ function savePrevisaoEncField(key,value){
 function renderPrevisaoEncProcessRows(day){
   const tbody=document.getElementById('prevEncProcessRows');
   if(!tbody)return;
-  const data=ensurePrevisaoEncerramento(day);
   tbody.innerHTML=PREV_ENC_PROCESSOS.map(row=>{
     const calc=previsaoEncProcessCalc(day,row);
     const eff=calc.eficiencia===null?'-':calc.eficiencia+'%';
@@ -14587,8 +14539,8 @@ function renderPrevisaoEncProcessRows(day){
       <td class="prev-enc-auto">${excelText(calc.resultado)}</td>
       <td class="prev-enc-auto">${excelText(calc.cap)}</td>
       <td class="prev-enc-auto ${previsaoEncEfficiencyClass(calc.eficiencia)}">${excelText(eff)}</td>
-      <td><input class="prev-enc-input prev-enc-time-input" type="time" value="${attrText(data[row.previsto]!==undefined?data[row.previsto]:'')}" onchange="savePrevisaoEncField('${row.previsto}',this.value)" onblur="savePrevisaoEncField('${row.previsto}',this.value)" placeholder="-"/></td>
-      <td><input class="prev-enc-input prev-enc-time-input" type="time" value="${attrText(data[row.realizado]!==undefined?data[row.realizado]:'')}" onchange="savePrevisaoEncField('${row.realizado}',this.value)" onblur="savePrevisaoEncField('${row.realizado}',this.value)" placeholder="-"/></td>
+      <td class="prev-enc-auto">${excelText(calc.previsto)}</td>
+      <td class="prev-enc-auto">${excelText(calc.realizado)}</td>
     </tr>`;
   }).join('');
 }
@@ -14618,7 +14570,7 @@ function renderPrevisaoEncTab(){
       </tbody>
       <tbody id="prevEncProcessRows"></tbody>
     </table>
-    <div class="prev-enc-note">Resultados, horario previsto e horario realizado sao preenchidos manualmente por dia. % eficiencia = resultado dividido por (meta/h vezes o tempo ate a finalizacao preenchida). Quando houver horario realizado, ele e usado; se estiver vazio, usa o horario previsto.</div>
+    <div class="prev-enc-note">Resultados sao preenchidos manualmente por dia. Horario previsto = resultado dividido pela meta/h, a partir de 17:30. Horario realizado puxa automaticamente dos campos finais do Editar Dados.</div>
   </div>`;
   renderPrevisaoEncProcessRows(day);
 }
