@@ -4208,12 +4208,6 @@ async function syncFromFirebaseRest(showOk){
       else if(showOk)showSyncStatus('Nuvem ativa',false);
       return false;
     }
-    if(localUserEditActive()){
-      pendingCloudSave=true;
-      setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),20);
-      if(showOk)showSyncStatus('Salvando preenchimento...',null);
-      return false;
-    }
     const remoteDays=remote.days;
     if(shouldRejectOlderCloud(remoteDays,'firebase-rest'))return false;
     const remoteHash=cloudPayloadHash(remote);
@@ -4461,14 +4455,6 @@ function initFirebase(){
         }
         const remoteHash=cloudPayloadHash(remote);
         const remoteTs=remote.savedAt||0;
-        if(localUserEditActive()){
-          pendingCloudSave=true;
-          setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),20);
-          setTimeout(()=>{if(typeof sbSave==='function')sbSave(false).catch(()=>{});},80);
-          fbRestLastHash=remoteHash;
-          showSyncStatus('Salvando preenchimento...',null);
-          return;
-        }
         const shouldApply=!isSaving&&(remoteTs>lastSaveTs||remoteDaysHaveBetterData(remote.days)||remoteHash!==fbRestLastHash);
         if(shouldApply){
           lastSaveTs=remoteTs;
@@ -14146,12 +14132,6 @@ async function sbLoad(){
   try{
     const remote=await sbReadPayload();
     if(!remote)return false;
-    if(localUserEditActive()){
-      pendingCloudSave=true;
-      setTimeout(()=>sbSave(false).catch(()=>{}),20);
-      setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),80);
-      return false;
-    }
     const remoteTs=remote.savedAt||0;
     // Sempre aplicar se remoto tem dados e é diferente do que temos
     const localTs=sbLastTs||0;
