@@ -4391,10 +4391,11 @@ function cloudNeedsLocalMerge(remote){
 }
 
 function queueCloudMergeSave(remote){
-  if(!localUserEditActive())return;
   if(!cloudNeedsLocalMerge(remote))return;
   pendingCloudSave=true;
-  setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),120);
+  const delay=localUserEditActive()?120:500;
+  setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),delay);
+  setTimeout(()=>{if(typeof sbSave==='function')sbSave(false).catch(()=>{});},delay+140);
 }
 
 function save(replaceDays=false){
