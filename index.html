@@ -2697,9 +2697,17 @@ function mergeHourData(current,next,chosen){
       const aCleared=hourCellWasCleared(current,metric,i);
       const bCleared=hourCellWasCleared(next,metric,i);
       if(ats||bts){
-        if(bts>ats)return bCleared?'':bv;
-        if(ats>bts)return aCleared?'':av;
+        if(bts>ats){
+          if(bCleared)return '';
+          return hasB?bv:(hasA?av:'');
+        }
+        if(ats>bts){
+          if(aCleared)return '';
+          return hasA?av:(hasB?bv:'');
+        }
         if(bCleared||aCleared)return '';
+        if(hasB)return bv;
+        if(hasA)return av;
         return cv!==undefined?cv:(bv!==undefined?bv:av);
       }
       if(current&&current._nightPartialSave&&hasB)return bv;
@@ -2730,9 +2738,14 @@ function mergeDayRootFields(current,next,chosen){
     const bts=Math.max(+bft[key]||0,+bcf[key]||0);
     const hasA=dayFieldHasValue(av);
     const hasB=dayFieldHasValue(bv);
+    const aCleared=(+acf[key]||0)>0&&(+acf[key]||0)>=(+aft[key]||0);
+    const bCleared=(+bcf[key]||0)>0&&(+bcf[key]||0)>=(+bft[key]||0);
     if(ats||bts){
-      if(bts>ats)out[key]=bv;
-      else if(ats>bts)out[key]=av;
+      if(bts>ats)out[key]=bCleared?'':(hasB?bv:(hasA?av:''));
+      else if(ats>bts)out[key]=aCleared?'':(hasA?av:(hasB?bv:''));
+      else if(bCleared||aCleared)out[key]='';
+      else if(hasB)out[key]=bv;
+      else if(hasA)out[key]=av;
       else out[key]=cv!==undefined?cv:bv;
       return;
     }
@@ -4334,12 +4347,6 @@ function applyRemoteData(remote){
     }
   }
   if(!remote.days||!Array.isArray(remote.days))return changed;
-  if(localUserEditActive()){
-    pendingCloudSave=true;
-    setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),20);
-    setTimeout(()=>{if(typeof sbSave==='function')sbSave(false).catch(()=>{});},80);
-    return changed;
-  }
   if(shouldRejectOlderCloud(remote.days,'remote-apply'))return changed;
   const previousLatest=maxDayDate(db.days);
   const previousCurrent=curDate;
