@@ -1860,9 +1860,12 @@ const MEDIA_HORA_AUTO=[
 
 const SK='cdgam_v6';
 const SK_BACKUPS='cdgam_v6_backups';
-const LOCAL_CACHE_DAYS=180;
-const LOCAL_CACHE_FALLBACK_DAYS=90;
-const LOCAL_BACKUP_DAYS=10;
+const LOCAL_CACHE_DAYS=45;
+const LOCAL_CACHE_FALLBACK_DAYS=15;
+const LOCAL_BACKUP_DAYS=5;
+const LOCAL_DRAFT_DAYS=5;
+const LOCAL_DRAFT_FALLBACK_DAYS=2;
+const STORE_FLUXOGRAMAS=false;
 const PWD='gam2025';
 const NEW_RULES_FROM='2026-06-02';
 const SIMPLE_OPERATIONAL_FROM='2026-06-16';
@@ -1942,11 +1945,28 @@ function setCurrentDate(dt){
 function saveNightDayDraft(day){
   try{
     if(!day||!day.date)return;
-    const clean=compactDayForStorage(stripTransientDayFlags(day));
+    const clean=compactDayForFastLocalStorage(stripTransientDayFlags(day));
     localStorage.setItem(NIGHT_DAY_DRAFT_PREFIX+day.date,JSON.stringify(clean));
+    cleanupNightDayDrafts(LOCAL_DRAFT_DAYS);
   }catch(e){
     console.warn('Draft local da producao noturna nao salvo:',e.message);
   }
+}
+
+function cleanupNightDayDrafts(keep=LOCAL_DRAFT_DAYS){
+  try{
+    const drafts=[];
+    for(let i=0;i<localStorage.length;i++){
+      const key=localStorage.key(i);
+      if(!key||!key.startsWith(NIGHT_DAY_DRAFT_PREFIX))continue;
+      const date=key.slice(NIGHT_DAY_DRAFT_PREFIX.length);
+      drafts.push({key,date});
+    }
+    drafts
+      .sort((a,b)=>(b.date||'').localeCompare(a.date||''))
+      .slice(Math.max(+keep||0,0))
+      .forEach(item=>localStorage.removeItem(item.key));
+  }catch(e){}
 }
 
 function restoreNightDayDrafts(reason){
@@ -2214,6 +2234,7 @@ function load(){
   db.fluxogramas=normalizeFluxogramas(db.fluxogramas);
   db.days=db.days.map(normalizeDay);
   db.days.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  cleanupNightDayDrafts(LOCAL_DRAFT_DAYS);
   restoreNightDayDrafts('load');
   restoreBestLocalBackupIfNeeded('load');
 }
@@ -2366,16 +2387,30 @@ function compactDayForStorage(day){
   return copy;
 }
 
+function compactDayForFastLocalStorage(day){
+  const copy=compactDayForStorage(day);
+  if(!copy||typeof copy!=='object')return copy;
+  delete copy.recebArm;
+  delete copy.inventario;
+  return copy;
+}
+
 function compactDbForStorage(snapshot,limitDays){
   const src=snapshot&&Array.isArray(snapshot.days)?snapshot:{days:[]};
   let days=src.days.map(compactDayForStorage);
   const maxDays=limitDays===undefined?LOCAL_CACHE_DAYS:limitDays;
   if(maxDays&&days.length>maxDays)days=days.sort((a,b)=>(a.date||'').localeCompare(b.date||'')).slice(-maxDays);
-  return{...src,days};
+  const out={...src,days};
+  if(STORE_FLUXOGRAMAS)out.fluxogramas=normalizeFluxogramas(src.fluxogramas);
+  else delete out.fluxogramas;
+  return out;
 }
 
 function compactDbForLocalStorage(snapshot,limitDays){
-  return compactDbForStorage(snapshot,limitDays);
+  const compact=compactDbForStorage(snapshot,limitDays);
+  compact.days=(compact.days||[]).map(compactDayForFastLocalStorage);
+  delete compact.fluxogramas;
+  return compact;
 }
 
 function compactDbForCloudStorage(snapshot){
@@ -2396,6 +2431,7 @@ function saveLocalDb(snapshot=db){
     return true;
   }catch(e){
     try{
+      cleanupNightDayDrafts(LOCAL_DRAFT_FALLBACK_DAYS);
       localStorage.removeItem(SK_BACKUPS);
       writeCompact(LOCAL_CACHE_FALLBACK_DAYS);
       console.warn('Backups locais limpos para liberar espaco:',e.message);
@@ -3179,8 +3215,8 @@ function mergeProdRow(current,next){
     const aCleared=prodFieldWasCleared(a,field);
     const bCleared=prodFieldWasCleared(b,field);
     if(aTs||bTs){
-      if(bTs>aTs)out[field]=bCleared?'':bv;
-      else if(aTs>bTs)out[field]=aCleared?'':av;
+      if(bTs>aTs)out[field]=bCleared?'':(hasB?bv:(hasA?av:''));
+      else if(aTs>bTs)out[field]=aCleared?'':(hasA?av:(hasB?bv:''));
       else out[field]=bCleared?'':(aCleared?'':(hasB?bv:av));
       return;
     }
@@ -3240,16 +3276,36 @@ function mergeProdDiaPerson(current,next){
   const out={...a,...b};
   const aTs=a._fieldUpdatedAt||{};
   const bTs=b._fieldUpdatedAt||{};
-  out.matricula=(+bTs.matricula||0)>=(+aTs.matricula||0)?(b.matricula??a.matricula??''):(a.matricula??b.matricula??'');
+  const aClearedAt=a._fieldClearedAt||{};
+  const bClearedAt=b._fieldClearedAt||{};
+  const aMatTs=Math.max(+aTs.matricula||0,+aClearedAt.matricula||0);
+  const bMatTs=Math.max(+bTs.matricula||0,+bClearedAt.matricula||0);
+  const hasMatA=String(a.matricula??'').trim()!=='';
+  const hasMatB=String(b.matricula??'').trim()!=='';
+  const aMatCleared=(+aClearedAt.matricula||0)>0&&(+aClearedAt.matricula||0)>=(+aTs.matricula||0);
+  const bMatCleared=(+bClearedAt.matricula||0)>0&&(+bClearedAt.matricula||0)>=(+bTs.matricula||0);
+  if(bMatTs>aMatTs)out.matricula=bMatCleared?'':(hasMatB?b.matricula:(hasMatA?a.matricula:''));
+  else if(aMatTs>bMatTs)out.matricula=aMatCleared?'':(hasMatA?a.matricula:(hasMatB?b.matricula:''));
+  else if(bMatCleared||aMatCleared)out.matricula='';
+  else out.matricula=hasMatB?(b.matricula??''):(hasMatA?(a.matricula??''):(b.matricula??a.matricula??''));
   out.nome=b.nome??a.nome??'';
   const values=[];
   for(let i=0;i<PROD_DIA_HOURS.length;i++){
     const key='v'+i;
     const av=Array.isArray(a.values)?a.values[i]:'';
     const bv=Array.isArray(b.values)?b.values[i]:'';
-    const ats=+aTs[key]||0;
-    const bts=+bTs[key]||0;
-    if(ats||bts)values[i]=bts>=ats?bv:av;
+    const ats=Math.max(+aTs[key]||0,+aClearedAt[key]||0);
+    const bts=Math.max(+bTs[key]||0,+bClearedAt[key]||0);
+    const hasA=prodFieldHasValue(av);
+    const hasB=prodFieldHasValue(bv);
+    const aCleared=(+aClearedAt[key]||0)>0&&(+aClearedAt[key]||0)>=(+aTs[key]||0);
+    const bCleared=(+bClearedAt[key]||0)>0&&(+bClearedAt[key]||0)>=(+bTs[key]||0);
+    if(ats||bts){
+      if(bts>ats)values[i]=bCleared?'':(hasB?bv:(hasA?av:''));
+      else if(ats>bts)values[i]=aCleared?'':(hasA?av:(hasB?bv:''));
+      else if(bCleared||aCleared)values[i]='';
+      else values[i]=hasB?bv:(hasA?av:(bv!==undefined?bv:av));
+    }
     else values[i]=prodFieldHasValue(bv)?bv:(prodFieldHasValue(av)?av:(bv!==undefined?bv:av));
   }
   out.values=values;
@@ -3259,6 +3315,15 @@ function mergeProdDiaPerson(current,next){
   });
   if(Object.keys(fieldUpdatedAt).length)out._fieldUpdatedAt=fieldUpdatedAt;
   else delete out._fieldUpdatedAt;
+  const fieldClearedAt={...aClearedAt};
+  Object.entries(bClearedAt).forEach(([field,ts])=>{
+    fieldClearedAt[field]=Math.max(+fieldClearedAt[field]||0,+ts||0);
+  });
+  Object.keys(fieldClearedAt).forEach(field=>{
+    if((+fieldUpdatedAt[field]||0)>(+fieldClearedAt[field]||0))delete fieldClearedAt[field];
+  });
+  if(Object.keys(fieldClearedAt).length)out._fieldClearedAt=fieldClearedAt;
+  else delete out._fieldClearedAt;
   return out;
 }
 
@@ -3751,9 +3816,9 @@ function encodeFirebasePayload(payload){
   const safePayload={
     days:Array.isArray(compact&&compact.days)?compact.days:[],
     users:(compact&&compact.users)||{},
-    fluxogramas:normalizeFluxogramas(compact&&compact.fluxogramas),
     savedAt:(compact&&compact.savedAt)||Date.now()
   };
+  if(STORE_FLUXOGRAMAS)safePayload.fluxogramas=normalizeFluxogramas(compact&&compact.fluxogramas);
   return {payload:JSON.stringify(safePayload),savedAt:safePayload.savedAt};
 }
 
@@ -4130,13 +4195,15 @@ async function mirrorPayloadToSupabase(payload){
 }
 
 function currentCloudPayload(base={},ts=Date.now()){
-  return {
+  const payload={
     ...base,
     days:Array.isArray(db.days)?db.days:[],
     users:(base&&base.users)||getLocalUsersCache(),
-    fluxogramas:normalizeFluxogramas(db.fluxogramas),
     savedAt:Math.max(+((base&&base.savedAt)||0),+ts||Date.now())
   };
+  if(STORE_FLUXOGRAMAS)payload.fluxogramas=normalizeFluxogramas(db.fluxogramas);
+  else delete payload.fluxogramas;
+  return payload;
 }
 
 function payloadDaysHash(days){
@@ -5622,7 +5689,8 @@ function ensureProdDiurno(day){
         matricula,
         nome:person.nome||prodDiaDefaultName(metric.key,matricula),
         values:PROD_DIA_HOURS.map((_,i)=>values[i]??''),
-        ...(person._fieldUpdatedAt?{_fieldUpdatedAt:person._fieldUpdatedAt}:{_fieldUpdatedAt:{}})
+        ...(person._fieldUpdatedAt?{_fieldUpdatedAt:person._fieldUpdatedAt}:{_fieldUpdatedAt:{}}),
+        ...(person._fieldClearedAt?{_fieldClearedAt:person._fieldClearedAt}:{})
       };
     });
     if(defaults.length&&block.people.length===1&&!prodDiaHasInput(block.people[0]))block.people=[];
@@ -5692,9 +5760,25 @@ function prodDiaMediaHora(person){
   return hours?prodDiaTotal(person)/hours:null;
 }
 
-function prodDiaTouch(day,person,field){
+function prodDiaTouch(day,person,field,value){
   const ts=Date.now();
-  person._fieldUpdatedAt={...(person._fieldUpdatedAt||{}),[field]:ts};
+  let currentValue=value;
+  if(currentValue===undefined){
+    if(field==='matricula')currentValue=person.matricula;
+    else if(/^v\d+$/.test(field)&&Array.isArray(person.values))currentValue=person.values[+field.slice(1)];
+  }
+  const hasValue=field==='matricula'?String(currentValue??'').trim()!=='':prodFieldHasValue(currentValue);
+  person._fieldUpdatedAt={...(person._fieldUpdatedAt||{})};
+  person._fieldClearedAt={...(person._fieldClearedAt||{})};
+  if(hasValue){
+    person._fieldUpdatedAt[field]=ts;
+    delete person._fieldClearedAt[field];
+  }else{
+    delete person._fieldUpdatedAt[field];
+    person._fieldClearedAt[field]=ts;
+  }
+  if(!Object.keys(person._fieldUpdatedAt).length)delete person._fieldUpdatedAt;
+  if(!Object.keys(person._fieldClearedAt).length)delete person._fieldClearedAt;
   day._updatedAt=ts;
   setCurrentDate(day.date);
 }
