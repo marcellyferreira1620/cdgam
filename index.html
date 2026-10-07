@@ -1122,6 +1122,22 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
       <div style="position:relative;height:200px"><canvas id="cAcum" role="img" aria-label="Especial hora a hora"></canvas></div>
     </div>
   </div>
+  <div class="chart-grid">
+    <div class="chart-box" style="border-color:rgba(0,230,118,.35)">
+      <div class="chart-ttl">Expedição hora a hora — CD 2</div>
+      <div style="position:relative;height:200px"><canvas id="cExpCd2" role="img" aria-label="Expedicao CD 2 hora a hora"></canvas></div>
+    </div>
+    <div class="chart-box" style="border-color:rgba(0,230,118,.35)">
+      <div class="chart-ttl">Produção hora a hora — Especial CD 2</div>
+      <div style="position:relative;height:200px"><canvas id="cAcumCd2" role="img" aria-label="Especial CD 2 hora a hora"></canvas></div>
+    </div>
+  </div>
+  <div class="chart-grid" style="grid-template-columns:1fr">
+    <div class="chart-box" style="border-color:rgba(0,230,118,.35)">
+      <div class="chart-ttl">Fraldas Cx Fechada hora a hora — CD 2</div>
+      <div style="position:relative;height:200px"><canvas id="cFraldaFCd2" role="img" aria-label="Fraldas caixa fechada CD 2 hora a hora"></canvas></div>
+    </div>
+  </div>
   <!-- DOCA BALANCE ROW -->
   <div class="chart-grid" style="grid-template-columns:1fr">
     <div class="chart-box" id="geladeiraBox" style="border-color:rgba(77,166,255,.45)">
@@ -1144,6 +1160,20 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
     <div class="chart-box" style="border-color:rgba(0,230,118,.4)">
       <div class="chart-ttl">📦 Resumo Doca — Turno</div>
       <div id="docaKpiPanel" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;padding:4px"></div>
+    </div>
+  </div>
+  <div class="chart-grid" style="grid-template-columns:1fr">
+    <div class="chart-box" style="border-color:rgba(0,230,118,.4)">
+      <div class="chart-ttl">
+        <span>⚖️ Fechamento de Rotas CD 2 — Volumes da Doca</span>
+      </div>
+      <div class="doca-route-chart-scroll"><div class="doca-route-chart-inner"><canvas id="cDocaBalanceCd2" role="img" aria-label="Fechamento de rotas CD 2 por volume"></canvas></div></div>
+      <div class="doca-routes-hour" id="docaRoutesHourCd2"></div>
+      <div id="docaBalanceAlertCd2" style="margin-top:5px;font-size:10px;padding:5px 10px;border-radius:3px;display:none;font-weight:bold"></div>
+    </div>
+    <div class="chart-box" style="border-color:rgba(0,230,118,.4)">
+      <div class="chart-ttl">📦 Resumo Doca CD 2 — Turno</div>
+      <div id="docaKpiPanelCd2" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;padding:4px"></div>
     </div>
   </div>
   <div class="chart-grid" style="grid-template-columns:1fr">
@@ -1526,16 +1556,19 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
               <div class="prev-item"><label>Correia (vol.)</label><input type="number" id="iPNCorreia" placeholder="0" oninput="liveUpdate()"/></div>
               <div class="prev-item"><label>Cx Fechada Psico (vol.)</label><input type="number" id="iPNPsico" placeholder="0" oninput="liveUpdate()"/></div>
               <div class="prev-item"><label>Especial (vol.)</label><input type="number" id="iPNEspecial" placeholder="0" oninput="liveUpdate()"/></div>
+              <div class="prev-item"><label>Vol Especial CD 2</label><input type="number" id="iPNEspecialCd2" placeholder="0" oninput="liveUpdate()"/></div>
               <div class="prev-item"><label>Especial Fracionado (vol.)</label><input type="number" id="iPNEspFrac" placeholder="0" oninput="liveUpdate()"/></div>
               <div class="prev-item"><label>Especial Medicamento (vol.)</label><input type="number" id="iPNEspMed" placeholder="0" oninput="liveUpdate()"/></div>
               <div class="prev-item"><label>Especial Perfumaria (vol.)</label><input type="number" id="iPNEspPerf" placeholder="0" oninput="liveUpdate()"/></div>
               <div class="prev-item"><label>Fraldas (vol.)</label><input type="number" id="iPNFralda" placeholder="0" oninput="liveUpdate()"/></div>
               <div class="prev-item"><label>Fraldas Cx Fechada (vol.)</label><input type="number" id="iPNFraldaF" placeholder="0" oninput="liveUpdate()"/></div>
+              <div class="prev-item"><label>Vol Fraldas Cx Fechada CD 2</label><input type="number" id="iPNFraldaFCd2" placeholder="0" oninput="liveUpdate()"/></div>
               <div class="prev-item"><label>Geladeira (vol.)</label><input type="number" id="iPNGel" placeholder="0" oninput="liveUpdate()"/></div>
               <div class="prev-item"><label>Oncológico (vol.)</label><input type="number" id="iPNOnco" placeholder="0" oninput="liveUpdate()"/></div>
               <div class="prev-item"><label>Oncológico Termolábil (vol.)</label><input type="number" id="iPNOncoT" placeholder="0" oninput="liveUpdate()"/></div>
               <div class="prev-item"><label>Junção (vol.)</label><input type="number" id="iPNJuncao" placeholder="0" oninput="liveUpdate()"/></div>
               <div class="prev-item"><label>Doca (vol.)</label><input type="number" id="iPNDoca" placeholder="0" oninput="liveUpdate()"/></div>
+              <div class="prev-item"><label>Vol Doca CD 2</label><input type="number" id="iPNDocaCd2" placeholder="0" oninput="liveUpdate()"/></div>
             </div>
           </div>
         </div>
@@ -1799,6 +1832,7 @@ const MHORA=[
   'Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.',
   'Vol. Geladeira','Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.',
   'Vol. Doca',
+  'Vol. Especial CD 2','Vol. Fraldas Cx Fech. CD 2','Vol. Doca CD 2',
   // CONTROLE
   'Vales','Conf. Planejado','Conf. Ativo','Conf. Planejado Psico','Conf. Ativo Psico'
 ];
@@ -1814,6 +1848,7 @@ const CAP_MAP={
   'Vol. Geladeira':'iCapGel',
   'Vol. Fraldas Cx Fech.':'iCapFrF','Vol. Fraldas Frac.':'iCapFrFc',
   'Vol. Doca':'iCapVE',
+  'Vol. Especial CD 2':'iCapEsp','Vol. Fraldas Cx Fech. CD 2':'iCapFrF','Vol. Doca CD 2':'iCapVE',
   'Vales':'iCapVales'
 };
 // métricas que somam automaticamente no "Realizado Total"
@@ -1835,6 +1870,9 @@ const REAL_AUTO=[
   {id:'aFrF',  lbl:'Fraldas Cx Fech.', m:'Vol. Fraldas Cx Fech.'},
   {id:'aFrFc', lbl:'Fraldas Frac.',     m:'Vol. Fraldas Frac.'},
   {id:'aDoca', lbl:'Vol. Doca',         m:'Vol. Doca'},
+  {id:'aEspCd2', lbl:'Vol. Especial CD 2', m:'Vol. Especial CD 2'},
+  {id:'aFrFCd2', lbl:'Fraldas Cx Fech. CD 2', m:'Vol. Fraldas Cx Fech. CD 2'},
+  {id:'aDocaCd2', lbl:'Vol. Doca CD 2', m:'Vol. Doca CD 2'},
   {id:'aErros',lbl:'Erros Sep.',        m:'Erros Sep. Med.'},
   {id:'aVales',lbl:'Vales',          m:'Vales'},
 ];
@@ -1856,6 +1894,9 @@ const MEDIA_HORA_AUTO=[
   {lbl:'Fraldas Cx Fech.',m:'Vol. Fraldas Cx Fech.',ini:'iFrF',fim:'iFrFFim'},
   {lbl:'Fraldas Frac.',m:'Vol. Fraldas Frac.',ini:'iFrFc',fim:'iFrFcFim'},
   {lbl:'Vol. Doca',m:'Vol. Doca',ini:'iExp',fim:'iExpFim'},
+  {lbl:'Vol. Especial CD 2',m:'Vol. Especial CD 2',ini:'iEsp',fim:'iEspFim'},
+  {lbl:'Fraldas Cx Fech. CD 2',m:'Vol. Fraldas Cx Fech. CD 2',ini:'iFrF',fim:'iFrFFim'},
+  {lbl:'Vol. Doca CD 2',m:'Vol. Doca CD 2',ini:'iExp',fim:'iExpFim'},
 ];
 
 const SK='cdgam_v6';
@@ -2160,7 +2201,7 @@ const EPM_SERIES_NAME_LABEL_PLUGIN={
 const HORA_PRODUCTION_SERIES_NAME_LABEL_PLUGIN={
   id:'horaProductionSeriesNameLabels',
   afterDraw(chart){
-    if(!chart.canvas||!['cHoraMed','cHoraPerf','cHoraCheckout','cHoraCheckoutPsico','cExp','cGeladeira','cAcum'].includes(chart.canvas.id))return;
+    if(!chart.canvas||!['cHoraMed','cHoraPerf','cHoraCheckout','cHoraCheckoutPsico','cExp','cExpCd2','cGeladeira','cAcum','cAcumCd2','cFraldaFCd2'].includes(chart.canvas.id))return;
     const {ctx,chartArea}=chart;
     if(!chartArea)return;
     const labelFor=label=>{
@@ -2584,10 +2625,10 @@ function dayDataScore(day){
 
 function cloudDayOperationalValue(day){
   if(!day||typeof day!=='object')return 0;
-  const rootKeys=['osTotal','osTotalMed','osTotalPerf','osProdBase','osProdMedBase','osProdPerfBase','pnVol','pnUnid','pnDoca','rDoc','sys2130VolDoca','sys2130UnitCheckout'];
+  const rootKeys=['osTotal','osTotalMed','osTotalPerf','osProdBase','osProdMedBase','osProdPerfBase','pnVol','pnUnid','pnDoca','pnDocaCd2','pnEspecialCd2','pnFraldaFCd2','rDoc','sys2130VolDoca','sys2130UnitCheckout'];
   let total=rootKeys.reduce((s,k)=>s+(Number.isFinite(+day[k])?Math.max(+day[k],0):0),0);
   const hd=day.hd&&typeof day.hd==='object'?day.hd:{};
-  ['Linhas Med.','Linhas Perf.','Vol. Med.','Vol. Perf.','Unid. Med.','Unid. Perf.','Vol. Checkout','Unid. Checkout','Vol. Doca','Vol. Especial','Vol. Esp. Frac.','Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.'].forEach(metric=>{
+  ['Linhas Med.','Linhas Perf.','Vol. Med.','Vol. Perf.','Unid. Med.','Unid. Perf.','Vol. Checkout','Unid. Checkout','Vol. Doca','Vol. Especial','Vol. Esp. Frac.','Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Especial CD 2','Vol. Fraldas Cx Fech. CD 2','Vol. Doca CD 2'].forEach(metric=>{
     const arr=Array.isArray(hd[metric])?hd[metric]:[];
     total+=arr.reduce((s,v)=>s+(v!==''&&v!==null&&v!==undefined?Math.max(+v||0,0):0),0);
   });
@@ -4588,7 +4629,7 @@ function emptyDay(dt){
     date:dt||today(),
     pnVol:0,pnUnid:0,
     pnCorreia:0,pnPsico:0,pnEspecial:0,pnEspFrac:0,pnEspMed:0,pnEspPerf:0,
-    pnFralda:0,pnFraldaF:0,pnGel:0,pnOnco:0,pnOncoT:0,pnJuncao:0,pnDoca:0,
+    pnEspecialCd2:0,pnFralda:0,pnFraldaF:0,pnFraldaFCd2:0,pnGel:0,pnOnco:0,pnOncoT:0,pnJuncao:0,pnDoca:0,pnDocaCd2:0,
     acum:0,acumMed:0,acumPerf:0,meta:0,
     osImp:0,osImpMed:0,osImpPerf:0,osFin:0,osFinMed:0,osFinPerf:0,
     osNaoImp:0,osNaoImpMed:0,osNaoImpPerf:0,osTotalMed:0,osTotalPerf:0,
@@ -4632,20 +4673,36 @@ function useEditableSystemForecast(dt){return String(dt||currentFormDate())>=SYS
 function useRouteLiveDelay(dt){return String(dt||currentFormDate())>=ROUTE_LIVE_DELAY_FROM;}
 function routeMetricKey(r){return`Rota ${r.cod} — ${r.cidade}`;}
 function routeTotalMetricKey(r){return`Total ${routeMetricKey(r)}`;}
+function routeMetricKeyCd2(r){return`Rota CD 2 ${r.cod} — ${r.cidade}`;}
+function routeTotalMetricKeyCd2(r){return`Total ${routeMetricKeyCd2(r)}`;}
 function routeHourMetrics(){return ROTAS_FIXAS.map(routeMetricKey);}
 function routeTotalHourMetrics(){return ROTAS_FIXAS.map(routeTotalMetricKey);}
-function routeFromMetric(metric){return ROTAS_FIXAS.find(r=>routeMetricKey(r)===metric)||null;}
-function routeFromTotalMetric(metric){return ROTAS_FIXAS.find(r=>routeTotalMetricKey(r)===metric)||null;}
+function routeHourMetricsCd2(){return ROTAS_FIXAS.map(routeMetricKeyCd2);}
+function routeTotalHourMetricsCd2(){return ROTAS_FIXAS.map(routeTotalMetricKeyCd2);}
+function routeMetricInfo(metric){
+  for(const r of ROTAS_FIXAS){
+    if(routeMetricKey(r)===metric)return{route:r,cd2:false,total:false,baseMetric:routeMetricKey(r),totalMetric:routeTotalMetricKey(r)};
+    if(routeTotalMetricKey(r)===metric)return{route:r,cd2:false,total:true,baseMetric:routeMetricKey(r),totalMetric:routeTotalMetricKey(r)};
+    if(routeMetricKeyCd2(r)===metric)return{route:r,cd2:true,total:false,baseMetric:routeMetricKeyCd2(r),totalMetric:routeTotalMetricKeyCd2(r)};
+    if(routeTotalMetricKeyCd2(r)===metric)return{route:r,cd2:true,total:true,baseMetric:routeMetricKeyCd2(r),totalMetric:routeTotalMetricKeyCd2(r)};
+  }
+  return null;
+}
+function routeFromMetric(metric){const info=routeMetricInfo(metric);return info&&!info.total?info.route:null;}
+function routeFromTotalMetric(metric){const info=routeMetricInfo(metric);return info&&info.total?info.route:null;}
 function routeFromAnyMetric(metric){return routeFromMetric(metric)||routeFromTotalMetric(metric);}
 function isRouteMetric(metric){return !!routeFromMetric(metric);}
 function isRouteTotalMetric(metric){return !!routeFromTotalMetric(metric);}
+function routeBaseMetricKey(metric){const info=routeMetricInfo(metric);return info?info.baseMetric:null;}
+function routeTotalMetricKeyFor(metric){const info=routeMetricInfo(metric);return info?info.totalMetric:null;}
+function isRouteCd2Metric(metric){const info=routeMetricInfo(metric);return !!(info&&info.cd2);}
 function routeInitialTotal(day,metric){
-  const route=routeFromAnyMetric(metric);if(!route)return 0;
+  const info=routeMetricInfo(metric);const route=info&&info.route;if(!route||info.cd2)return 0;
   const saved=day&&Array.isArray(day.rotas)?day.rotas.find(r=>normalizeRouteCode(r.cod)===normalizeRouteCode(route.cod)):null;
   return saved?+saved.vol||0:0;
 }
 function activeHourMetrics(dt){
-  let base=useSplitIndicators(dt)?[...MHORA,...routeHourMetrics(),...routeTotalHourMetrics()]:MHORA.filter(m=>!NEW_CORREIA_DETAIL_METRICS.includes(m));
+  let base=useSplitIndicators(dt)?[...MHORA,...routeHourMetrics(),...routeTotalHourMetrics(),...routeHourMetricsCd2(),...routeTotalHourMetricsCd2()]:MHORA.filter(m=>!NEW_CORREIA_DETAIL_METRICS.includes(m));
   if(!useGeladeiraHora(dt))base=base.filter(m=>m!=='Vol. Geladeira');
   return useCheckoutPsico(dt)?base:base.filter(m=>!CHECKOUT_PSICO_ALL.includes(m));
 }
@@ -4891,8 +4948,8 @@ function systemForecastFormSnapshot(){
   return{
     date:currentFormDate(),
     pnVol:v('iPNVol'),pnUnid:v('iPNUnid'),pnCorreia:v('iPNCorreia'),pnPsico:v('iPNPsico'),
-    pnEspecial:v('iPNEspecial'),pnFralda:v('iPNFralda'),pnFraldaF:v('iPNFraldaF'),
-    pnGel:v('iPNGel'),pnJuncao:v('iPNJuncao'),pnDoca:v('iPNDoca'),
+    pnEspecial:v('iPNEspecial'),pnEspecialCd2:v('iPNEspecialCd2'),pnFralda:v('iPNFralda'),pnFraldaF:v('iPNFraldaF'),pnFraldaFCd2:v('iPNFraldaFCd2'),
+    pnGel:v('iPNGel'),pnJuncao:v('iPNJuncao'),pnDoca:v('iPNDoca'),pnDocaCd2:v('iPNDocaCd2'),
     osImpMed:v('iOsImpMed'),osImpPerf:v('iOsImpPerf'),
     osTotalMed:v('iOsTotalMed'),osTotalPerf:v('iOsTotalPerf'),
     osProdMedBase:parseSumNumber(document.getElementById('iOsProdMedBase')?.value||0),
@@ -4996,8 +5053,8 @@ function sumHoraInput(metric){
   const inputs=[...document.querySelectorAll(`#hTblBody input[data-m="${metric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
   if(!inputs.length)return 0;
   if(isRouteMetric(metric)){
-    const route=routeFromMetric(metric);
-    const totals=[...document.querySelectorAll(`#hTblBody input[data-m="${routeTotalMetricKey(route)}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i).map(inp=>inp.value!==''?+inp.value:'');
+    const totalMetric=routeTotalMetricKeyFor(metric);
+    const totals=[...document.querySelectorAll(`#hTblBody input[data-m="${totalMetric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i).map(inp=>inp.value!==''?+inp.value:'');
     const pending=inputs.map(inp=>inp.value!==''?+inp.value:'');
     return routePendingToDone(pending,totals,routeInitialTotal(getDay(currentFormDate()),metric)).reduce((s,v)=>s+(v===''?0:+v),0);
   }
@@ -11815,6 +11872,45 @@ function renderDashCharts(day){
       scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45,autoSkip:false,padding:18},grid:{color:'rgba(6,35,61,0.10)'}},
               y:{beginAtZero:true,ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'}}}}});
 
+  const veCd2=dv(hd,'Vol. Doca CD 2');
+  const veCd2Acum=[];let runCd2=0;
+  veCd2.forEach(v=>{if(v!==null){runCd2+=v;veCd2Acum.push(runCd2);}else veCd2Acum.push(runCd2>0?runCd2:null);});
+  destroyChart('expCd2');
+  const expCd2Canvas=document.getElementById('cExpCd2');
+  if(expCd2Canvas){
+    CH.expCd2=new Chart(expCd2Canvas,{type:'bar',
+      data:{labels:HOURS,datasets:[
+        {label:'Meta do período CD 2',data:HOURS.map((_,i)=>capForHour('Vol. Doca CD 2',capVEh,i,day.date)),type:'line',borderColor:CAPACITY_OK_COLOR,borderDash:[5,3],borderWidth:1.5,pointRadius:0,fill:false},
+        {label:'Vol. Expedição CD 2/h',data:veCd2,backgroundColor:veCd2.map((v,i)=>v===null?'transparent':v>=capForHour('Vol. Doca CD 2',capVEh,i,day.date)?CAPACITY_OK_COLOR:CAPACITY_LOW_COLOR),borderRadius:3},
+        {label:'Acumulado CD 2',data:veCd2Acum,type:'line',borderColor:CAPACITY_OK_COLOR,borderWidth:2,pointRadius:2,fill:false,yAxisID:'y2'}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,
+        layout:{padding:{bottom:10}},
+        plugins:{legend:{labels:{color:'#00385f',font:{size:9,weight:'bold'}}}},
+        scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45,autoSkip:false,padding:18},grid:{color:'rgba(6,35,61,0.10)'}},
+                y:{ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'},position:'left'},
+                y2:{ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{display:false},position:'right'}}}});
+  }
+
+  const renderCd2SingleChart=(key,canvasId,metric,cap,label)=>{
+    destroyChart(key);
+    const canvas=document.getElementById(canvasId);
+    if(!canvas)return;
+    const vals=dv(hd,metric);
+    CH[key]=new Chart(canvas,{type:'bar',
+      data:{labels:HOURS,datasets:[
+        {label:'Meta do período',data:HOURS.map((_,i)=>capForHour(metric,cap,i,day.date)),type:'line',borderColor:CAPACITY_OK_COLOR,borderDash:[5,3],borderWidth:1.5,pointRadius:0,fill:false},
+        {label,data:vals,backgroundColor:vals.map((v,i)=>v===null?'transparent':v>=capForHour(metric,cap,i,day.date)?CAPACITY_OK_COLOR:CAPACITY_LOW_COLOR),borderRadius:3}
+      ]},
+      options:{responsive:true,maintainAspectRatio:false,
+        layout:{padding:{bottom:10}},
+        plugins:{legend:{labels:{color:'#00385f',font:{size:9,weight:'bold'}}}},
+        scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45,autoSkip:false,padding:18},grid:{color:'rgba(6,35,61,0.10)'}},
+                y:{beginAtZero:true,ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'}}}}});
+  };
+  renderCd2SingleChart('acumCd2','cAcumCd2','Vol. Especial CD 2',capEspH,'Vol. Especial CD 2/h');
+  renderCd2SingleChart('fraldaFCd2','cFraldaFCd2','Vol. Fraldas Cx Fech. CD 2',useNewRules(day.date)?100:(day.capFrF||114),'Vol. Fraldas Cx Fech. CD 2/h');
+
   // EPM e Vales
   const epm=epmSeriesFromHd(hd),vals=dv(hd,'Vales');
   const capEPM=day.capErros||2500,capVales=day.capVales||1;
@@ -11832,6 +11928,7 @@ function renderDashCharts(day){
               y2:{ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{display:false},position:'right'}}}});
 
   renderRouteClosure(day);
+  renderRouteClosureCd2(day);
 }
 
 // ── DOCA BALANCE CHART ────────────────────────────────────
@@ -11977,6 +12074,131 @@ function renderRouteClosure(day){
     if(totalRotas===0){alertEl.style.background='rgba(180,130,0,.25)';alertEl.style.color='#ffd700';alertEl.textContent='Preencha a volumetria das rotas para acompanhar o fechamento da Doca.';}
     else if(volumePendente>0){alertEl.style.background='rgba(180,20,20,.35)';alertEl.style.color='#ff4c4c';alertEl.textContent=`${volumePendente.toLocaleString('pt-BR')} volumes pendentes em ${rotasPendentes} rota(s).`;}
     else{alertEl.style.background='rgba(0,180,80,.25)';alertEl.style.color='#00e676';alertEl.textContent='Todas as rotas com volumetria foram expedidas.';}
+  }
+}
+
+function renderRouteClosureCd2(day){
+  const hd=day.hd||{};
+  const rotas=buildRotasMerged(day);
+  const baseMetric=r=>routeMetricKeyCd2(r);
+  const totalMetric=r=>routeTotalMetricKeyCd2(r);
+  const routeSnapshots=rotas.map(r=>routeProgressSnapshotForMetric(day,r,hd,baseMetric(r),totalMetric(r),0));
+  const totais=routeSnapshots.map(s=>s.total);
+  const expedidos=routeSnapshots.map(s=>s.completed);
+  const pendencias=routeSnapshots.map(s=>s.remaining);
+  const percentuais=rotas.map((_,i)=>totais[i]>0?Math.min(Math.round(expedidos[i]/totais[i]*100),100):null);
+  const percentuaisFalta=percentuais.map(p=>p===null?null:Math.max(100-p,0));
+  const barras=percentuais.map(p=>p===null?null:100);
+  const wrapRouteName=name=>{
+    const lines=[];
+    String(name||'').split('/').forEach(part=>{
+      const words=part.trim().split(/\s+/);let line='';
+      words.forEach(word=>{
+        if(line&&`${line} ${word}`.length>18){lines.push(line);line=word;}
+        else line=line?`${line} ${word}`:word;
+      });
+      if(line)lines.push(line);
+    });
+    return lines;
+  };
+  const labels=rotas.map(r=>[`Rota ${r.cod}`,...wrapRouteName(r.cidade),`Prev. ${r.hPrev}`]);
+  const rotasHora=HOURS.map((_,i)=>{
+    const total=rotas.reduce((sum,r)=>{
+      const vals=hd[baseMetric(r)]||[];
+      return sum+(vals[i]!==''&&vals[i]!==null&&vals[i]!==undefined?+vals[i]:0);
+    },0);
+    return total>0?total:null;
+  });
+  const totalEntrada=sumHoraField('Vol. Especial CD 2',hd)+sumHoraField('Vol. Fraldas Cx Fech. CD 2',hd);
+  const totalDocaHora=sumHoraField('Vol. Doca CD 2',hd);
+  const totalRotas=totais.reduce((s,v)=>s+v,0);
+  const totalSaida=expedidos.reduce((s,v)=>s+v,0);
+  const totalRotasHora=rotasHora.reduce((s,v)=>s+(v||0),0);
+  const rotasFinalizadas=rotas.filter((_,i)=>totais[i]>0&&expedidos[i]>=totais[i]).length;
+  const rotasPendentes=rotas.length-rotasFinalizadas;
+  const volumePendente=totalRotas-totalSaida;
+  const saldoFinal=totalEntrada-totalSaida;
+
+  if(CH.docaBalCd2)CH.docaBalCd2.destroy();
+  const canvas=document.getElementById('cDocaBalanceCd2');
+  if(canvas){
+    const routeProgressLabels={
+      id:'routeProgressLabelsCd2',
+      afterDatasetsDraw(chart){
+        const meta=chart.getDatasetMeta(0),ctx=chart.ctx;
+        ctx.save();ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillStyle='#ffffff';ctx.font='bold 9px Arial';
+        meta.data.forEach((bar,i)=>{
+          const feito=percentuais[i],falta=percentuaisFalta[i];
+          if(feito===null)return;
+          const altura=bar.base-bar.y;
+          const divisao=bar.base-(altura*feito/100);
+          if(feito>0&&bar.base-divisao>=14)ctx.fillText(`${feito}% feito`,bar.x,(divisao+bar.base)/2);
+          if(falta>0&&divisao-bar.y>=14)ctx.fillText(`${falta}% falta`,bar.x,(bar.y+divisao)/2);
+        });
+        ctx.restore();
+      }
+    };
+    const routeProgressColor=ctx=>{
+      const area=ctx.chart.chartArea,p=percentuais[ctx.dataIndex];
+      if(!area||p===null)return CAPACITY_LOW_COLOR;
+      const ratio=Math.max(0,Math.min(p,100))/100;
+      const gradient=ctx.chart.ctx.createLinearGradient(0,area.bottom,0,area.top);
+      if(ratio>=1){gradient.addColorStop(0,CAPACITY_OK_COLOR);gradient.addColorStop(1,CAPACITY_OK_COLOR);}
+      else{
+        gradient.addColorStop(0,CAPACITY_OK_COLOR);gradient.addColorStop(ratio,CAPACITY_OK_COLOR);
+        gradient.addColorStop(ratio,CAPACITY_LOW_COLOR);gradient.addColorStop(1,CAPACITY_LOW_COLOR);
+      }
+      return gradient;
+    };
+    CH.docaBalCd2=new Chart(canvas,{type:'bar',
+      data:{labels,datasets:[{label:'Fechamento da rota CD 2',data:barras,backgroundColor:routeProgressColor,borderColor:'#1c4f70',borderWidth:1,borderRadius:3,borderSkipped:false,maxBarThickness:42,categoryPercentage:.68,barPercentage:.78}]},
+      plugins:[routeProgressLabels],
+      options:{responsive:true,maintainAspectRatio:false,
+        layout:{padding:{top:24,right:28,left:8,bottom:6}},
+        plugins:{legend:{display:false},tooltip:{callbacks:{
+          title:items=>{const r=rotas[items[0].dataIndex];return`${r.cod} — ${r.cidade}`;},
+          label:ctx=>{const i=ctx.dataIndex;return[
+            ` Fechamento CD 2: ${percentuais[i]===null?'—':percentuais[i]+'%'}`,
+            ` Volumes: ${expedidos[i].toLocaleString('pt-BR')} / ${totais[i].toLocaleString('pt-BR')}`,
+            ` Pendente: ${pendencias[i].toLocaleString('pt-BR')}`
+          ];}
+        }}},
+        scales:{
+          x:{ticks:{color:'#00385f',font:{size:10,weight:'bold'},maxRotation:0,minRotation:0,autoSkip:false,padding:7},grid:{display:false},offset:true},
+          y:{beginAtZero:true,max:110,ticks:{color:'#00385f',font:{size:9,weight:'bold'},stepSize:20,callback:v=>v>100?'':v+'%'},grid:{color:'rgba(6,35,61,0.12)'},title:{display:true,text:'% Fechamento CD 2',color:'#00385f',font:{size:9,weight:'bold'}}}
+        }}
+    });
+  }
+
+  const routesHourEl=document.getElementById('docaRoutesHourCd2');
+  if(routesHourEl){
+    routesHourEl.innerHTML=`<table><thead><tr><th style="text-align:left">Volumes das Rotas CD 2 / Hora</th>${HOURS.map(h=>`<th>${h}</th>`).join('')}<th>Total</th></tr></thead>
+      <tbody><tr><td class="row-lbl">Somatório das 18 rotas CD 2</td>${rotasHora.map(v=>`<td>${v===null?'-':v.toLocaleString('pt-BR')}</td>`).join('')}<td style="color:#00e5ff;font-weight:bold">${totalRotasHora.toLocaleString('pt-BR')}</td></tr></tbody></table>`;
+  }
+
+  const panel=document.getElementById('docaKpiPanelCd2');
+  if(panel){
+    const kpis=[
+      {l:'Total Entrou CD 2',v:totalEntrada.toLocaleString('pt-BR'),c:'#ff9500'},
+      {l:'Vol. Rotas Previsto CD 2',v:totalRotas.toLocaleString('pt-BR'),c:'#4da6ff'},
+      {l:'Vol. Rotas Expedido CD 2',v:totalSaida.toLocaleString('pt-BR'),c:'#00e676'},
+      {l:'Vol. Pendente CD 2',v:volumePendente.toLocaleString('pt-BR'),c:volumePendente>0?'#ff4c4c':'#00e676',sub:`${rotasPendentes} rota(s) pendente(s)`},
+      {l:'Vol. Doca CD 2 H/H',v:totalDocaHora.toLocaleString('pt-BR'),c:'#00e5ff',sub:'Realizado hora a hora'},
+      {l:'Rotas CD 2 Finalizadas',v:`${rotasFinalizadas}/${rotas.length}`,c:rotasPendentes?'#ffd700':'#00e676'},
+      {l:'Vol. Rotas CD 2 H/H',v:totalRotasHora.toLocaleString('pt-BR'),c:totalRotasHora===totalSaida?'#00e676':'#ffd700',sub:'Somatório das linhas por rota'},
+      {l:'Saldo Entrada x Rotas CD 2',v:(saldoFinal>0?'+':'')+saldoFinal.toLocaleString('pt-BR'),c:saldoFinal<=0?'#00e676':'#ff4c4c',sub:saldoFinal<=0?'Entrada coberta pelas rotas':'Volume ainda sem saída por rota'}
+    ];
+    panel.innerHTML=kpis.map(k=>`<div class="kpi" style="border-color:rgba(0,230,118,.3);padding:7px 9px;min-height:54px;text-align:left">
+      <div class="kpi-lbl" style="white-space:normal;overflow:visible;text-overflow:clip;line-height:1.15">${k.l}</div><div class="kpi-val" style="color:${k.c};font-size:16px;line-height:1.1;text-align:left;word-break:keep-all">${k.v}</div>
+      ${k.sub?`<div style="font-size:9px;color:#4a7a9b;margin-top:3px;line-height:1.2;white-space:normal">${k.sub}</div>`:''}</div>`).join('');
+  }
+
+  const alertEl=document.getElementById('docaBalanceAlertCd2');
+  if(alertEl){
+    alertEl.style.display='block';
+    if(totalRotas===0){alertEl.style.background='rgba(180,130,0,.25)';alertEl.style.color='#ffd700';alertEl.textContent='Preencha a volumetria das rotas CD 2 para acompanhar o fechamento.';}
+    else if(volumePendente>0){alertEl.style.background='rgba(180,20,20,.35)';alertEl.style.color='#ff4c4c';alertEl.textContent=`${volumePendente.toLocaleString('pt-BR')} volumes pendentes em ${rotasPendentes} rota(s) CD 2.`;}
+    else{alertEl.style.background='rgba(0,180,80,.25)';alertEl.style.color='#00e676';alertEl.textContent='Todas as rotas CD 2 com volumetria foram expedidas.';}
   }
 }
 
@@ -12132,7 +12354,8 @@ function renderDashTables(day){
     'Vol. Checkout Psico':checkoutPsicoVolCap(day),'Linhas Checkout Psico':day.capLCPsi||null,'Unid. Checkout Psico':checkoutPsicoUnidCap(day),
     'Vol. Psico CK':day.capVPsi,'Unid. Psico CK':day.capUPsi,'Vol. Gel. CK':day.capVGel,
     'Vales':day.capVales,'Vol. Expedição':day.capVE,'Vol. Especial':day.capEsp,
-    'Vol. Fralda Frac.':day.capFrFc,'Vol. Fralda Fech.':day.capFrF};
+    'Vol. Fralda Frac.':day.capFrFc,'Vol. Fralda Fech.':day.capFrF,
+    'Vol. Especial CD 2':day.capEsp,'Vol. Fraldas Cx Fech. CD 2':day.capFrF,'Vol. Doca CD 2':day.capVE};
   const renderConfTbl=(id,plannedMetric,activeMetric)=>{
     const cp=fitHourValues(hd[plannedMetric]);
     const ca=fitHourValues(hd[activeMetric]);
@@ -12153,6 +12376,8 @@ function renderDashTables(day){
     :['Linhas Med.','Linhas Perf.','Erros Sep. Med.'];
   const expedicaoMetrics=['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.',
     ...(useGeladeiraHora(day.date)?['Vol. Geladeira']:[]),'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca'];
+  const expedicaoCd2Metrics=['Vol. Especial CD 2','Vol. Fraldas Cx Fech. CD 2','Vol. Doca CD 2',
+    ...(useSplitIndicators(day.date)?routeHourMetricsCd2():[])];
   const DASH_GROUPS=[
     {title:'🔴 CORREIA — Separação',    bg:'rgba(255,149,0,.12)',
      metrics:correiaMetrics},
@@ -12160,6 +12385,8 @@ function renderDashTables(day){
      metrics:['Vol. Checkout','Linhas Checkout','Unid. Checkout']},
     {title:'🟢 EXPEDIÇÃO — DOCA (base até 04:00 | extensão até 07:00)', bg:'rgba(0,230,118,.1)',
      metrics:expedicaoMetrics},
+    {title:'🟢 FECHAMENTO DE ROTAS CD 2', bg:'rgba(0,230,118,.14)',
+     metrics:expedicaoCd2Metrics},
     {title:'📋 CONTROLE',               bg:'rgba(100,100,180,.08)',
      metrics:['Vales','Conf. Planejado','Conf. Ativo']},
   ];
@@ -12171,8 +12398,8 @@ function renderDashTables(day){
       const isCK=['Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.','Vol. Checkout','Linhas Checkout','Unid. Checkout'].includes(m);
       const rawVals=fitHourValues(hd[m]);
       const initialTotal=isRoute?routeInitialTotal(day,m):0;
-      const route=isRoute?routeFromMetric(m):null;
-      const rawTotals=isRoute?fitHourValues(hd[routeTotalMetricKey(route)]):fitHourValues([]);
+      const totalMetric=isRoute?routeTotalMetricKeyFor(m):null;
+      const rawTotals=isRoute?fitHourValues(hd[totalMetric]):fitHourValues([]);
       const carriedTotals=isRoute?routeCarriedTotals(rawTotals,initialTotal):rawTotals;
       const vals=isRoute?routeDoneToPending(rawVals,rawTotals,initialTotal):(isEpmMetric(m)?epmSeries(rawVals,hd['Unid. Med.']||[]):rawVals);
       const displayMetric=metricDisplayName(m);
@@ -12899,20 +13126,23 @@ function routePendingToDone(pending,totals,totalInitial){
   return done;
 }
 
-function routeProgressSnapshot(day,route,hd){
-  const done=fitHourValues(hd[routeMetricKey(route)]||[]);
-  const totals=fitHourValues(hd[routeTotalMetricKey(route)]||[]);
-  const fallback=+route.vol||routeInitialTotal(day,routeMetricKey(route));
+function routeProgressSnapshotForMetric(day,route,hd,baseMetric,totalMetric,initialTotal=0){
+  const done=fitHourValues(hd[baseMetric]||[]);
+  const totals=fitHourValues(hd[totalMetric]||[]);
+  const fallback=+initialTotal||0;
   const carried=routeCarriedTotals(totals,fallback);
   const pending=routeDoneToPending(done,totals,fallback);
   let total=fallback,remaining=total,hasData=false;
   for(let i=0;i<HOURS.length;i++){
     if(carried[i]!=='')total=carried[i];
     if(pending[i]!==''){remaining=pending[i];hasData=true;}
-    else if(totals[i]!==''&&totals[i]!==null&&totals[i]!==undefined){remaining=Math.max(total-sumHoraField(routeMetricKey(route),hd),0);hasData=true;}
+    else if(totals[i]!==''&&totals[i]!==null&&totals[i]!==undefined){remaining=Math.max(total-sumHoraField(baseMetric,hd),0);hasData=true;}
   }
-  const completed=hasData?Math.max(total-remaining,0):Math.min(sumHoraField(routeMetricKey(route),hd),total||Infinity);
+  const completed=hasData?Math.max(total-remaining,0):Math.min(sumHoraField(baseMetric,hd),total||Infinity);
   return{total,remaining:Math.max(total-completed,0),completed,totals,pending,done};
+}
+function routeProgressSnapshot(day,route,hd){
+  return routeProgressSnapshotForMetric(day,route,hd,routeMetricKey(route),routeTotalMetricKey(route),+route.vol||routeInitialTotal(day,routeMetricKey(route)));
 }
 
 function deltaHintHtml(delta,label='resultado/hora'){
@@ -12954,6 +13184,8 @@ function buildHoraTable(hd){
     :['Linhas Med.','Linhas Perf.','Erros Sep. Med.'];
   const expedicaoMetrics=['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.',
     ...(useGeladeiraHora(formDate)?['Vol. Geladeira']:[]),'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca',...(useSplitIndicators(formDate)?routeHourMetrics():[])];
+  const expedicaoCd2Metrics=['Vol. Especial CD 2','Vol. Fraldas Cx Fech. CD 2','Vol. Doca CD 2',
+    ...(useSplitIndicators(formDate)?routeHourMetricsCd2():[])];
   const MHORA_GROUPS=[
     {title:'🔴 CORREIA — Separação', color:'rgba(255,149,0,.15)',
      metrics:correiaMetrics},
@@ -12961,6 +13193,8 @@ function buildHoraTable(hd){
      metrics:['Vol. Checkout','Linhas Checkout',...(useCheckoutPsico(formDate)?CHECKOUT_PSICO_METRICS:[]),'Unid. Checkout']},
     {title:'🟢 EXPEDIÇÃO — DOCA (base até 04:00 | extensão até 07:00)', color:'rgba(0,230,118,.12)',
      metrics:expedicaoMetrics},
+    {title:'🟢 FECHAMENTO DE ROTAS CD 2', color:'rgba(0,230,118,.18)',
+     metrics:expedicaoCd2Metrics},
     {title:'📋 CONTROLE', color:'rgba(100,100,180,.1)',
      metrics:['Vales','Conf. Planejado','Conf. Ativo',...(useCheckoutPsico(formDate)?CHECKOUT_PSICO_CONTROL_METRICS:[])]},
   ];
@@ -12978,8 +13212,10 @@ function buildHoraTable(hd){
       const epmModeHint=isEpmMetric(m)?`<span style="font-size:8px;color:#00e5ff;display:block">erros ÷ unid. med. × 1.000.000</span>`:'';
       let html=`<td class="hlbl">${metricDisplayName(m)}${cap?`<span style="font-size:9px;color:#6a9fc0;font-weight:normal;display:block">${isInv?'máx':'meta'}: ${cap.toLocaleString('pt-BR')}/h</span>`:''} ${modeHint}${epmModeHint}</td>`;
       // Para modo delta: converter deltas armazenados → acumulados para exibir
+      const baseMetric=isRoute?routeBaseMetricKey(m):m;
+      const totalMetric=isRoute?routeTotalMetricKeyFor(m):null;
       const rawVals=hd&&hd[m]?hd[m]:new Array(HOURS.length).fill('');
-      const rawTotals=isRoute&&hd&&hd[routeTotalMetricKey(route)]?hd[routeTotalMetricKey(route)]:new Array(HOURS.length).fill('');
+      const rawTotals=isRoute&&hd&&hd[totalMetric]?hd[totalMetric]:new Array(HOURS.length).fill('');
       const displayVals=isRoute?routeDoneToPending(rawVals,rawTotals,initialTotal):useDelta?deltasToAcums(rawVals):rawVals;
       // Deltas calculados para colorir célula (baseado no ritmo/hora)
       const deltaVals=isEpmMetric(m)?epmSeries(rawVals,(hd&&hd['Unid. Med.'])||[]):rawVals;
@@ -13004,7 +13240,7 @@ function buildHoraTable(hd){
         const periodTarget=cap?capForHour(m,cap,i,formDate):null;
         const targetTitle=periodTarget?`${isInv?'Limite':'Meta'} do período: ${periodTarget.toLocaleString('pt-BR')}`:'';
         html+=`<td class="hora-cell" style="${bg};${extraStyle}" title="${[isExtra?'⚡ Hora extra':'',targetTitle,isRoute?'Realizado acumulado = total atualizado - pendente':useDelta?'Resultado da hora = acumulado atual - acumulado anterior':''].filter(Boolean).join(' | ')}">
-          ${isRoute?`<span class="route-hour-label">Total atualizado</span><input class="route-total-hour-input" type="number" min="0" data-m="${routeTotalMetricKey(route)}" data-i="${i}" data-route-total="1" value="${rawTotals[i]??''}" placeholder="total" oninput="onHoraInput(this);persistHoraInputNow(this);liveUpdate({skipAutoSave:true})"/><span class="route-hour-label">Pendente</span>`:''}
+          ${isRoute?`<span class="route-hour-label">Total atualizado</span><input class="route-total-hour-input" type="number" min="0" data-m="${totalMetric}" data-i="${i}" data-route-total="1" value="${rawTotals[i]??''}" placeholder="total" oninput="onHoraInput(this);persistHoraInputNow(this);liveUpdate({skipAutoSave:true})"/><span class="route-hour-label">Pendente</span>`:''}
           <input class="${isRoute?'hora-acum-input route-pending-input':useDelta?'hora-acum-input':''}" type="number" min="0" data-m="${m}" data-i="${i}" data-use-delta="${useDelta?1:0}" data-route-pending="${isRoute?1:0}" value="${vDisplay}" placeholder="${isRoute?'pendente':'-'}"
             oninput="onHoraInput(this);persistHoraInputNow(this);liveUpdate({skipAutoSave:true})"
             style="${isExtra?'opacity:0.75':''}"/>
@@ -13020,7 +13256,7 @@ function onHoraInput(inp){
   const m=inp.dataset.m;const route=routeFromAnyMetric(m);const isRoute=!!route;const useDelta=inp.dataset.useDelta==='1';
   if(isRoute){
     const row=inp.closest('tr');
-    const baseMetric=routeMetricKey(route),totalMetric=routeTotalMetricKey(route);
+    const baseMetric=routeBaseMetricKey(m),totalMetric=routeTotalMetricKeyFor(m);
     const inputs=[...row.querySelectorAll(`input[data-m="${baseMetric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
     const totalInputs=[...row.querySelectorAll(`input[data-m="${totalMetric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
     const pending=inputs.map(el=>el.value!==''?+el.value:'');
@@ -13038,7 +13274,7 @@ function onHoraInput(inp){
       td.style.background=current!==''&&carried[idx]!==''&&current>carried[idx]?'rgba(180,20,20,.5)':current===0?'rgba(0,100,50,.45)':'';
     });
     const latestTotal=[...totals].reverse().find(v=>v!=='');
-    if(latestTotal!==undefined)syncRouteCurrentTotal(route.cod,latestTotal,{fromUser:true});
+    if(latestTotal!==undefined&&!isRouteCd2Metric(m))syncRouteCurrentTotal(route.cod,latestTotal,{fromUser:true});
   } else if(useDelta){
     // Recalcular e atualizar os hints Δ da linha inteira
     const row=inp.closest('tr');
@@ -13117,9 +13353,8 @@ function readHoraData(){
   const metricsToRead=new Set(metrics);
   Object.keys(byMetric).forEach(m=>{
     if(routeFromAnyMetric(m)){
-      const route=routeFromAnyMetric(m);
-      metricsToRead.add(routeMetricKey(route));
-      metricsToRead.add(routeTotalMetricKey(route));
+      metricsToRead.add(routeBaseMetricKey(m));
+      metricsToRead.add(routeTotalMetricKeyFor(m));
     }
   });
   metricsToRead.forEach(m=>{
@@ -13127,9 +13362,9 @@ function readHoraData(){
     if(!hd[m])hd[m]=new Array(HOURS.length).fill('');
     const vals=byMetric[m]||new Array(HOURS.length).fill('');
     if(isRouteMetric(m)){
-      const route=routeFromMetric(m);
-      const totals=byMetric[routeTotalMetricKey(route)]||new Array(HOURS.length).fill('');
-      hd[routeTotalMetricKey(route)]=totals;
+      const totalMetric=routeTotalMetricKeyFor(m);
+      const totals=byMetric[totalMetric]||new Array(HOURS.length).fill('');
+      hd[totalMetric]=totals;
       hd[m]=routePendingToDone(vals,totals,routeInitialTotal(getDay(dt),m));
     } else if(isDeltaMetric(m,dt)){
       hd[m]=acumToDeltas(vals);
@@ -13172,8 +13407,8 @@ function persistHoraInputNow(inp){
   const ts=Date.now();
   const route=routeFromAnyMetric(m);
   if(route){
-    const baseMetric=routeMetricKey(route);
-    const totalMetric=routeTotalMetricKey(route);
+    const baseMetric=routeBaseMetricKey(m);
+    const totalMetric=routeTotalMetricKeyFor(m);
     const row=inp.closest('tr')||document;
     const inputs=[...row.querySelectorAll(`input[data-m="${baseMetric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
     const totalInputs=[...row.querySelectorAll(`input[data-m="${totalMetric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
@@ -13185,7 +13420,7 @@ function persistHoraInputNow(inp){
       setDayHdCell(day,baseMetric,i,done[i],ts,m===baseMetric&&i===changedIndex);
     }
     const latestTotal=[...totals].reverse().find(v=>v!==''&&v!==null&&v!==undefined);
-    if(latestTotal!==undefined)syncRouteCurrentTotal(route.cod,latestTotal,{fromUser:true});
+    if(latestTotal!==undefined&&!isRouteCd2Metric(m))syncRouteCurrentTotal(route.cod,latestTotal,{fromUser:true});
   }else if(isDeltaMetric(m,dt)){
     const row=inp.closest('tr')||document;
     const inputs=[...row.querySelectorAll(`input[data-m="${m}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
@@ -13207,8 +13442,8 @@ let nightEditedFieldIds=new Set();
 let nightEditedHourCells=new Set();
 const NIGHT_INPUT_FIELD_KEYS={
   iPNVol:'pnVol',iPNUnid:'pnUnid',iPNCorreia:'pnCorreia',iPNPsico:'pnPsico',iPNEspecial:'pnEspecial',
-  iPNEspFrac:'pnEspFrac',iPNEspMed:'pnEspMed',iPNEspPerf:'pnEspPerf',iPNFralda:'pnFralda',
-  iPNFraldaF:'pnFraldaF',iPNGel:'pnGel',iPNOnco:'pnOnco',iPNOncoT:'pnOncoT',iPNJuncao:'pnJuncao',iPNDoca:'pnDoca',
+  iPNEspecialCd2:'pnEspecialCd2',iPNEspFrac:'pnEspFrac',iPNEspMed:'pnEspMed',iPNEspPerf:'pnEspPerf',iPNFralda:'pnFralda',
+  iPNFraldaF:'pnFraldaF',iPNFraldaFCd2:'pnFraldaFCd2',iPNGel:'pnGel',iPNOnco:'pnOnco',iPNOncoT:'pnOncoT',iPNJuncao:'pnJuncao',iPNDoca:'pnDoca',iPNDocaCd2:'pnDocaCd2',
   iAcumMed:'acumMed',iAcumPerf:'acumPerf',iMeta:'meta',iOsImpMed:'osImpMed',iOsImpPerf:'osImpPerf',
   iOsNaoImpMed:'osNaoImpMed',iOsNaoImpPerf:'osNaoImpPerf',iOsTotalMed:'osTotalMed',iOsTotalPerf:'osTotalPerf',
   iOsFinMed:'osFinMed',iOsFinPerf:'osFinPerf',iOsProdMedBase:'osProdMedBase',iOsProdPerfBase:'osProdPerfBase',
@@ -13245,8 +13480,9 @@ function wasNightHourCellEdited(metric,index){
   if(nightEditedHourCells.has(hourEditKey(metric,i)))return true;
   const route=routeFromAnyMetric(metric);
   if(route){
-    if(nightEditedHourCells.has(hourEditKey(routeMetricKey(route),i)))return true;
-    if(nightEditedHourCells.has(hourEditKey(routeTotalMetricKey(route),i)))return true;
+    const baseMetric=routeBaseMetricKey(metric),totalMetric=routeTotalMetricKeyFor(metric);
+    if(baseMetric&&nightEditedHourCells.has(hourEditKey(baseMetric,i)))return true;
+    if(totalMetric&&nightEditedHourCells.has(hourEditKey(totalMetric,i)))return true;
   }
   return false;
 }
@@ -13394,16 +13630,19 @@ function readFormAsDay(){
     pnCorreia:+document.getElementById('iPNCorreia').value||0,
     pnPsico:+document.getElementById('iPNPsico').value||0,
     pnEspecial:+document.getElementById('iPNEspecial').value||0,
+    pnEspecialCd2:+document.getElementById('iPNEspecialCd2').value||0,
     pnEspFrac:+document.getElementById('iPNEspFrac').value||0,
     pnEspMed:+document.getElementById('iPNEspMed').value||0,
     pnEspPerf:+document.getElementById('iPNEspPerf').value||0,
     pnFralda:+document.getElementById('iPNFralda').value||0,
     pnFraldaF:+document.getElementById('iPNFraldaF').value||0,
+    pnFraldaFCd2:+document.getElementById('iPNFraldaFCd2').value||0,
     pnGel:+document.getElementById('iPNGel').value||0,
     pnOnco:+document.getElementById('iPNOnco').value||0,
     pnOncoT:+document.getElementById('iPNOncoT').value||0,
     pnJuncao:+document.getElementById('iPNJuncao').value||0,
     pnDoca:+document.getElementById('iPNDoca').value||0,
+    pnDocaCd2:+document.getElementById('iPNDocaCd2').value||0,
     acum:acumMed+acumPerf,
     acumMed,acumPerf,
     meta:+document.getElementById('iMeta').value||0,
@@ -13484,12 +13723,12 @@ function loadFormFrom(day){
   s('iData',day.date);
   s('iPNVol',day.pnVol||'');s('iPNUnid',day.pnUnid||'');
   s('iPNCorreia',day.pnCorreia||'');s('iPNPsico',day.pnPsico||'');
-  s('iPNEspecial',day.pnEspecial||'');s('iPNEspFrac',day.pnEspFrac||'');
+  s('iPNEspecial',day.pnEspecial||'');s('iPNEspecialCd2',day.pnEspecialCd2||'');s('iPNEspFrac',day.pnEspFrac||'');
   s('iPNEspMed',day.pnEspMed||'');s('iPNEspPerf',day.pnEspPerf||'');
-  s('iPNFralda',day.pnFralda||'');s('iPNFraldaF',day.pnFraldaF||'');
+  s('iPNFralda',day.pnFralda||'');s('iPNFraldaF',day.pnFraldaF||'');s('iPNFraldaFCd2',day.pnFraldaFCd2||'');
   s('iPNGel',day.pnGel||'');s('iPNOnco',day.pnOnco||'');
   s('iPNOncoT',day.pnOncoT||'');s('iPNJuncao',day.pnJuncao||'');
-  s('iPNDoca',day.pnDoca||'');
+  s('iPNDoca',day.pnDoca||'');s('iPNDocaCd2',day.pnDocaCd2||'');
   const splitOp=hasSplitOperational(day);
   const simpleOp=useSimpleOperational(day.date);
   s('iAcumMed',splitOp?day.acumMed||'':day.acum||'');s('iAcumPerf',splitOp?day.acumPerf||'':'');s('iMeta',day.meta||'');
@@ -13812,6 +14051,7 @@ function saveRotaField(cod,field,val){
   updateRotasKPIs(renderDay);
   if(!isEditingDataField())renderRotasTbl(renderDay,'rotasTbl');
   renderRouteClosure(renderDay);
+  renderRouteClosureCd2(renderDay);
 }
 
 function calcAtraso(hPrev,hReal){
@@ -15211,10 +15451,13 @@ function renderPreench(){
     :['Linhas Med.','Linhas Perf.','Erros Sep. Med.'];
   const expedicaoMetrics=['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.',
     ...(useGeladeiraHora(day.date)?['Vol. Geladeira']:[]),'Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.','Vol. Doca'];
+  const expedicaoCd2Metrics=['Vol. Especial CD 2','Vol. Fraldas Cx Fech. CD 2','Vol. Doca CD 2',
+    ...(useSplitIndicators(day.date)?routeHourMetricsCd2():[])];
   const grupos=[
     {lbl:'CORREIA',cor:'rgba(255,149,0,.7)',metrics:correiaMetrics},
     {lbl:'CHECKOUT',cor:'rgba(0,229,255,.7)',metrics:['Vol. Checkout','Linhas Checkout',...(useCheckoutPsico(day.date)?CHECKOUT_PSICO_METRICS:[]),'Unid. Checkout']},
     {lbl:'EXPEDIÇÃO',cor:'rgba(0,230,118,.7)',metrics:expedicaoMetrics},
+    {lbl:'FECHAMENTO DE ROTAS CD 2',cor:'rgba(0,230,118,.9)',metrics:expedicaoCd2Metrics},
     {lbl:'CONTROLE',cor:'rgba(170,170,170,.5)',metrics:['Vales','Conf. Planejado','Conf. Ativo',...(useCheckoutPsico(day.date)?CHECKOUT_PSICO_CONTROL_METRICS:[])]},
   ];
   const soCK=new Set(['Vol. Checkout','Linhas Checkout','Unid. Checkout',...CHECKOUT_PSICO_METRICS,'Linhas Med.','Vol. Med.','Unid. Med.','Linhas Perf.','Vol. Perf.','Unid. Perf.','Erros Sep. Med.','Vales','Conf. Planejado','Conf. Ativo',...CHECKOUT_PSICO_CONTROL_METRICS]);
@@ -15224,7 +15467,8 @@ function renderPreench(){
     g.metrics.forEach(m=>{
       const isRoute=isRouteMetric(m);const route=routeFromMetric(m);const initialTotal=isRoute?routeInitialTotal(day,m):0;
       const rawVals=day.hd&&day.hd[m]?day.hd[m]:new Array(HOURS.length).fill('');
-      const rawTotals=isRoute&&day.hd&&day.hd[routeTotalMetricKey(route)]?day.hd[routeTotalMetricKey(route)]:new Array(HOURS.length).fill('');
+      const totalMetric=isRoute?routeTotalMetricKeyFor(m):null;
+      const rawTotals=isRoute&&day.hd&&day.hd[totalMetric]?day.hd[totalMetric]:new Array(HOURS.length).fill('');
       const displayVals=isRoute?routeDoneToPending(rawVals,rawTotals,initialTotal):isDeltaMetric(m,day.date)?deltasToAcums(rawVals):rawVals;
       const epmVals=isEpmMetric(m)?epmSeries(rawVals,(day.hd&&day.hd['Unid. Med.'])||[]):null;
       const routeHint=isRoute?`<span class="route-mode-hint">Total atualizado + pendente</span>`:'';
@@ -15238,7 +15482,7 @@ function renderPreench(){
           rows+=`<td style="background:#060e18;border:1px solid #1a3550"></td>`;
         }else{
           rows+=`<td style="border:1px solid #1a3550;padding:1px 2px;background:${extra?'rgba(255,149,0,.06)':'#0d1c2e'}">
-            ${isRoute?`<span class="route-hour-label">Total atualizado</span><input type="number" min="0" value="${rawTotals[i]??''}" data-m="${routeTotalMetricKey(route)}" data-i="${i}" data-route-total="1" style="width:56px;background:transparent;border:none;color:#00e5ff;padding:2px 4px;font-size:10px;text-align:center;outline:none" placeholder="total" oninput="preenchInput(this)"/><span class="route-hour-label">Pendente</span>`:''}
+            ${isRoute?`<span class="route-hour-label">Total atualizado</span><input type="number" min="0" value="${rawTotals[i]??''}" data-m="${totalMetric}" data-i="${i}" data-route-total="1" style="width:56px;background:transparent;border:none;color:#00e5ff;padding:2px 4px;font-size:10px;text-align:center;outline:none" placeholder="total" oninput="preenchInput(this)"/><span class="route-hour-label">Pendente</span>`:''}
             <input type="number" min="0" value="${val}" data-m="${m}" data-i="${i}"
               style="width:56px;background:transparent;border:none;color:${isRoute?'#ffd700':'#fff'};padding:2px 4px;font-size:10px;text-align:center;outline:none"
               placeholder="${isRoute?'pend.':''}"
@@ -15257,7 +15501,7 @@ function renderPreench(){
 }
 function updatePreenchRouteDone(metric){
   const route=routeFromAnyMetric(metric);if(!route)return;
-  const baseMetric=routeMetricKey(route),totalMetric=routeTotalMetricKey(route);
+  const baseMetric=routeBaseMetricKey(metric),totalMetric=routeTotalMetricKeyFor(metric);
   const inputs=[...document.querySelectorAll(`#preenchBody input[data-m="${baseMetric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
   const totalInputs=[...document.querySelectorAll(`#preenchBody input[data-m="${totalMetric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
   const pending=inputs.map(el=>el.value!==''?+el.value:'');
@@ -15333,20 +15577,19 @@ function persistPreenchInputsNow(changedMetric,changedIndex){
     if(changedMetric===undefined||changedMetric===null||changedIndex===undefined||changedIndex===null)return false;
     if(+i!==+changedIndex)return false;
     if(metric===changedMetric)return true;
-    const route=routeFromAnyMetric(changedMetric);
-    return !!(route&&(metric===routeMetricKey(route)||metric===routeTotalMetricKey(route)));
+    return !!(routeFromAnyMetric(changedMetric)&&(metric===routeBaseMetricKey(changedMetric)||metric===routeTotalMetricKeyFor(changedMetric)));
   };
   if(changedMetric){
     const route=routeFromAnyMetric(changedMetric);
     if(route){
-      metricsToSave.add(routeMetricKey(route));
-      metricsToSave.add(routeTotalMetricKey(route));
+      metricsToSave.add(routeBaseMetricKey(changedMetric));
+      metricsToSave.add(routeTotalMetricKeyFor(changedMetric));
     }
   }
   metricsToSave.forEach(metric=>{
     const route=routeFromAnyMetric(metric);
     if(route){
-      const baseMetric=routeMetricKey(route),totalMetric=routeTotalMetricKey(route);
+      const baseMetric=routeBaseMetricKey(metric),totalMetric=routeTotalMetricKeyFor(metric);
       const pending=byMetric[baseMetric]||routeDoneToPending(ensureDayHdArray(day,baseMetric),ensureDayHdArray(day,totalMetric),routeInitialTotal(day,baseMetric));
       const totals=byMetric[totalMetric]||ensureDayHdArray(day,totalMetric);
       const initialTotal=routeInitialTotal(day,baseMetric);
@@ -15356,7 +15599,7 @@ function persistPreenchInputsNow(changedMetric,changedIndex){
         setDayHdCell(day,baseMetric,i,done[i],ts,shouldAllowClear(baseMetric,i));
       }
       const latestTotal=[...totals].reverse().find(v=>v!==''&&v!==null&&v!==undefined);
-      if(latestTotal!==undefined){
+      if(latestTotal!==undefined&&!isRouteCd2Metric(metric)){
         if(!Array.isArray(day.rotas))day.rotas=[];
         const cod=normalizeRouteCode(route.cod);
         let savedRoute=day.rotas.find(r=>normalizeRouteCode(r.cod)===cod);
@@ -15396,7 +15639,7 @@ function preenchInput(inp){
   const st=document.getElementById('preenchStatus');
   if(st){st.textContent='⏳ Salvando...';st.style.color='#ffd700';}
   const saved=persistPreenchInputsNow(m,+inp.dataset.i)||persistDayNow();
-  if(saved&&routeFromAnyMetric(m)){renderRouteClosure(saved);renderDashTables(saved);}
+  if(saved&&routeFromAnyMetric(m)){renderRouteClosure(saved);renderRouteClosureCd2(saved);renderDashTables(saved);}
   if(st&&saved){st.textContent='✅ Salvo';st.style.color='#00e676';}
   setTimeout(()=>{const s=document.getElementById('preenchStatus');if(s)s.textContent='';},3000);
 }
