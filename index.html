@@ -2261,6 +2261,7 @@ let fbRestSaveRunning=false;
 let fbRestSaveQueued=false;
 let fbRestReplaceQueued=false;
 let pendingCloudSave=false;
+let cloudSaveError='';
 let cloudMirrorRunning=false;
 
 function load(){
@@ -4325,12 +4326,15 @@ async function saveToFirebaseRest(replaceDays=false){
       fbConnected=true;
       cloudConnecting=false;
       pendingCloudSave=false;
+      cloudSaveError='';
       fbRestLastHash=cloudPayloadHash(confirmed);
       showSyncStatus('Nuvem ativa',false);
       const lb=document.getElementById('liveBadge');if(lb)lb.style.display='inline';
     }while(fbRestSaveQueued||fbRestReplaceQueued);
   }catch(e){
     fbConnected=false;
+    pendingCloudSave=true;
+    cloudSaveError=e.message;
     showSyncStatus('Erro Firebase: '+e.message,true);
     console.error('Firebase REST save error:',e);
     throw e;
@@ -4417,6 +4421,7 @@ async function saveToFirebase(replaceDays=false){
       db.fluxogramas=normalizeFluxogramas(confirmed.fluxogramas||fluxogramasToSave);
       saveLocalDb(db);
       fbConnected=true;
+      cloudSaveError='';
       fbRestLastHash=cloudPayloadHash(confirmed);
       showSyncStatus('☁ Nuvem ativa',false);
       setTimeout(()=>{isSaving=false;},1000);
@@ -4444,13 +4449,18 @@ function startFirebaseFallback(reason,pushLocal=false,replaceDays=false){
 
 function showSyncStatus(msg,isErr){
   const el=document.getElementById('syncStatus');if(!el)return;
+  if(cloudSaveError&&pendingCloudSave&&isErr!==true){
+    msg='Falha no envio - dados locais pendentes: '+cloudSaveError;
+    isErr=true;
+  }
   el.textContent=msg;
   el.style.color=isErr?'#ff4c4c':isErr===false?'#00e676':'#ffd700';
   el.style.borderColor=isErr?'rgba(233,69,96,.5)':isErr===false?'rgba(0,230,118,.5)':'rgba(255,215,0,.3)';
   // após 3s mostra status consolidado
   clearTimeout(el._statusTimer);
   el._statusTimer=setTimeout(()=>{
-    if(sbConnected&&fbConnected){el.textContent='☁ Firebase + Supabase';el.style.color='#00e676';}
+    if(cloudSaveError&&pendingCloudSave){el.textContent='Falha no envio - dados locais pendentes: '+cloudSaveError;el.style.color='#ff4c4c';}
+    else if(sbConnected&&fbConnected){el.textContent='☁ Firebase + Supabase';el.style.color='#00e676';}
     else if(sbConnected){el.textContent='☁ Supabase ativo';el.style.color='#00e676';}
     else if(fbConnected){el.textContent='☁ Firebase ativo';el.style.color='#00e676';}
     else if(cloudConnecting){el.textContent='☁ Reconectando nuvem...';el.style.color='#ffd700';}
