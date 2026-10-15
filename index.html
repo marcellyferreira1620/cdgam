@@ -3843,6 +3843,14 @@ function cloudPayloadHash(payload){
 
 function decodeFirebasePayload(raw){
   if(!raw)return null;
+  if(raw.payloadEncoding==='json-chunks-v1'){
+    const chunks=raw.payloadChunks;
+    if(!Array.isArray(chunks)||chunks.length!==raw.payloadChunkCount||chunks.some(part=>typeof part!=='string')){
+      throw new Error('Dados da nuvem incompletos; sincronizacao adiada');
+    }
+    const parsed=JSON.parse(chunks.join(''));
+    return {...parsed,savedAt:raw.savedAt||parsed.savedAt||0};
+  }
   if(typeof raw.payload==='string'){
     try{
       const parsed=JSON.parse(raw.payload);
@@ -3860,7 +3868,20 @@ function encodeFirebasePayload(payload){
     savedAt:(compact&&compact.savedAt)||Date.now()
   };
   if(STORE_FLUXOGRAMAS)safePayload.fluxogramas=normalizeFluxogramas(compact&&compact.fluxogramas);
-  return {payload:JSON.stringify(safePayload),savedAt:safePayload.savedAt};
+  const serialized=JSON.stringify(safePayload);
+  // Firebase limits each individual string to 10 MB, including UTF-8 characters.
+  if(new TextEncoder().encode(serialized).length<8*1024*1024){
+    return {payload:serialized,savedAt:safePayload.savedAt};
+  }
+  const chunks=[];
+  for(let start=0;start<serialized.length;){
+    let end=Math.min(start+256*1024,serialized.length);
+    const last=serialized.charCodeAt(end-1);
+    if(end<serialized.length&&last>=0xD800&&last<=0xDBFF)end--;
+    chunks.push(serialized.slice(start,end));
+    start=end;
+  }
+  return {payloadEncoding:'json-chunks-v1',payloadChunks:chunks,payloadChunkCount:chunks.length,savedAt:safePayload.savedAt};
 }
 
 async function fbRestReadPayload(){
@@ -4201,7 +4222,10 @@ async function fbRestWritePayload(payload){
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify(encodeFirebasePayload(payload))
   });
-  if(!r.ok)throw new Error(`Firebase REST HTTP ${r.status}`);
+  if(!r.ok){
+    const detail=await r.json().catch(()=>({}));
+    throw new Error(`Firebase REST HTTP ${r.status}: ${detail.error||'falha ao gravar'}`);
+  }
   await Promise.allSettled([fbRestWriteRotasShadow(payload),fbRestWriteRecebArm997Shadow(payload),fbRestWriteInventarioShadow(payload)]);
   return await r.json().catch(()=>null);
 }
