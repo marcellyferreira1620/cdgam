@@ -7493,6 +7493,11 @@ function removeRecebArmNota(notaId){
   renderRecebArm();
 }
 
+function recebArmQrpLocal(value){
+  const match=String(value??'').match(/(?:^|\s)(\d+)\s+(\d+)\s+(\d+)\s+(\d+)(?=\s|$)/);
+  return match?match.slice(1).join(' '):'';
+}
+
 function parseRecebArmQrpText(text,endereco){
   const raw=String(text||'');
   const skip=/^(Arial|Arial Narrow|Courier New|MS Sans Serif|Lista de Conferencia WMS \(PALETE\)|Local|Código|Codigo|Nome|Apresentação|Apresentacao|Entrada|Lote|Tipo|QT\. EMB|Validade|Prob\.|Venc\.|QT\. LOCAL|Reserva----|C\. Cx\. Lab\.|Genésio A\. Mendes & Cia\. Ltda\.)$/i;
@@ -7507,7 +7512,7 @@ function parseRecebArmQrpText(text,endereco){
     if(/^\d{1,3}(\.\d{3})+$/.test(v))return +v.replace(/\./g,'')||0;
     return +v.replace(',','.')||0;
   };
-  const isLocal=t=>/^\d{2}\s+\d{2}\s+\d{3}\s+\d{2}/.test(t);
+  const isLocal=t=>!!recebArmQrpLocal(t);
   const isCode=t=>/^\d{3,8}[A-ZÇÃÕÉÊÁÍÓÚÂÔÀÜ]?$/i.test(t);
   const isDate=t=>/^\d{2}\/\d{2}\/\d{4}$/.test(t);
   const hasLetter=t=>/[A-ZÇÃÕÉÊÁÍÓÚÂÔÀÜ]/i.test(t);
@@ -7531,6 +7536,7 @@ function parseRecebArmQrpText(text,endereco){
     rows.push({
       id:recebArmId('qrp'),
       endereco:endereco||'997',
+      local:recebArmQrpLocal(chunk[0]),
       codigo:code,
       descricao:chunk[codeRel+1]||'',
       apresentacao:chunk[codeRel+2]||'',
@@ -7556,7 +7562,7 @@ function parseRecebArmQrpText(text,endereco){
     if(/^\d{1,3}(\.\d{3})+$/.test(v))return +v.replace(/\./g,'')||0;
     return +v.replace(',','.')||0;
   };
-  const isLocal=t=>/^\d{2}\s+\d{2}\s+\d{3}\s+\d{2}/.test(t);
+  const isLocal=t=>!!recebArmQrpLocal(t);
   const isCode=t=>/^\d{3,8}(?:\/\d{1,2})?[A-Z\u00C0-\u017F]?$/i.test(t);
   const isDate=t=>/^\d{2}\/\d{2}\/\d{4}$/.test(t);
   const hasLetter=t=>/[A-Z\u00C0-\u017F]/i.test(t);
@@ -7594,6 +7600,7 @@ function parseRecebArmQrpText(text,endereco){
     rows.push({
       id:recebArmId('qrp'),
       endereco:endereco||'997',
+      local:recebArmQrpLocal(chunk[0]),
       codigo:code,
       nome,
       descricao:[nome,apresentacao].filter(Boolean).join(' - '),
@@ -7626,6 +7633,7 @@ function parseRecebArmExcel997(workbook,endereco){
     return{
       id:recebArmId('qrp'),
       endereco:endereco||recebArmCell(row,headers,['local','endereco','endereço'])||'997',
+      local:String(recebArmCell(row,headers,['local','endereco','endereço'])||'').trim(),
       codigo:String(codigo).trim(),
       descricao:String(recebArmCell(row,headers,['nome','descricao','descrição','produto'])||'').trim(),
       apresentacao:String(recebArmCell(row,headers,['apresentacao','apresentação'])||'').trim(),
@@ -7652,6 +7660,7 @@ function parseRecebArmExcel997(workbook,endereco){
     parsed.push({
       id:recebArmId('qrp'),
       endereco:endereco||recebArmCell(row,headers,['local','endereco','endereço'])||'997',
+      local:String(recebArmCell(row,headers,['local','endereco','endereço'])||'').trim(),
       codigo:String(codigo).trim(),
       nome,
       descricao:String(recebArmCell(row,headers,['nome do produto','nome','descricao','descrição','produto'])||nome).trim(),
@@ -7750,7 +7759,8 @@ function parseRecebArmQrpBuffer(buffer,endereco){
     }
     Object.values(groups).forEach(items=>{
       items.sort((a,b)=>a.x-b.x);
-      if(!items.some(item=>item.text==='09 09 999 07'))return;
+      const local=recebArmQrpLocal(items.filter(item=>item.x<120).map(item=>item.text).join(' '));
+      if(!local)return;
       const qtEmb=recebArm997ParseQty(recebArm997NearestText(items,595,635));
       const qtdLocal=recebArm997ParseQty(recebArm997NearestText(items,745,790));
       const volCalc=qtEmb>0?qtdLocal/qtEmb:0;
@@ -7760,7 +7770,7 @@ function parseRecebArmQrpBuffer(buffer,endereco){
         id:recebArmId('qrp'),
         endereco:endereco||'997',
         pagina:pageIdx+1,
-        local:recebArm997NearestText(items,10,90),
+        local,
         codigo,
         nome:recebArm997NearestText(items,185,315),
         descricao:[recebArm997NearestText(items,185,315),recebArm997NearestText(items,320,475)].filter(Boolean).join(' - '),
@@ -8046,6 +8056,21 @@ async function importRecebArm997(ev){
     }
     rows=recebArmQrpCurrentSnapshot(rows);
     if(!rows.length)throw new Error('Nenhuma linha encontrada');
+    const convertedRows=rows;
+    if(rows.some(row=>recebArmQrpLocal(row.local)&&recebArmQrpLocal(row.local)!=='09 09 999 07')){
+      const exportDay=getDay(curDate)||emptyDay(curDate||today());
+      recebArm997ExportCache={
+        date:exportDay.date,
+        importedAt:Date.now(),
+        fileName:file.name,
+        rows:recebArm997ConvertedRows({...exportDay.recebArm,qrpRows:convertedRows})
+      };
+      rows=rows.filter(row=>!recebArmQrpLocal(row.local)||recebArmQrpLocal(row.local)==='09 09 999 07');
+      if(!rows.length){
+        recebArmMsg('recebArm997Msg',`${convertedRows.length} linha(s) convertidas com endereco completo. Clique em "Exportar 997 convertida" para baixar o relatorio.`,false);
+        return;
+      }
+    }
     const day=recebArmDay();
     const data=ensureRecebArm(day);
     const sameParser=data.qrpParserVersion==='emf-997-v1';
@@ -8070,7 +8095,7 @@ async function importRecebArm997(ev){
       date:day.date,
       importedAt:importRecord.importedAt,
       fileName:file.name,
-      rows:recebArm997ConvertedRows(data)
+      rows:recebArm997ConvertedRows({...data,qrpRows:convertedRows})
     };
     recebArmTouch(day);
     compareRecebArmStorage(false);
@@ -11239,6 +11264,7 @@ function recebArm997ConvertedRows(data){
       pagina:r.pagina||'',
       local:r.local||r.endereco||'997',
       codigo:code,
+      descricao:[r.descricao||r.nome||base.descricao||'',`Endereco: ${r.local||r.endereco||'997'}`].filter(Boolean).join(' - '),
       nome:r.nome||String(r.descricao||'').split(' - ')[0]||base.descricao||'',
       apresentacao:r.apresentacao||'',
       lote:r.lote||'',
@@ -11272,6 +11298,7 @@ function exportRecebArm997Convertida(){
   const outRows=rows.map(r=>({
     Pagina:r.pagina,
     Local:r.local,
+    Descricao:r.descricao,
     Codigo:r.codigo,
     Nome:r.nome,
     Apresentacao:r.apresentacao,
@@ -11296,9 +11323,9 @@ function exportRecebArm997Convertida(){
     return;
   }
   let html='<!doctype html><html><head><meta charset="utf-8"></head><body>';
-  html+='<table border="1"><tr><th>Página</th><th>Local</th><th>Código</th><th>Nome</th><th>Apresentação</th><th>Lote</th><th>QT. EMB</th><th>Prob</th><th>Venc</th><th>QT. LOCAL</th><th>Volumes Calc.</th><th>Volumes Arred.</th><th>Validade</th><th>Entrada</th><th>Tipo</th><th>C. Cx. Lab.</th><th>NOME.FORNEC</th></tr>';
+  html+='<table border="1"><tr><th>Página</th><th>Local</th><th>Descrição</th><th>Código</th><th>Nome</th><th>Apresentação</th><th>Lote</th><th>QT. EMB</th><th>Prob</th><th>Venc</th><th>QT. LOCAL</th><th>Volumes Calc.</th><th>Volumes Arred.</th><th>Validade</th><th>Entrada</th><th>Tipo</th><th>C. Cx. Lab.</th><th>NOME.FORNEC</th></tr>';
   rows.forEach(r=>{
-    html+=`<tr><td>${excelText(r.pagina)}</td><td>${excelText(r.local)}</td><td>${excelText(r.codigo)}</td><td>${excelText(r.nome)}</td><td>${excelText(r.apresentacao)}</td><td>${excelText(r.lote)}</td><td>${+r.qtEmb||0}</td><td>${+r.prob||0}</td><td>${+r.venc||0}</td><td>${+r.qtLocal||0}</td><td>${+r.qtVolumeCalc||0}</td><td>${+r.qtVolume||0}</td><td>${excelText(r.validade)}</td><td>${excelText(r.entrada)}</td><td>${excelText(r.tipo)}</td><td>${excelText(r.caixaLab)}</td><td>${excelText(r.fornecedor||'')}</td></tr>`;
+    html+=`<tr><td>${excelText(r.pagina)}</td><td style="mso-number-format:'\\@'">${excelText(r.local)}</td><td>${excelText(r.descricao||'')}</td><td>${excelText(r.codigo)}</td><td>${excelText(r.nome)}</td><td>${excelText(r.apresentacao)}</td><td>${excelText(r.lote)}</td><td>${+r.qtEmb||0}</td><td>${+r.prob||0}</td><td>${+r.venc||0}</td><td>${+r.qtLocal||0}</td><td>${+r.qtVolumeCalc||0}</td><td>${+r.qtVolume||0}</td><td>${excelText(r.validade)}</td><td>${excelText(r.entrada)}</td><td>${excelText(r.tipo)}</td><td>${excelText(r.caixaLab)}</td><td>${excelText(r.fornecedor||'')}</td></tr>`;
   });
   html+='</table></body></html>';
   const blob=new Blob([html],{type:'application/vnd.ms-excel;charset=utf-8'});
