@@ -1661,13 +1661,13 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
         <div class="adm-row"><label>Vales máx /h <span style="color:#ff4c4c;font-size:9px">(máximo)</span></label><input type="number" id="iCapVales" value="1" oninput="liveUpdate()"/></div>
         <div style="background:#071525;border-radius:3px;padding:5px 8px;margin-top:4px;border:1px solid rgba(0,230,118,.2)">
           <div style="font-size:9px;color:#00e676;font-weight:bold;margin-bottom:4px">EXPEDIÇÃO — capacidade /hora</div>
-          <div class="adm-row"><label>Vol. Especial /h</label><input type="number" id="iCapEsp" value="340" oninput="liveUpdate()"/></div>
+          <div class="adm-row"><label>Vol. Especial /h</label><input type="number" id="iCapEsp" value="480" oninput="liveUpdate()"/></div>
           <div class="adm-row"><label>Vol. Esp. Frac. /h</label><input type="number" id="iCapEspFrac" value="0" oninput="liveUpdate()"/></div>
           <div class="adm-row"><label>Vol. Esp. Med. /h</label><input type="number" id="iCapEspMed" value="100" oninput="liveUpdate()"/></div>
           <div class="adm-row"><label>Vol. Esp. Perf. /h</label><input type="number" id="iCapEspPerf" value="0" oninput="liveUpdate()"/></div>
           <div class="adm-row"><label>Fraldas Cx Fech. /h</label><input type="number" id="iCapFrF" value="100" oninput="liveUpdate()"/></div>
           <div class="adm-row"><label>Fraldas Frac. /h</label><input type="number" id="iCapFrFc" value="89" oninput="liveUpdate()"/></div>
-          <div class="adm-row"><label>Vol. Doca /h</label><input type="number" id="iCapVE" value="1303" oninput="liveUpdate()"/></div>
+          <div class="adm-row"><label>Vol. Doca /h</label><input type="number" id="iCapVE" value="1648" oninput="liveUpdate()"/></div>
         </div>
       </div>
 
@@ -4675,7 +4675,7 @@ function emptyDay(dt){
     capLM:3500,capVMed:575,capUMed:10000,capLP:3000,capVPerf:425,capUPerf:6666,
     capErros:2500,capVC:1280,capLC:6500,capVCPsi:checkoutPsicoVolDefault(dt||today()),capLCPsi:'',capUCPsi:checkoutPsicoUnidDefault(dt||today()),capUC:20800,capGel:28,
     capVales:1,
-    capEsp:340,capEspFrac:0,capEspMed:newRules?100:0,capEspPerf:0,capFrF:newRules?100:114,capFrFc:89,capVE:1303,
+    capEsp:nightProcessCapacity({date:dt||today()},'capEsp'),capEspFrac:0,capEspMed:newRules?100:0,capEspPerf:0,capFrF:newRules?100:114,capFrFc:89,capVE:nightProcessCapacity({date:dt||today()},'capVE'),
     rPsico:0,rGel:0,rOnco:0,rOncoT:0,rJuncao:0,rDoc:0,
     hd
   };
@@ -4684,6 +4684,14 @@ function today(){return new Date().toISOString().slice(0,10);}
 function fmtDate(d){return new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{weekday:'short',day:'2-digit',month:'2-digit',year:'numeric'});}
 function fmtDateShort(d){return new Date(d+'T12:00:00').toLocaleDateString('pt-BR',{day:'2-digit',month:'2-digit'});}
 function currentFormDate(){const el=document.getElementById('iData');return el&&el.value?el.value:(curDate||today());}
+function nightProcessCapacity(day,key){
+  const legacy=key==='capVE'?1303:340;
+  const updated=key==='capVE'?1648:480;
+  const value=+(day&&day[key])||0;
+  const current=String(day&&day.date||today())>='2026-10-20';
+  return current&&(!value||value===legacy)?updated:(value||legacy);
+}
+
 function useNewRules(dt){return String(dt||currentFormDate())>=NEW_RULES_FROM;}
 function useSimpleOperational(dt){return String(dt||currentFormDate())>=SIMPLE_OPERATIONAL_FROM;}
 function useTotalLinesOperational(dt){return String(dt||currentFormDate())>=TOTAL_LINES_OPERATIONAL_FROM;}
@@ -11504,7 +11512,7 @@ function renderFlowBar(day){
       {lbl:'Volumes',real:sumH('Vol. Geladeira'),capDia:170,capHour:day.capGel||28,target:sys.volGeladeira||0}
     ]),
     cardHtml('Especial','#9b59b6',[
-      {lbl:'Volumes',real:sumH('Vol. Especial'),capDia:2040,capHour:day.capEsp||340,target:sys.volEspecial||0}
+      {lbl:'Volumes',real:sumH('Vol. Especial'),capDia:2040,capHour:nightProcessCapacity(day,'capEsp'),target:sys.volEspecial||0}
     ]),
     cardHtml('Fraldas Cx Fech.','#4a90d9',[
       {lbl:'Unidades',real:sumH('Vol. Fraldas Cx Fech.'),capDia:684,capHour:useNewRules(day.date)?100:(day.capFrF||114),target:sys.fraldaFechado||0}
@@ -11513,7 +11521,7 @@ function renderFlowBar(day){
       {lbl:'Volumes',real:sumH('Vol. Fraldas Frac.'),capDia:534,capHour:day.capFrFc||89,target:sys.fraldaFrac||0}
     ]),
     cardHtml('Expedicao','#00e676',[
-      {lbl:'Volumes',real:sumH('Vol. Doca'),capDia:7820,capHour:day.capVE||1303,target:sys.volDoca||0}
+      {lbl:'Volumes',real:sumH('Vol. Doca'),capDia:7820,capHour:nightProcessCapacity(day,'capVE'),target:sys.volDoca||0}
     ])
   ];
   const bar=document.getElementById('flowBar');
@@ -11562,7 +11570,7 @@ function renderFlowBar(day){
   // DOCA = todos os volumes (previsto = pnDoca)
   const expPrev=day.pnDoca||day.pnVol||0;
   const expPend=Math.max(expPrev-expReal,0);
-  const capExp=(day.capVE||1303)*H_EX;
+  const capExp=(nightProcessCapacity(day,'capVE'))*H_EX;
   const pExp=expPrev>0?Math.min(Math.round(expReal/expPrev*100),100):capExp>0?Math.min(Math.round(expReal/capExp*100),100):0;
   document.getElementById('fsExpPrev').textContent=expPrev.toLocaleString('pt-BR');
   document.getElementById('fsExpReal').textContent=expReal.toLocaleString('pt-BR');
@@ -11856,7 +11864,7 @@ function renderDashCharts(day){
     });
   }
 
-  const ve=dv(hd,'Vol. Doca');const capVEh=day.capVE||1303;
+  const ve=dv(hd,'Vol. Doca');const capVEh=nightProcessCapacity(day,'capVE');
   const veAcum=[];let runV=0;
   ve.forEach(v=>{if(v!==null){runV+=v;veAcum.push(runV);}else veAcum.push(runV>0?runV:null);});
   const totalExp=ve.reduce((s,v)=>s+(v||0),0);
@@ -11893,7 +11901,7 @@ function renderDashCharts(day){
 
   // Especial hora a hora
   const espHora=dv(hd,'Vol. Especial');
-  const capEspH=day.capEsp||340;
+  const capEspH=nightProcessCapacity(day,'capEsp');
   if(CH.acum)CH.acum.destroy();
   CH.acum=new Chart(document.getElementById('cAcum'),{type:'bar',
     data:{labels:HOURS,datasets:[
@@ -12238,7 +12246,7 @@ function renderRouteClosureCd2(day){
 
 function renderDocaBalance(day){
   const hd=day.hd||{};
-  const capDoca=day.capVE||1303;
+  const capDoca=nightProcessCapacity(day,'capVE');
   const espMetrics=['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.','Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.'];
 
   const entradas=HOURS.map((_,i)=>{
@@ -12387,9 +12395,9 @@ function renderDashTables(day){
     'Vol. Checkout':day.capVC,'Linhas Checkout':day.capLC,'Unid. Checkout':day.capUC,
     'Vol. Checkout Psico':checkoutPsicoVolCap(day),'Linhas Checkout Psico':day.capLCPsi||null,'Unid. Checkout Psico':checkoutPsicoUnidCap(day),
     'Vol. Psico CK':day.capVPsi,'Unid. Psico CK':day.capUPsi,'Vol. Gel. CK':day.capVGel,
-    'Vales':day.capVales,'Vol. Expedição':day.capVE,'Vol. Especial':day.capEsp,
+    'Vales':day.capVales,'Vol. Expedição':nightProcessCapacity(day,'capVE'),'Vol. Doca':nightProcessCapacity(day,'capVE'),'Vol. Especial':nightProcessCapacity(day,'capEsp'),
     'Vol. Fralda Frac.':day.capFrFc,'Vol. Fralda Fech.':day.capFrF,
-    'Vol. Especial CD 2':day.capEsp,'Vol. Fraldas Cx Fech. CD 2':day.capFrF,'Vol. Doca CD 2':day.capVE};
+    'Vol. Especial CD 2':nightProcessCapacity(day,'capEsp'),'Vol. Fraldas Cx Fech. CD 2':day.capFrF,'Vol. Doca CD 2':nightProcessCapacity(day,'capVE')};
   const renderConfTbl=(id,plannedMetric,activeMetric)=>{
     const cp=fitHourValues(hd[plannedMetric]);
     const ca=fitHourValues(hd[activeMetric]);
@@ -12476,11 +12484,11 @@ function renderDashTables(day){
     if(anyData){estoqueRunning+=entrada-saida;}
     return anyData?estoqueRunning:null;
   });
-  h2+=`<tr><td colspan="${HOURS.length+1}" style="background:rgba(0,230,118,.06);color:#00e676;font-size:9px;font-weight:bold;padding:3px 8px;border-top:2px solid rgba(0,230,118,.3)">📦 EQUILÍBRIO DOCA — Volume acumulado por hora (Entrada - Saída) — meta: 0 | capacidade entrega: 1.303/h</td></tr>`;
+  h2+=`<tr><td colspan="${HOURS.length+1}" style="background:rgba(0,230,118,.06);color:#00e676;font-size:9px;font-weight:bold;padding:3px 8px;border-top:2px solid rgba(0,230,118,.3)">📦 EQUILÍBRIO DOCA — Volume acumulado por hora (Entrada - Saída) — meta: 0 | capacidade entrega: ${nightProcessCapacity(day,'capVE').toLocaleString('pt-BR')}/h</td></tr>`;
   h2+=`<tr><td class="row-lbl">Volume Acumulado<span style="font-size:9px;color:#6a9fc0;font-weight:normal;display:block">CK+Esp+Fralda−Doca</span></td>`;
   estoqueArr.forEach((v,i)=>{
     if(v===null){h2+=`<td style="text-align:center;color:#2a3a4a">-</td>`;return;}
-    const capH=1303; // capacidade doca/h
+    const capH=nightProcessCapacity(day,'capVE'); // capacidade doca/h
     let bg,col;
     if(v<=0){bg='background:rgba(0,180,80,.3)';col='color:#00e676;font-weight:bold';}
     else if(v<=capH){bg='background:rgba(180,130,0,.3)';col='color:#ffd700;font-weight:bold';}
@@ -12594,8 +12602,8 @@ function compIndicators(){
     {key:'checkout',label:'Checkout',short:'Checkout',metric:'Vol. Checkout',canvas:'cCompCheckout',cap:d=>+d.capVC||1280},
     {key:'checkoutUnid',label:'Checkout Unidade',short:'CK Unid.',metric:'Unid. Checkout',canvas:'cCompCheckoutUnid',cap:d=>+d.capUC||20800},
     {key:'checkoutPsico',label:'Checkout Psico',short:'CK Psico',metric:'Vol. Checkout Psico',canvas:'cCompCheckoutPsico',cap:d=>checkoutPsicoVolCap(d)},
-    {key:'especial',label:'Especial',short:'Especial',metric:'Vol. Especial',canvas:'cCompEspecial',cap:d=>+d.capEsp||340},
-    {key:'expedicao',label:'Expedição',short:'Expedição',metric:'Vol. Doca',canvas:'cCompExpedicao',cap:d=>+d.capVE||1303},
+    {key:'especial',label:'Especial',short:'Especial',metric:'Vol. Especial',canvas:'cCompEspecial',cap:d=>nightProcessCapacity(d,'capEsp')},
+    {key:'expedicao',label:'Expedição',short:'Expedição',metric:'Vol. Doca',canvas:'cCompExpedicao',cap:d=>nightProcessCapacity(d,'capVE')},
     {key:'epm',label:'EPM',short:'EPM',metric:'Erros Sep. Med.',canvas:'cCompEpm',cap:d=>+d.capErros||2500,inverse:true,kind:'epm'},
     {key:'vale',label:'Vale',short:'Vale',metric:'Vales',canvas:'cCompVale',cap:d=>+d.capVales||1,inverse:true}
   ];
@@ -13730,13 +13738,13 @@ function readFormAsDay(){
     capUC:+document.getElementById('iCapUC').value||20800,
     capGel:+document.getElementById('iCapGel').value||28,
     capVales:+document.getElementById('iCapVales').value||1,
-    capEsp:+document.getElementById('iCapEsp').value||340,
+    capEsp:+document.getElementById('iCapEsp').value||nightProcessCapacity({date:dt},'capEsp'),
     capEspFrac:+document.getElementById('iCapEspFrac').value||0,
     capEspMed:+document.getElementById('iCapEspMed').value||(newRules?100:0),
     capEspPerf:+document.getElementById('iCapEspPerf').value||0,
     capFrF:+document.getElementById('iCapFrF').value||(newRules?100:114),
     capFrFc:+document.getElementById('iCapFrFc').value||89,
-    capVE:+document.getElementById('iCapVE').value||1303,
+    capVE:+document.getElementById('iCapVE').value||nightProcessCapacity({date:dt},'capVE'),
     rPsico:+document.getElementById('iRPsico').value||0,rGel:+document.getElementById('iRGel').value||0,
     rOnco:+document.getElementById('iROnco').value||0,rOncoT:+document.getElementById('iROncoT').value||0,
     rJuncao:+document.getElementById('iRJuncao').value||0,rDoc:+document.getElementById('iRDoc').value||0,
@@ -13791,10 +13799,10 @@ function loadFormFrom(day){
   s('iCapUC',day.capUC||20800);
   s('iCapGel',day.capGel||28);
   s('iCapVales',day.capVales||1);
-  s('iCapEsp',day.capEsp||340);s('iCapEspFrac',day.capEspFrac||0);
+  s('iCapEsp',nightProcessCapacity(day,'capEsp'));s('iCapEspFrac',day.capEspFrac||0);
   s('iCapEspMed',newRules?100:(day.capEspMed||0));s('iCapEspPerf',day.capEspPerf||0);
   s('iCapFrF',newRules?100:(day.capFrF||114));s('iCapFrFc',day.capFrFc||89);
-  s('iCapVE',day.capVE||1303);
+  s('iCapVE',nightProcessCapacity(day,'capVE'));
   s('iRPsico',day.rPsico||'');s('iRGel',day.rGel||'');
   s('iROnco',day.rOnco||'');s('iROncoT',day.rOncoT||'');
   s('iRJuncao',day.rJuncao||'');s('iRDoc',day.rDoc||'');
@@ -14156,7 +14164,7 @@ function docaHoraVals(day){
 }
 function hasDocaHoraData(vals){return vals.some(v=>v!==null&&Number.isFinite(v)&&v>0);}
 function docaExpectedAt(day,shiftMin){
-  const cap=day&&day.capVE?+day.capVE:1303;
+  const cap=nightProcessCapacity(day,'capVE');
   const prev=(day&&(+day.pnDoca||+day.pnVol))||0;
   const expected=Math.max(0,shiftMin)/60*cap;
   return prev>0?Math.min(prev,expected):expected;
@@ -14190,7 +14198,7 @@ function docaCatchupMin(day,required){
     total+=v;
     lastEnd=end;
   }
-  const cap=day&&day.capVE?+day.capVE:1303;
+  const cap=nightProcessCapacity(day,'capVE');
   return cap>0?lastEnd+((required-total)/cap)*60:null;
 }
 function calcExpRotaImpact(day,hPrev){
@@ -14846,7 +14854,7 @@ function previsaoEncEfficiencyClass(pct){
 
 function previsaoEncProcessCalc(day,row){
   const total=previsaoEncRawNumber(previsaoEncGetResult(day,row.resultado));
-  const cap=+(day&&day[row.cap])||row.capDefault||0;
+  const cap=['capEsp','capVE'].includes(row.cap)?nightProcessCapacity(day,row.cap):(+(day&&day[row.cap])||row.capDefault||0);
   const previsto=previsaoEncExpectedTime(total,cap);
   const realizado=day&&day[row.realizado]?day[row.realizado]:'-';
   const realMin=previsaoEncTimeToMinutes(realizado);
@@ -15009,7 +15017,7 @@ function calcPrevisaoEncerramento(dayOverride,options){
   });
 
   // 4. ESPECIAL
-  const capEsp=day.capEsp||340;
+  const capEsp=nightProcessCapacity(day,'capEsp');
   const prevEsp=day.pnEspecial||0;
   const realEsp=realizado('Vol. Especial');
   const faltaEsp=Math.max(prevEsp-realEsp,0);
@@ -15075,7 +15083,7 @@ function calcPrevisaoEncerramento(dayOverride,options){
   });
 
   // 9. DOCA — usa o campo manual "Doca (vol.)" como previsto de expedição
-  const capVE=day.capVE||1303;
+  const capVE=nightProcessCapacity(day,'capVE');
   const prevDoca=day.pnDoca||day.pnVol||0;
   const realDoca=realizado('Vol. Doca');
   const faltaDoca=Math.max(prevDoca-realDoca,0);
@@ -15129,7 +15137,7 @@ function calcPrevisaoEncerramento(dayOverride,options){
     {lbl:'Unid. Checkout Psico',prev:sys.unitCheckoutPsico,real:realizado('Unid. Checkout Psico'),cap:checkoutPsicoUnidCap(day),unidade:'unid.'}
   ]);
   setorFromDrivers('Especial','#9b59b6','🟣',[
-    {lbl:'Vol. Especial',prev:sys.volEspecial,real:realizado('Vol. Especial'),cap:day.capEsp||340,unidade:'vol'}
+    {lbl:'Vol. Especial',prev:sys.volEspecial,real:realizado('Vol. Especial'),cap:nightProcessCapacity(day,'capEsp'),unidade:'vol'}
   ]);
   setorFromDrivers('Esp. Frac.','#9b59b6','🟣',[
     {lbl:'Vol. Esp. Frac.',prev:day.pnEspFrac||0,real:realizado('Vol. Esp. Frac.'),cap:day.capEspFrac||0,unidade:'vol'}
@@ -15147,7 +15155,7 @@ function calcPrevisaoEncerramento(dayOverride,options){
     {lbl:'Vol. Fraldas Frac.',prev:sys.fraldaFrac,real:realizado('Vol. Fraldas Frac.'),cap:day.capFrFc||89,unidade:'vol'}
   ]);
   setorFromDrivers('DOCA (Expedição)','#00e676','🟢',[
-    {lbl:'Vol. Doca',prev:sys.volDoca,real:realizado('Vol. Doca'),cap:day.capVE||1303,unidade:'vol'}
+    {lbl:'Vol. Doca',prev:sys.volDoca,real:realizado('Vol. Doca'),cap:nightProcessCapacity(day,'capVE'),unidade:'vol'}
   ]);
 
   // = o setor que termina mais tarde
