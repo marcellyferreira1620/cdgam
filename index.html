@@ -1235,6 +1235,8 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
     <label for="compMonthSelect" style="font-size:11px;font-weight:bold;color:#00385f;text-transform:uppercase">Mês do comparativo</label>
     <select id="compMonthSelect" onchange="compSelectedMonth=this.value;renderComp()" style="background:#eef6ff;border:1px solid #9cc3df;color:#00385f;font-weight:bold;border-radius:4px;padding:4px 8px;font-size:11px"></select>
   </div>
+  <div class="separator" id="compPalletTitle">Paletes por transportadora</div>
+  <div class="tbl-wrap" id="compPalletTbl"></div>
   <div class="separator" id="compMonthTitle">Comparativo mensal — média realizada por hora</div>
   <div class="chart-grid" style="grid-template-columns:1fr">
     <div class="chart-box"><div class="chart-ttl">Média do mês — todos os indicadores</div><div style="position:relative;height:260px"><canvas id="cCompResumo" role="img" aria-label="Media mensal de todos os indicadores"></canvas></div><div class="tbl-wrap" id="compFinishPanel" style="margin:8px 0 0"></div></div>
@@ -13007,11 +13009,48 @@ function renderCompRouteCharts(days,labels){
     });
   });
 }
+function compPalletCarrier(route){
+  const code=String(route&&route.cod||'').trim().replace(/^0+/,'');
+  if(code==='78')return 'ceresul';
+  if(['81','94','82'].includes(code))return 'rondolog';
+  return 'saoGabriel';
+}
+
+function compPalletSummary(days){
+  const totals={ceresul:0,rondolog:0,saoGabriel:0,total:0};
+  let accumulated=0;
+  const rows=[...days].sort((a,b)=>String(a.date).localeCompare(String(b.date))).map(day=>{
+    const row={date:day.date,ceresul:0,rondolog:0,saoGabriel:0,total:0};
+    buildRotasMerged(day).forEach(route=>{
+      const value=Number(route.paletes);
+      const pallets=Number.isFinite(value)&&value>0?value:0;
+      row[compPalletCarrier(route)]+=pallets;
+      row.total+=pallets;
+    });
+    Object.keys(totals).forEach(key=>{totals[key]+=row[key];});
+    accumulated+=row.total;
+    return {...row,accumulated};
+  });
+  return {rows,totals};
+}
+
+function renderCompPallets(days,ym){
+  const el=document.getElementById('compPalletTbl');
+  if(!el)return;
+  const title=document.getElementById('compPalletTitle');
+  if(title)title.textContent=`Paletes por transportadora — ${compMonthLabel(ym)}`;
+  const {rows,totals}=compPalletSummary(days);
+  const fmt=value=>value.toLocaleString('pt-BR');
+  const cells=row=>`<td>${fmt(row.ceresul)}</td><td>${fmt(row.rondolog)}</td><td>${fmt(row.saoGabriel)}</td><td style="font-weight:bold">${fmt(row.total)}</td><td style="font-weight:bold">${fmt(row.accumulated)}</td>`;
+  el.innerHTML=`<table aria-label="Paletes por dia e transportadora"><thead><tr><th scope="col">Dia</th><th scope="col">CERESUL</th><th scope="col">RONDOLOG</th><th scope="col">SÃO GABRIEL</th><th scope="col">Total do dia</th><th scope="col">Acumulado no mês</th></tr></thead><tbody>${rows.length?rows.map(row=>`<tr><th scope="row" style="white-space:nowrap">${fmtDateShort(row.date)}</th>${cells(row)}</tr>`).join(''):'<tr><td colspan="6">Sem dados para este mês</td></tr>'}</tbody><tfoot><tr><th scope="row">TOTAL DO MÊS</th>${cells({...totals,accumulated:totals.total})}</tr></tfoot></table>`;
+}
+
 function renderComp(){
   destroyCompCharts();
   const ym=compReferenceMonth();
   updateCompMonthSelect(ym);
   const days=sortedDays().filter(d=>String(d.date||'').slice(0,7)===ym);
+  renderCompPallets(days,ym);
   const title=document.getElementById('compMonthTitle');
   if(title)title.textContent=`Comparativo mensal — média realizada por hora — ${compMonthLabel(ym)}`;
   if(!days.length){
