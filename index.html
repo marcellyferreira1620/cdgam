@@ -9386,7 +9386,7 @@ async function importDevolucaoOccurrences(event,kind){
     const first=previous||ordered[0];
     const prefix=kind==='volume'?'gppFaltaVolume':'gppFaltaMercadoria';
     const fields={[key]:data[key],[prefix+'Inicio']:first.total,[prefix+'Final']:latest.total};
-    if(kind==='volume')fields.mediaTempoOcorrencia=latest.averageDays===null?'':latest.averageDays.toLocaleString('pt-BR',{maximumFractionDigits:1})+' dias';
+    if(kind==='volume'&&latest.expeditionSample)fields.mediaTempoOcorrencia=latest.expeditionAverageDays.toLocaleString('pt-BR',{maximumFractionDigits:1})+' dias';
     data._fieldUpdatedAt=data._fieldUpdatedAt||{};
     data._fieldClearedAt=data._fieldClearedAt||{};
     Object.entries(fields).forEach(([field,value])=>{
