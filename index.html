@@ -272,6 +272,15 @@ body.boletim-view .day-nav{justify-content:flex-start;padding:8px 14px}
 .devolucao-field{display:flex;flex-direction:column;gap:4px;color:#0b3b63;font-size:11px;font-weight:800}
 .devolucao-field input,.devolucao-field textarea{border:1px solid #9fc7e6;border-radius:5px;padding:8px;background:#fff;color:#0a2340;font-weight:700;font-size:12px;min-width:0}
 .devolucao-field textarea{min-height:82px;resize:vertical;font-weight:600}
+.devolucao-occurrence-tools{display:flex;flex-wrap:wrap;gap:10px;align-items:flex-end;margin-bottom:12px}
+.devolucao-occurrence-tools .devolucao-field{flex:1 1 180px;min-width:0}
+.devolucao-occurrence-tools .devolucao-field:first-child{flex:0 1 140px}
+.devolucao-occurrence-tools input{width:100%;max-width:100%}
+.devolucao-occurrence-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px;margin-bottom:12px}
+#devolucaoPage .tbl-wrap table{min-width:0}
+#devolucaoPage .tbl-wrap th{white-space:normal}
+.devolucao-two>div{min-width:0}
+@media(max-width:640px){.devolucao-head,.devolucao-section-h{align-items:flex-start;flex-direction:column}.devolucao-two{grid-template-columns:minmax(0,1fr)}.devolucao-fields{grid-template-columns:repeat(auto-fit,minmax(140px,1fr))}}
 .devolucao-progress{display:grid;grid-template-columns:1fr auto;gap:6px 10px;align-items:center;margin-top:10px;padding-top:10px;border-top:1px solid #dbe8f3}
 .devolucao-progress b{color:#003b6f;font-size:12px}
 .devolucao-progress strong{color:#004b8d;font-size:12px}
@@ -3523,17 +3532,28 @@ function mergeDevolucao(current,next){
   const out={};
   const aft=a._fieldUpdatedAt||{};
   const bft=b._fieldUpdatedAt||{};
+  const acf=a._fieldClearedAt||{};
+  const bcf=b._fieldClearedAt||{};
   const keys=new Set([...Object.keys(a),...Object.keys(b)]);
   keys.forEach(key=>{
-    if(key==='_fieldUpdatedAt'||key==='_updatedAt')return;
+    if(key==='_fieldUpdatedAt'||key==='_fieldClearedAt'||key==='_updatedAt')return;
     const av=a[key],bv=b[key];
-    const ats=+aft[key]||0;
-    const bts=+bft[key]||0;
+    if(key==='ocorrenciasVolume'||key==='ocorrenciasMercadoria'){
+      const reports=new Map();
+      [...((av&&av.snapshots)||[]),...((bv&&bv.snapshots)||[])].forEach(report=>{
+        if(report&&report.id)reports.set(report.id,report);
+      });
+      out[key]={snapshots:[...reports.values()].sort((x,y)=>String(x.observedAt).localeCompare(String(y.observedAt))||x.importedAt-y.importedAt)};
+      return;
+    }
+    const ats=Math.max(+aft[key]||0,+acf[key]||0);
+    const bts=Math.max(+bft[key]||0,+bcf[key]||0);
     const hasA=moduleFieldHasValue(av);
     const hasB=moduleFieldHasValue(bv);
     if(ats||bts){
-      if(bts>ats)out[key]=(hasB||!hasA)?bv:av;
-      else if(ats>bts)out[key]=(hasA||!hasB)?av:bv;
+      if(bts>ats)out[key]=Object.prototype.hasOwnProperty.call(b,key)?bv:av;
+      else if(ats>bts)out[key]=Object.prototype.hasOwnProperty.call(a,key)?av:bv;
+      else if((+acf[key]||0)>=ats&&ats>0||(+bcf[key]||0)>=bts&&bts>0)out[key]='';
       else out[key]=hasB?bv:av;
       return;
     }
@@ -3545,6 +3565,11 @@ function mergeDevolucao(current,next){
   out._fieldUpdatedAt={...aft,...bft};
   Object.keys(aft).forEach(key=>{
     if((+aft[key]||0)>(+bft[key]||0))out._fieldUpdatedAt[key]=aft[key];
+  });
+  out._fieldClearedAt={...acf};
+  Object.entries(bcf).forEach(([key,ts])=>{out._fieldClearedAt[key]=Math.max(+out._fieldClearedAt[key]||0,+ts||0);});
+  Object.keys(out._fieldClearedAt).forEach(key=>{
+    if((+out._fieldUpdatedAt[key]||0)>+out._fieldClearedAt[key])delete out._fieldClearedAt[key];
   });
   const ts=Math.max(+a._updatedAt||0,+b._updatedAt||0);
   if(ts)out._updatedAt=ts;
@@ -5391,6 +5416,7 @@ function refreshFromDb(){
   if(tab==='proddia'&&!editing)renderProdDiurno();
   if(tab==='recebarm'&&!editing)renderRecebArm();
   if(tab==='inventario'&&!editing)renderInventario();
+  if(tab==='devolucao'&&!editing)renderDevolucao();
   if(adminOk&&tab==='adm'&&!editing)loadFormFrom(day||emptyDay(curDate||today()));
   if(currentUser&&currentUser.role==='admin')renderUsersList();
 }
@@ -9211,13 +9237,233 @@ function renderRecebArm(){
   renderRecebArm997Report();
 }
 
+function devolucaoOccurrenceKey(kind){return kind==='volume'?'ocorrenciasVolume':'ocorrenciasMercadoria';}
+function devolucaoOccurrenceLabel(kind){return kind==='volume'?'falta de volume':'falta de mercadoria';}
+function devolucaoHeader(value){return String(value??'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase().replace(/[^a-z0-9]+/g,' ').trim();}
+function devolucaoDate(value){
+  if(value===null||value===undefined||value==='')return '';
+  let year,month,day;
+  if(value instanceof Date&&!Number.isNaN(value.getTime())){
+    year=value.getFullYear();month=value.getMonth()+1;day=value.getDate();
+  }else if(typeof value==='number'){
+    const parsed=XLSX.SSF.parse_date_code(value);
+    if(!parsed)return '';
+    year=parsed.y;month=parsed.m;day=parsed.d;
+  }else{
+    const text=String(value).trim();
+    let match=text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(match){year=+match[1];month=+match[2];day=+match[3];}
+    else{
+      match=text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{2}|\d{4})(?:\s|$)/);
+      if(!match)return '';
+      day=+match[1];month=+match[2];year=+match[3];if(year<100)year+=2000;
+    }
+  }
+  const date=new Date(Date.UTC(year,month-1,day));
+  if(date.getUTCFullYear()!==year||date.getUTCMonth()+1!==month||date.getUTCDate()!==day)return '';
+  return date.toISOString().slice(0,10);
+}
+function devolucaoDaysBetween(from,to){
+  if(!from||!to)return null;
+  const days=(Date.parse(to+'T00:00:00Z')-Date.parse(from+'T00:00:00Z'))/86400000;
+  return Number.isFinite(days)&&days>=0?days:null;
+}
+function devolucaoParseOccurrences(workbook,kind){
+  const byId=new Map();
+  let sourceTotal=0,matching=0,closed=0,invalidDates=0;
+  let foundHeader=false;
+  workbook.SheetNames.forEach(name=>{
+    const rows=XLSX.utils.sheet_to_json(workbook.Sheets[name],{header:1,defval:'',raw:true});
+    const headerIndex=rows.findIndex(row=>{
+      const keys=row.map(devolucaoHeader);
+      return keys.includes('ocorrencia')&&keys.includes('data registro')&&keys.includes('data limite');
+    });
+    if(headerIndex<0)return;
+    foundHeader=true;
+    const headers=rows[headerIndex].map(devolucaoHeader);
+    const col=(...names)=>headers.findIndex(value=>names.includes(value));
+    const indexes={
+      id:col('ocorrencia','numero ocorrencia'),company:col('empresa','codigo empresa'),
+      type:col('tipo de ocorrencia','tipo ocorrencia'),status:col('status da solucao','status solucao','status'),
+      registered:col('data registro','data do registro'),issued:col('data da emissao','data emissao'),
+      deadline:col('data limite'),expedition:col('data expedicao','data da expedicao')
+    };
+    if(indexes.type<0||indexes.status<0)throw new Error('A planilha precisa das colunas Tipo de Ocorrencia e Status da Solucao.');
+    rows.slice(headerIndex+1).forEach(row=>{
+      const id=String(row[indexes.id]??'').trim();if(!id)return;
+      sourceTotal++;
+      const type=devolucaoHeader(row[indexes.type]);
+      const matches=/\bfalta\b/.test(type)&&(kind==='volume'?/\bvolumes?\b/.test(type):/\bmercadorias?\b/.test(type));
+      if(!matches)return;
+      matching++;
+      const status=devolucaoHeader(row[indexes.status]);
+      if(!/\bnao\b/.test(status)&&/\b(finalizad[ao]s?|concluid[ao]s?|resolvid[ao]s?|encerrad[ao]s?|cancelad[ao]s?|solucionad[ao]s?)\b/.test(status)){closed++;return;}
+      const record={
+        id:String(row[indexes.company]??'').trim()+'|'+id,
+        registered:devolucaoDate(row[indexes.registered]),issued:devolucaoDate(row[indexes.issued]),
+        deadline:devolucaoDate(row[indexes.deadline]),expedition:devolucaoDate(row[indexes.expedition])
+      };
+      if(!record.registered||!record.issued)invalidDates++;
+      const previous=byId.get(record.id);
+      if(!previous)byId.set(record.id,record);
+      else ['registered','issued','deadline','expedition'].forEach(key=>{
+        if(record[key]&&(!previous[key]||record[key]<previous[key]))previous[key]=record[key];
+      });
+    });
+  });
+  if(!foundHeader)throw new Error('Colunas Ocorrencia, Data Registro e Data Limite nao encontradas.');
+  if(sourceTotal&&matching===0)throw new Error('Nenhuma ocorrencia de '+devolucaoOccurrenceLabel(kind)+' encontrada nesta planilha.');
+  const records=[...byId.values()];
+  const byDeadline={};
+  const emissionDays=[],expeditionDays=[];
+  records.forEach(record=>{
+    const key=record.deadline||'sem-data';byDeadline[key]=(byDeadline[key]||0)+1;
+    const emission=devolucaoDaysBetween(record.issued,record.registered);
+    if(emission!==null)emissionDays.push(emission);
+    const expedition=devolucaoDaysBetween(record.expedition,record.registered);
+    if(expedition!==null)expeditionDays.push(expedition);
+  });
+  const average=values=>values.length?values.reduce((sum,value)=>sum+value,0)/values.length:null;
+  return {ids:records.map(record=>record.id).sort(),total:records.length,byDeadline,
+    averageDays:average(emissionDays),averageSample:emissionDays.length,
+    expeditionAverageDays:average(expeditionDays),expeditionSample:expeditionDays.length,
+    sourceTotal,matching,ignored:sourceTotal-matching,closed,invalidDates};
+}
+function devolucaoOccurrenceSnapshots(day,kind){
+  return [...((day&&day.devolucao&&day.devolucao[devolucaoOccurrenceKey(kind)]&&day.devolucao[devolucaoOccurrenceKey(kind)].snapshots)||[])]
+    .sort((a,b)=>String(a.observedAt).localeCompare(String(b.observedAt))||a.importedAt-b.importedAt);
+}
+function devolucaoPreviousOccurrenceSnapshot(day,kind){
+  const days=(db.days||[]).filter(item=>item.date<day.date).sort((a,b)=>b.date.localeCompare(a.date));
+  for(const item of days){const snapshots=devolucaoOccurrenceSnapshots(item,kind);if(snapshots.length)return snapshots[snapshots.length-1];}
+  return null;
+}
+function devolucaoOccurrenceTimeline(snapshots,previous=null){
+  let last=previous;
+  return snapshots.map(snapshot=>{
+    const before=last?new Set(last.ids):null;
+    const current=new Set(snapshot.ids);
+    const entered=before?snapshot.ids.filter(id=>!before.has(id)).length:0;
+    const left=before?last.ids.filter(id=>!current.has(id)).length:0;
+    const result={snapshot,entered,left,baseline:!before};
+    last=snapshot;return result;
+  });
+}
+function devolucaoOccurrenceHours(timeline){
+  const map=new Map();
+  timeline.forEach(item=>{
+    const hour=String(item.snapshot.observedAt).slice(11,13)+':00';
+    const row=map.get(hour)||{hour,entered:0,left:0,total:0,uploads:0,baseline:item.baseline};
+    row.entered+=item.entered;row.left+=item.left;row.total=item.snapshot.total;row.uploads++;map.set(hour,row);
+  });
+  return [...map.values()];
+}
+function devolucaoOccurrenceStatus(kind,message,error=false){
+  const el=document.getElementById('devolucaoOccurrenceMsg-'+kind);
+  if(el){el.textContent=message;el.style.color=error?'#c62828':'#007a50';}
+}
+async function importDevolucaoOccurrences(event,kind){
+  const file=event.target.files&&event.target.files[0];if(!file)return;
+  const dt=curDate||today();
+  const timeInput=document.getElementById('devolucaoOccurrenceTime-'+kind);
+  const selectedTime=timeInput&&timeInput.value;
+  if(!/^([01]\d|2[0-3]):[0-5]\d$/.test(selectedTime||'')){devolucaoOccurrenceStatus(kind,'Informe o horario da leitura.',true);event.target.value='';return;}
+  devolucaoOccurrenceStatus(kind,'Lendo planilha...');
+  try{
+    if(typeof XLSX==='undefined')throw new Error('Leitor de Excel indisponivel. Atualize a pagina e tente novamente.');
+    const workbook=XLSX.read(await readFileBuffer(file),{type:'array',cellDates:true});
+    const parsed=devolucaoParseOccurrences(workbook,kind);
+    const day=JSON.parse(JSON.stringify(getDay(dt)||emptyDay(dt)));
+    const data=day.devolucao=day.devolucao||{};
+    const key=devolucaoOccurrenceKey(kind);
+    const snapshots=devolucaoOccurrenceSnapshots(day,kind);
+    const ts=Date.now();
+    const snapshot={...parsed,id:uid(),fileName:file.name,observedAt:dt+'T'+selectedTime+':00',importedAt:ts};
+    data[key]={snapshots:[...snapshots,snapshot]};
+    const ordered=devolucaoOccurrenceSnapshots(day,kind);
+    const latest=ordered[ordered.length-1];
+    const previous=devolucaoPreviousOccurrenceSnapshot(day,kind);
+    const first=previous||ordered[0];
+    const prefix=kind==='volume'?'gppFaltaVolume':'gppFaltaMercadoria';
+    const fields={[key]:data[key],[prefix+'Inicio']:first.total,[prefix+'Final']:latest.total};
+    if(kind==='volume')fields.mediaTempoOcorrencia=latest.averageDays===null?'':latest.averageDays.toLocaleString('pt-BR',{maximumFractionDigits:1})+' dias';
+    data._fieldUpdatedAt=data._fieldUpdatedAt||{};
+    data._fieldClearedAt=data._fieldClearedAt||{};
+    Object.entries(fields).forEach(([field,value])=>{
+      data[field]=value;data._fieldUpdatedAt[field]=ts;
+      if(value==='')data._fieldClearedAt[field]=ts;else delete data._fieldClearedAt[field];
+    });
+    data._updatedAt=ts;day._updatedAt=ts;
+    devolucaoSaveCurrent(day);
+    if(curDate===dt&&activeTab()==='devolucao')renderDevolucao();
+    devolucaoOccurrenceStatus(kind,parsed.total+' ocorrencias abertas importadas. '+parsed.ignored+' linha(s) de outros tipos ignoradas.');
+  }catch(error){devolucaoOccurrenceStatus(kind,error.message||'Nao foi possivel ler a planilha.',true);}
+  finally{event.target.value='';}
+}
+function renderDevolucaoOccurrences(day,kind){
+  const snapshots=devolucaoOccurrenceSnapshots(day,kind);
+  const latest=snapshots[snapshots.length-1];
+  const timeline=devolucaoOccurrenceTimeline(snapshots,devolucaoPreviousOccurrenceSnapshot(day,kind));
+  const totalEntered=timeline.reduce((sum,item)=>sum+item.entered,0);
+  const totalLeft=timeline.reduce((sum,item)=>sum+item.left,0);
+  const now=new Date(),time=String(now.getHours()).padStart(2,'0')+':'+String(now.getMinutes()).padStart(2,'0');
+  let html='<div class="devolucao-subhead">Planilhas de '+devolucaoOccurrenceLabel(kind)+'</div>';
+  html+='<div class="devolucao-occurrence-tools"><label class="devolucao-field"><span>Horario da leitura</span><input type="time" id="devolucaoOccurrenceTime-'+kind+'" value="'+time+'"></label>';
+  html+='<label class="devolucao-field"><span>Anexar planilha</span><input type="file" id="devolucaoOccurrenceFile-'+kind+'" accept=".xls,.xlsx,.csv" onchange="importDevolucaoOccurrences(event,\''+kind+'\')"></label></div>';
+  html+='<div id="devolucaoOccurrenceMsg-'+kind+'" role="status" aria-live="polite" style="margin-bottom:8px"></div>';
+  if(!latest)return html+'<div class="devolucao-progress">Nenhuma leitura registrada.</div>';
+  const average=latest.averageDays===null?'-':prodFmt(latest.averageDays,1)+' dias';
+  html+='<div class="devolucao-occurrence-kpis">';
+  html+=devolucaoCard('Ocorrencias abertas',prodFmt(latest.total,0),'Ultima leitura','#00e676');
+  html+=devolucaoCard('Media emissao → registro',average,latest.averageSample+' ocorrencias com datas validas');
+  html+=devolucaoCard('Expedicao → registro',latest.expeditionSample?prodFmt(latest.expeditionAverageDays,1)+' dias':'-',
+    latest.expeditionSample?latest.expeditionSample+' ocorrencias com datas validas':'Data de expedicao nao informada na planilha');
+  html+='</div><div style="margin-bottom:10px"><b>Entraram:</b> '+totalEntered+' &nbsp; <b>Sairam da lista:</b> '+totalLeft+'</div>';
+  html+='<div class="tbl-wrap" style="margin:0;max-height:340px"><table aria-label="Ocorrencias por data limite"><thead><tr><th>Data limite</th><th>Ocorrencias abertas</th></tr></thead><tbody>';
+  Object.entries(latest.byDeadline).sort(([a],[b])=>a.localeCompare(b)).forEach(([date,count])=>{
+    const label=date==='sem-data'?'Sem data':fmtDateShort(date);
+    html+='<tr><td'+(date!=='sem-data'&&date<day.date?' style="color:#c62828;font-weight:bold"':'')+'>'+excelText(label)+'</td><td>'+prodFmt(count,0)+'</td></tr>';
+  });
+  html+='</tbody><tfoot><tr><th>Total</th><th>'+prodFmt(latest.total,0)+'</th></tr></tfoot></table></div>';
+  html+='<div class="devolucao-subhead">Hora a hora</div><div class="tbl-wrap" style="margin:0"><table aria-label="Movimentacao por hora"><thead><tr><th>Hora</th><th>Leituras</th><th>Entraram</th><th>Sairam da lista</th><th>Abertas</th></tr></thead><tbody>';
+  devolucaoOccurrenceHours(timeline).forEach(row=>{
+    html+='<tr><td>'+row.hour+'</td><td>'+row.uploads+'</td><td>'+row.entered+'</td><td>'+row.left+'</td><td>'+row.total+'</td></tr>';
+  });
+  html+='</tbody></table></div><details style="margin-top:10px"><summary>Leituras importadas ('+snapshots.length+')</summary><div class="tbl-wrap" style="margin:8px 0 0"><table><thead><tr><th>Horario</th><th>Arquivo</th><th>Abertas</th><th>Entraram</th><th>Sairam da lista</th><th>Media dias</th></tr></thead><tbody>';
+  timeline.forEach(({snapshot,entered,left,baseline})=>{
+    html+='<tr><td>'+String(snapshot.observedAt).slice(11,16)+'</td><td style="white-space:normal;overflow-wrap:anywhere">'+excelText(snapshot.fileName)+'</td><td>'+snapshot.total+'</td><td>'+(baseline?'Base':entered)+'</td><td>'+(baseline?'Base':left)+'</td><td>'+(snapshot.averageDays===null?'-':prodFmt(snapshot.averageDays,1))+'</td></tr>';
+  });
+  return html+'</tbody></table></div></details>';
+}
+function devolucaoOccurrenceResumo(day,kind){
+  const snapshots=devolucaoOccurrenceSnapshots(day,kind),latest=snapshots[snapshots.length-1];
+  if(!latest)return '';
+  const timeline=devolucaoOccurrenceTimeline(snapshots,devolucaoPreviousOccurrenceSnapshot(day,kind));
+  return '\nPLANILHA '+devolucaoOccurrenceLabel(kind).toUpperCase()+
+    '\nAbertas: '+latest.total+' | Entraram: '+timeline.reduce((sum,item)=>sum+item.entered,0)+' | Sairam da lista: '+timeline.reduce((sum,item)=>sum+item.left,0)+
+    '\nMedia emissao -> registro: '+(latest.averageDays===null?'-':prodFmt(latest.averageDays,1)+' dias')+
+    '\nPor data limite: '+Object.entries(latest.byDeadline).sort(([a],[b])=>a.localeCompare(b)).map(([date,count])=>(date==='sem-data'?'Sem data':fmtDateShort(date))+': '+count).join(' | ');
+}
+function devolucaoRefreshKpis(day){
+  const el=document.getElementById('devolucaoKpis');if(!el)return;
+  const t=devolucaoTotals(devolucaoManual(day),day);
+  el.innerHTML=[
+    devolucaoCard('Pallets recebidos',prodFmt(t.inicioPallets,0),'Inicio do dia'),
+    devolucaoCard('Notas fiscais',prodFmt(t.inicioNfs,0),'Inicio do dia','#00e676'),
+    devolucaoCard('Volumes recebidos',prodFmt(t.inicioVolumes,0),'Inicio do dia'),
+    devolucaoCard('Pallets conferidos',prodFmt(t.palletsConf,0),devolucaoPct(t.palletsConf,t.inicioPallets)+'% do recebido','#00e676'),
+    devolucaoCard('Pend. conferencia',prodFmt(t.palletsPend,0),'Pallets pendentes','#ff466a'),
+    devolucaoCard('Menu 24 pendente',prodFmt(t.menu24Pend,0),'Guarda pendente','#ff9800')
+  ].join('');
+}
+
 function devolucaoNum(v){return parseSumNumber(v);}
 function devolucaoPct(part,total){total=devolucaoNum(total);return total?Math.round((devolucaoNum(part)/total)*100):0;}
 function devolucaoManual(day){return (day&&day.devolucao)||{};}
 function devolucaoSum(d,keys){
   return keys.reduce((s,k)=>s+devolucaoNum(d[k]),0);
 }
-function devolucaoTotals(d){
+function devolucaoTotals(d,day=null){
   const inicioPalletsTrans=devolucaoSum(d,['inicioPalletsTranslog','inicioPalletsRondolog','inicioPalletsCeresul']);
   const inicioNfsTrans=devolucaoSum(d,['inicioNfsTranslog','inicioNfsRondolog','inicioNfsCeresul']);
   const inicioVolTrans=devolucaoSum(d,['inicioVolumesTranslog','inicioVolumesRondolog','inicioVolumesCeresul']);
@@ -9230,17 +9476,21 @@ function devolucaoTotals(d){
   const menu24Pend=devolucaoNum(d.menu24PendenteGuarda);
   const faltaVolInicio=devolucaoNum(d.gppFaltaVolumeInicio);
   const faltaVolFinal=devolucaoNum(d.gppFaltaVolumeFinal);
-  const faltaVolProd=Math.max(faltaVolInicio-faltaVolFinal,0);
+  const reportEntries=kind=>{
+    const snapshots=(d[devolucaoOccurrenceKey(kind)]&&d[devolucaoOccurrenceKey(kind)].snapshots)||[];
+    return devolucaoOccurrenceTimeline([...snapshots].sort((a,b)=>String(a.observedAt).localeCompare(String(b.observedAt))||a.importedAt-b.importedAt),day?devolucaoPreviousOccurrenceSnapshot(day,kind):null).reduce((sum,item)=>sum+item.entered,0);
+  };
+  const faltaVolProd=Math.max(faltaVolInicio+reportEntries('volume')-faltaVolFinal,0);
   const faltaMercInicio=devolucaoNum(d.gppFaltaMercadoriaInicio);
   const faltaMercFinal=devolucaoNum(d.gppFaltaMercadoriaFinal);
-  const faltaMercProd=Math.max(faltaMercInicio-faltaMercFinal,0);
+  const faltaMercProd=Math.max(faltaMercInicio+reportEntries('mercadoria')-faltaMercFinal,0);
   return {inicioPallets,inicioNfs,inicioVolumes,palletsConf,palletsPend,menu24Guardados,menu24Pend,faltaVolInicio,faltaVolFinal,faltaVolProd,faltaMercInicio,faltaMercFinal,faltaMercProd};
 }
 function devolucaoField(label,key,value,type='number'){
-  return `<label class="devolucao-field"><span>${label}</span><input type="${type}" value="${attrText(value||'')}" oninput="saveDevolucaoField('${key}',this.value)"></label>`;
+  return `<label class="devolucao-field"><span>${label}</span><input data-devolucao-key="${key}" type="${type}" value="${attrText(value??'')}" oninput="saveDevolucaoField('${key}',this.value)"></label>`;
 }
 function devolucaoTextarea(label,key,value){
-  return `<label class="devolucao-field" style="grid-column:1/-1"><span>${label}</span><textarea oninput="saveDevolucaoField('${key}',this.value)">${excelText(value||'')}</textarea></label>`;
+  return `<label class="devolucao-field" style="grid-column:1/-1"><span>${label}</span><textarea data-devolucao-key="${key}" oninput="saveDevolucaoField('${key}',this.value)">${excelText(value??'')}</textarea></label>`;
 }
 function devolucaoCard(label,value,small='',color=''){
   return `<div class="devolucao-card"><span>${label}</span><strong${color?` style="color:${color}"`:''}>${value}</strong>${small?`<small>${small}</small>`:''}</div>`;
@@ -9251,6 +9501,7 @@ function devolucaoProgress(label,part,total,kind='ok'){
   return `<div class="devolucao-progress"><b>${label}</b><strong>${prodFmt(part,0)} de ${prodFmt(total,0)} (${pct}%)</strong><div class="devolucao-bar"><div class="devolucao-fill ${kind==='warn'?'warn':''}" style="width:${Math.min(pct,100)}%"></div></div><b>Pendente</b><strong>${prodFmt(pend,0)}</strong></div>`;
 }
 function devolucaoSaveCurrent(day){
+  markLocalUserEdit(300000);
   const idx=db.days.findIndex(d=>d.date===day.date);
   if(idx>=0)db.days[idx]=mergeDayRecords(db.days[idx],day);else db.days.push(day);
   db.days=mergeDays(db.days,[]);
@@ -9260,21 +9511,25 @@ function saveDevolucaoField(key,value){
   const dt=curDate||today();
   const base=getDay(dt)||emptyDay(dt);
   const day=JSON.parse(JSON.stringify(base));
-  const ts=Date.now();
+  const ts=Math.max(Date.now(),(+day.devolucao?._updatedAt||0)+1);
   day.devolucao=day.devolucao||{};
   day.devolucao._fieldUpdatedAt=day.devolucao._fieldUpdatedAt||{};
   day.devolucao[key]=value;
   day.devolucao._fieldUpdatedAt[key]=ts;
+  day.devolucao._fieldClearedAt=day.devolucao._fieldClearedAt||{};
+  if(value==='')day.devolucao._fieldClearedAt[key]=ts;
+  else delete day.devolucao._fieldClearedAt[key];
   day.devolucao._updatedAt=ts;
   day._updatedAt=ts;
   devolucaoSaveCurrent(day);
   const savedDay=getDay(dt)||day;
-  renderDevolucaoCharts(devolucaoTotals(savedDay.devolucao||day.devolucao||{}));
+  renderDevolucaoCharts(devolucaoTotals(savedDay.devolucao||day.devolucao||{},savedDay));
   devolucaoRefreshResumo();
+  devolucaoRefreshKpis(savedDay);
 }
 function devolucaoBuildResumo(day){
   const d=devolucaoManual(day);
-  const t=devolucaoTotals(d);
+  const t=devolucaoTotals(d,day);
   return [
     `DEVOLUCAO CD SJP`,
     `${fmtDate(day.date)}`,
@@ -9304,7 +9559,9 @@ function devolucaoBuildResumo(day){
     `Ocorrencias sem analise nas cameras: ${prodFmt(d.ocorrenciasSemCamera||0,0)}`,
     `Notas lancadas: ${prodFmt(d.notasFaltaMercadoria||0,0)}`,
     ``,
-    d.observacoesDevolucao?`OBS: ${d.observacoesDevolucao}`:`OBS: -`
+    d.observacoesDevolucao?`OBS: ${d.observacoesDevolucao}`:`OBS: -`,
+    devolucaoOccurrenceResumo(day,'volume'),
+    devolucaoOccurrenceResumo(day,'mercadoria')
   ].join('\n');
 }
 function devolucaoRefreshResumo(){
@@ -9366,7 +9623,7 @@ function renderDevolucao(){
   if(!wrap)return;
   const day=getDay(curDate)||emptyDay(curDate||today());
   const d=devolucaoManual(day);
-  const t=devolucaoTotals(d);
+  const t=devolucaoTotals(d,day);
   wrap.innerHTML=`
     <div class="devolucao-head">
       <div class="devolucao-title">
@@ -9379,7 +9636,7 @@ function renderDevolucao(){
         <button class="devolucao-btn gray" type="button" onclick="showAreaHub()">Trocar &aacute;rea</button>
       </div>
     </div>
-    <div class="devolucao-grid">
+    <div class="devolucao-grid" id="devolucaoKpis">
       ${devolucaoCard('Pallets recebidos',prodFmt(t.inicioPallets,0),'in&iacute;cio do dia')}
       ${devolucaoCard('Notas fiscais',prodFmt(t.inicioNfs,0),'in&iacute;cio do dia','#00e676')}
       ${devolucaoCard('Volumes recebidos',prodFmt(t.inicioVolumes,0),'in&iacute;cio do dia')}
@@ -9439,6 +9696,7 @@ function renderDevolucao(){
         <div class="devolucao-two">
           <div>
             <div class="devolucao-subhead">Ocorr&ecirc;ncias falta de volume</div>
+            ${renderDevolucaoOccurrences(day,'volume')}
             <div class="devolucao-fields">
               ${devolucaoField('Total no in&iacute;cio do dia','gppFaltaVolumeInicio',d.gppFaltaVolumeInicio)}
               ${devolucaoField('Total no final do dia','gppFaltaVolumeFinal',d.gppFaltaVolumeFinal)}
@@ -9457,6 +9715,7 @@ function renderDevolucao(){
           </div>
           <div>
             <div class="devolucao-subhead">Ocorr&ecirc;ncias falta de mercadoria</div>
+            ${renderDevolucaoOccurrences(day,'mercadoria')}
             <div class="devolucao-fields">
               ${devolucaoField('Total no in&iacute;cio do dia','gppFaltaMercadoriaInicio',d.gppFaltaMercadoriaInicio)}
               ${devolucaoField('Total no final do dia','gppFaltaMercadoriaFinal',d.gppFaltaMercadoriaFinal)}
