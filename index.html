@@ -1508,59 +1508,6 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
       </div>
     </div>
 
-    <div class="receb-arm-pend-grid">
-      <div class="receb-arm-panel">
-        <div class="receb-arm-head"><strong>Pendências de conferência</strong><span>Itens informados manualmente quando a conferência não finalizar.</span></div>
-        <div class="receb-arm-body">
-          <div class="receb-arm-form">
-            <label>NF
-              <select id="recebArmPendConfNf" onchange="renderRecebArm()"></select>
-            </label>
-            <label>Item/código
-              <select id="recebArmPendConfItem"></select>
-            </label>
-            <label>Qtd. volumes/caixas
-              <input type="number" id="recebArmPendConfQtdVol" min="0" step="0.001" placeholder="0">
-            </label>
-            <label>Qtd. unidades
-              <input type="number" id="recebArmPendConfQtdUn" min="0" placeholder="0">
-            </label>
-            <label>Observação
-              <input id="recebArmPendConfObs" placeholder="Observação">
-            </label>
-            <label class="receb-arm-check">
-              <input type="checkbox" id="recebArmPendConfNfd">
-              <span>Emitir NFD para fornecedor</span>
-            </label>
-            <button class="receb-arm-btn red" type="button" onclick="addRecebArmPendencia('conf')">Adicionar pendência</button>
-          </div>
-          <div style="overflow-x:auto;margin-top:8px" id="recebArmPendConfItens"></div>
-          <div style="overflow-x:auto;margin-top:8px" id="recebArmPendConfTbl"></div>
-        </div>
-      </div>
-
-      <div class="receb-arm-panel">
-        <div class="receb-arm-head"><strong>Pendências de armazenagem</strong><span>Também recebe pendências calculadas pela 997.</span></div>
-        <div class="receb-arm-body">
-          <div class="receb-arm-form">
-            <label>NF
-              <input id="recebArmPendArmNf" placeholder="NF">
-            </label>
-            <label>Item/código
-              <input id="recebArmPendArmItem" placeholder="Código ou item">
-            </label>
-            <label>Quantidade
-              <input type="number" id="recebArmPendArmQtd" min="0" placeholder="0">
-            </label>
-            <label>Endereço
-              <input id="recebArmPendArmEnd" value="997">
-            </label>
-            <button class="receb-arm-btn red" type="button" onclick="addRecebArmPendencia('arm')">Adicionar pendência</button>
-          </div>
-          <div style="overflow-x:auto;margin-top:8px" id="recebArmPendArmTbl"></div>
-        </div>
-      </div>
-    </div>
   </div>
 </div>
 
