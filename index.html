@@ -834,6 +834,24 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 .receb-arm-item-preview .preview-title{background:#071525;color:#ffd700;font-weight:bold;font-size:10px;padding:7px 9px;border-bottom:1px solid #1a3550;text-transform:uppercase}
 .receb-arm-item-mini{margin-top:8px;overflow-x:auto;border-top:1px solid #1a3550;padding-top:7px}
 .receb-arm-item-mini summary{cursor:pointer;color:#ffd700;font-weight:bold;font-size:10px;margin-bottom:6px}
+.receb-arm-received-totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;padding:12px 0;margin-bottom:10px;border-bottom:1px solid #1a3550}
+.receb-arm-received-totals span{display:block;color:#89b4d4;font-size:11px;font-weight:bold;margin-bottom:5px}
+.receb-arm-received-totals strong{display:block;color:#00e676;font-size:23px}
+.receb-arm-received-totals b{color:#ffd700;font-size:13px}
+.receb-arm-carrier{min-width:0;border:1px solid #1a3550;border-radius:6px;overflow:hidden;background:#0d1c2e}
+.receb-arm-carrier-head{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:12px;background:#0a2340}
+.receb-arm-carrier-head>div:first-child{min-width:0;overflow-wrap:anywhere}
+.receb-arm-carrier-head strong{color:#ffd700;font-size:13px}
+.receb-arm-carrier-controls{display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+.receb-arm-arrival{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:bold;color:#00e676}
+.receb-arm-arrival input{width:18px;height:18px;accent-color:#00a86b}
+.receb-arm-carrier-status{display:flex;flex-direction:column;gap:4px;font-size:10px;color:#89b4d4}
+.receb-arm-carrier-status select{min-width:210px;max-width:100%;padding:7px;background:#eef6ff;color:#00385f;border:1px solid #9cc3df;border-radius:4px;font-size:12px;font-weight:bold}
+.receb-arm-carrier-status select:disabled{opacity:.65}
+.receb-arm-carrier-table{overflow-x:auto;max-width:100%}
+.receb-arm-carrier-table>.receb-arm-tbl{min-width:620px}
+.receb-arm-carrier-table th[scope="row"]{text-align:left;white-space:normal;color:#ffd700;max-width:320px;overflow-wrap:anywhere}
+.receb-arm-groups{min-width:0}
 .receb-arm-groups{display:grid;grid-template-columns:1fr;gap:8px}
 .receb-arm-group{border:1px solid #1a3550;border-radius:6px;overflow:hidden;background:#0d1c2e}
 .receb-arm-group-title{background:#071525;color:#ffd700;padding:7px 9px;font-weight:bold;font-size:11px;display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap}
@@ -1378,7 +1396,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
   <div class="receb-arm-page">
     <div style="background:#0a2340;border-radius:6px;padding:8px 14px;margin-bottom:8px;border:1px solid rgba(0,230,118,.3);display:flex;align-items:center;gap:10px;flex-wrap:wrap">
       <span style="font-size:11px;font-weight:bold;color:#00e676">Recebimento/Armazenagem</span>
-      <span style="font-size:10px;color:#6a9fc0">Agenda do dia + NF + 997 | a mesma nota pode estar em conferência e armazenagem ao mesmo tempo</span>
+      <span style="font-size:10px;color:#6a9fc0">Transportadores | fornecedores | NF | 997</span>
       <button type="button" onclick="exportRecebArmExcel()" style="margin-left:auto;background:#00a86b;color:#fff;border:none;border-radius:4px;padding:6px 12px;font-weight:bold;font-size:11px;cursor:pointer">Exportar Excel</button>
     </div>
 
@@ -1391,7 +1409,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
           <label>Arquivo da agenda
             <input type="file" id="recebArmAgendaFile" accept=".xlsx,.xls,.csv" onchange="importRecebArmAgenda(event)">
           </label>
-          <label>Filtro fornecedor/protocolo
+          <label>Filtro transportador/fornecedor/protocolo
             <input id="recebArmFilter" placeholder="Digite para filtrar" oninput="renderRecebArm()">
           </label>
           <button class="receb-arm-btn gray" type="button" onclick="clearRecebArmAgenda()">Limpar agenda</button>
@@ -1402,7 +1420,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
     </div>
 
     <div class="receb-arm-panel">
-      <div class="receb-arm-head"><strong>Fluxo por fornecedor</strong><span>Fornecedores da agenda entram como agendados; ao bipar a NF, muda para em conferência.</span></div>
+      <div class="receb-arm-head"><strong>Fluxo por transportador</strong><span>Agendamento | conferencia | armazenagem</span></div>
       <div class="receb-arm-body">
         <div class="receb-arm-groups" id="recebArmFluxo"></div>
       </div>
@@ -3470,7 +3488,9 @@ function mergeRecebArm(current,next){
   return{
     ...a,
     ...b,
-    agendaRows:mergeByIdOrIndex(a.agendaRows,b.agendaRows,'id'),
+    transportadores:mergeRecebArmTransportadores(a.transportadores,b.transportadores),
+    agendaRows:mergeRecebArmAgenda(a,b),
+    _agendaUpdatedAt:Math.max(+a._agendaUpdatedAt||0,+b._agendaUpdatedAt||0),
     notas:mergeByIdOrIndex(a.notas,b.notas,'id'),
     pendConf:mergeByIdOrIndex(a.pendConf,b.pendConf,'id'),
     pendArm:mergeByIdOrIndex(a.pendArm,b.pendArm,'id'),
@@ -6119,6 +6139,8 @@ function emptyRecebArm(){
 function ensureRecebArm(day){
   if(!day.recebArm||typeof day.recebArm!=='object')day.recebArm=emptyRecebArm();
   const data=day.recebArm;
+  if(!data.transportadores||typeof data.transportadores!=='object'||Array.isArray(data.transportadores))data.transportadores={};
+  if(day.date)data.transportadores=mergeRecebArmTransportadores(data.transportadores,recebArmCarrierDraft(day.date));
   ['agendaRows','notas','pendConf','pendArm','qrpRows','qrpImports','qrpLastItems','qrpLastSummaryItems','qrpOpenPartials','productBase'].forEach(k=>{if(!Array.isArray(data[k]))data[k]=[];});
   if(data.qrpLastPendingSummary&&typeof data.qrpLastPendingSummary!=='object')data.qrpLastPendingSummary=null;
   if(day.date)data._date=day.date;
@@ -6439,11 +6461,11 @@ async function importRecebArmAgenda(ev){
     const dataRows=rows.slice(headerIndex+1);
     let lastTransportador='',lastHorario='',lastTipo='';
     const agendaRows=dataRows.map((row,i)=>{
-      const fornecedor=recebArmCell(row,headers,['fornecedor']);
-      if(!String(fornecedor||'').trim())return null;
       lastTransportador=recebArmCell(row,headers,['transportador'])||lastTransportador;
       lastHorario=recebArmCell(row,headers,['horario','horário'])||lastHorario;
       lastTipo=recebArmCell(row,headers,['tipo de mercadoria','mercadoria'])||lastTipo;
+      const fornecedor=recebArmCell(row,headers,['fornecedor']);
+      if(!String(fornecedor||'').trim())return null;
       return{
         id:recebArmId('agenda'),
         protocolo:String(recebArmCell(row,headers,['protocolo'])||'').trim(),
@@ -6460,6 +6482,8 @@ async function importRecebArmAgenda(ev){
     const day=recebArmDay();
     const data=ensureRecebArm(day);
     data.agendaRows=agendaRows;
+    data._agendaUpdatedAt=Math.max(Date.now(),(+data._agendaUpdatedAt||0)+1);
+    markLocalUserEdit(300000);
     recebArmTouch(day);
     recebArmMsg('recebArmAgendaMsg',`${agendaRows.length} linha(s) da agenda importadas. NFs de dias anteriores nao entram automaticamente neste recebimento.`,false);
     renderRecebArm();
@@ -6474,7 +6498,10 @@ async function importRecebArmAgenda(ev){
 function clearRecebArmAgenda(){
   if(!confirm('Limpar a agenda importada deste dia?'))return;
   const day=recebArmDay();
-  ensureRecebArm(day).agendaRows=[];
+  const data=ensureRecebArm(day);
+  data.agendaRows=[];
+  data._agendaUpdatedAt=Math.max(Date.now(),(+data._agendaUpdatedAt||0)+1);
+  markLocalUserEdit(300000);
   recebArmTouch(day);
   renderRecebArm();
 }
@@ -8268,15 +8295,154 @@ function recebArmAgendaIsTotalRow(row){
   return fornecedor.includes('total de ')||fornecedor.includes('total do ')||transportador.includes('total de ')||transportador.includes('total do ');
 }
 
+const RECEB_ARM_CARRIER_STAGES={recebido:'Recebido',conferencia:'Em conferencia',conferido:'Conferencia concluida',armazenagem:'Em armazenagem',armazenado:'Armazenagem concluida'};
+function recebArmCarrierKey(value){return recebArmKey(value).replace(/[^a-z0-9]+/g,' ').trim()||'sem transportador';}
+function mergeRecebArmAgenda(current,next){
+  const ats=+current._agendaUpdatedAt||0,bts=+next._agendaUpdatedAt||0;
+  if(ats||bts)return (bts>=ats?next:current).agendaRows||[];
+  return mergeByIdOrIndex(current.agendaRows,next.agendaRows,'id');
+}
+function recebArmCarrierDraft(date,records){
+  try{
+    const key='cdgam_receb_transportadores_v1';
+    const drafts=JSON.parse(localStorage.getItem(key)||'{}');
+    if(records){drafts[date]=records;localStorage.setItem(key,JSON.stringify(drafts));return records;}
+    return drafts[date]||{};
+  }catch(_){return {};}
+}
+function mergeRecebArmTransportadores(current,next){
+  const out={};
+  new Set([...Object.keys(current||{}),...Object.keys(next||{})]).forEach(key=>{
+    const a=current&&current[key]||{},b=next&&next[key]||{};
+    const fields=new Set([...Object.keys(a),...Object.keys(b)]);
+    const merged={};
+    fields.forEach(field=>{
+      if(field==='_fieldUpdatedAt'||field==='_updatedAt')return;
+      const ats=+(a._fieldUpdatedAt&&a._fieldUpdatedAt[field])||+a._updatedAt||0;
+      const bts=+(b._fieldUpdatedAt&&b._fieldUpdatedAt[field])||+b._updatedAt||0;
+      merged[field]=Object.prototype.hasOwnProperty.call(b,field)&&(!Object.prototype.hasOwnProperty.call(a,field)||bts>=ats)?b[field]:a[field];
+    });
+    merged._fieldUpdatedAt={...a._fieldUpdatedAt};
+    Object.entries(b._fieldUpdatedAt||{}).forEach(([field,ts])=>{merged._fieldUpdatedAt[field]=Math.max(+merged._fieldUpdatedAt[field]||0,+ts||0);});
+    merged._updatedAt=Math.max(+a._updatedAt||0,+b._updatedAt||0);
+    out[key]=merged;
+  });
+  return out;
+}
+function recebArmCarrierGroups(data){
+  const groups=new Map();
+  const ensure=label=>{
+    const name=String(label||'Sem transportador').trim(),key=recebArmCarrierKey(name);
+    if(!groups.has(key))groups.set(key,{key,name,agendaRows:[],notas:[],suppliers:new Map()});
+    return groups.get(key);
+  };
+  const supplier=(group,name)=>{
+    const label=String(name||'Sem fornecedor').trim(),key=recebArmCarrierKey(label);
+    if(!group.suppliers.has(key))group.suppliers.set(key,{key,name:label,agendaRows:[],notas:[]});
+    return group.suppliers.get(key);
+  };
+  const agenda=recebArmAgendaRowsForFlow(data);
+  agenda.forEach(row=>{
+    const group=ensure(row.transportador);
+    group.agendaRows.push(row);supplier(group,row.fornecedor).agendaRows.push(row);
+  });
+  recebArmUniqueNotas(data.notas||[]).filter(nota=>!nota.carryFromDate).forEach(nota=>{
+    let candidates=[];
+    if(nota.protocolo)candidates=agenda.filter(row=>String(row.protocolo||'').trim()===String(nota.protocolo).trim());
+    if(!candidates.length){
+      const scored=agenda.map(row=>({row,score:recebArmFornecedorScore(row.fornecedor,nota.fornecedor)})).filter(item=>item.score>=0.55).sort((a,b)=>b.score-a.score);
+      if(scored.length)candidates=scored.filter(item=>item.score===scored[0].score).map(item=>item.row);
+    }
+    const carrierKeys=[...new Set(candidates.map(row=>recebArmCarrierKey(row.transportador)))];
+    const explicit=nota.transportador||nota.transportadora||'';
+    let group,matched=null;
+    if(explicit){group=ensure(explicit);matched=candidates.find(row=>recebArmCarrierKey(row.transportador)===group.key);}
+    else if(carrierKeys.length===1){matched=candidates[0];group=ensure(matched.transportador);}
+    else group=ensure('Sem transportador');
+    group.notas.push(nota);supplier(group,matched?matched.fornecedor:nota.fornecedor).notas.push(nota);
+  });
+  return [...groups.values()].map(group=>{
+    const saved=data.transportadores&&data.transportadores[group.key]||{};
+    const received=saved.received===true;
+    const stage=received&&RECEB_ARM_CARRIER_STAGES[saved.status]?saved.status:(received?'recebido':'agendado');
+    const suppliers=[...group.suppliers.values()].map(item=>{
+      const skuIds=new Set(item.notas.flatMap(nota=>(nota.itens||[]).map((entry,i)=>String(entry.codGam||entry.codigo||entry.descricao||nota.id+'-'+i))));
+      return {...item,volumes:Math.max(item.agendaRows.reduce((sum,row)=>sum+(+row.volumes||0),0),item.notas.reduce((sum,nota)=>sum+(+nota.volumes||0),0)),
+        skus:Math.max(item.agendaRows.reduce((sum,row)=>sum+(+row.skus||0),0),skuIds.size)};
+    }).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+    return {...group,suppliers,received,stage,volumes:suppliers.reduce((sum,item)=>sum+item.volumes,0),skus:suppliers.reduce((sum,item)=>sum+item.skus,0)};
+  }).sort((a,b)=>a.name.localeCompare(b.name,'pt-BR'));
+}
+function recebArmCarrierTotals(data){
+  const groups=recebArmCarrierGroups(data);
+  const names=predicate=>new Set(groups.filter(predicate).flatMap(group=>group.suppliers.map(item=>item.key))).size;
+  return {groups,received:names(group=>group.received),conferencia:names(group=>group.stage==='conferencia'),
+    conferidos:names(group=>['conferido','armazenagem','armazenado'].includes(group.stage)),
+    armazenagem:names(group=>group.stage==='armazenagem'),armazenados:names(group=>group.stage==='armazenado'),
+    volumes:groups.filter(group=>group.received).reduce((sum,group)=>sum+group.volumes,0),
+    skus:groups.filter(group=>group.received).reduce((sum,group)=>sum+group.skus,0)};
+}
+function recebArmNotaCarrierStatuses(nota,data){
+  const group=recebArmCarrierGroups(data).find(group=>group.notas.some(item=>recebArmNotaUniqueKey(item)===recebArmNotaUniqueKey(nota)));
+  const stage=group?group.stage:'agendado';
+  return {confStatus:['conferido','armazenagem','armazenado'].includes(stage)?'finalizado':stage==='conferencia'?'andamento':'pendente',
+    armStatus:stage==='armazenado'?'finalizado':stage==='armazenagem'?'andamento':'pendente'};
+}
+function setRecebArmTransportador(key,field,value){
+  if(!['received','status'].includes(field))return false;
+  const day=recebArmDay(),data=ensureRecebArm(day);
+  const group=recebArmCarrierGroups(data).find(item=>item.key===key);
+  if(!group)return false;
+  data.transportadores=data.transportadores||{};
+  const record=data.transportadores[key]||{name:group.name,received:false,status:'agendado',_fieldUpdatedAt:{}};
+  if(field==='status'&&(!record.received||!RECEB_ARM_CARRIER_STAGES[value])){renderRecebArm();return false;}
+  const ts=Math.max(Date.now(),(+record._updatedAt||0)+1);
+  record._fieldUpdatedAt={...record._fieldUpdatedAt};
+  if(field==='received'){
+    record.received=value===true;
+    record.status=record.received?'recebido':'agendado';
+    record._fieldUpdatedAt.received=ts;record._fieldUpdatedAt.status=ts;
+  }else{record.status=value;record._fieldUpdatedAt.status=ts;}
+  record._updatedAt=ts;data.transportadores[key]=record;
+  recebArmCarrierDraft(day.date,data.transportadores);
+  markLocalUserEdit(300000);recebArmTouch(day);renderRecebArm();
+  return true;
+}
+function recebArmReceivedTotalsHtml(data){
+  const totals=recebArmCarrierTotals(data);
+  const agenda=recebArmAgendaSummary(data.agendaRows||[]);
+  return '<div class="receb-arm-received-totals"><div><span>Volumes recebidos</span><strong>'+prodFmt(totals.volumes,0)+'</strong></div><div><span>SKUs recebidos</span><strong>'+prodFmt(totals.skus,0)+'</strong></div><div class="receb-arm-planned-total"><span>Total da agenda</span><b>'+prodFmt(agenda.total,0)+' volumes / '+prodFmt(agenda.totalSkus,0)+' SKUs</b></div></div>';
+}
+function renderRecebArmTransportadores(data){
+  const el=document.getElementById('recebArmFluxo');if(!el)return;
+  const filter=recebArmCarrierKey(document.getElementById('recebArmFilter')?.value||'');
+  const activeFilter=String(document.getElementById('recebArmFilter')?.value||'').trim();
+  const groups=recebArmCarrierGroups(data).filter(group=>!activeFilter||recebArmCarrierKey([group.name,...group.suppliers.map(item=>item.name),...group.agendaRows.map(row=>row.protocolo),...group.notas.map(nota=>nota.nfNumero)].join(' ')).includes(filter));
+  if(!groups.length){el.innerHTML='<div class="no-data" style="padding:18px">Nenhum transportador para este dia.</div>';return;}
+  el.classList.remove('receb-arm-flow-list');
+  const qrpIndex=recebArm997PendingIndex(data,curDate||today());
+  el.innerHTML=groups.map(group=>{
+    const controls='<div class="receb-arm-carrier-controls"><label class="receb-arm-arrival"><input type="checkbox" data-carrier="'+attrText(group.key)+'" data-carrier-field="received" aria-label="'+attrText('Confirmar agendamento de '+group.name)+'" '+(group.received?'checked':'')+' onchange="setRecebArmTransportador(\''+group.key+'\',\'received\',this.checked)"> Agendamento confirmado</label><label class="receb-arm-carrier-status"><span>Status do transportador</span><select data-carrier="'+attrText(group.key)+'" data-carrier-field="status" aria-label="'+attrText('Status de '+group.name)+'" '+(!group.received?'disabled':'')+' onchange="setRecebArmTransportador(\''+group.key+'\',\'status\',this.value)">'+(!group.received?'<option>Agendado</option>':Object.entries(RECEB_ARM_CARRIER_STAGES).map(([value,label])=>'<option value="'+value+'" '+(value===group.stage?'selected':'')+'>'+label+'</option>').join(''))+'</select></label></div>';
+    const rows=group.suppliers.map(item=>{
+      const protocols=[...new Set(item.agendaRows.map(row=>row.protocolo).filter(Boolean))].join(', ');
+      const notes=item.notas.length?'<details><summary>Notas fiscais ('+item.notas.length+')</summary>'+item.notas.map(nota=>'<details class="receb-arm-item-mini"><summary>NF '+excelText(nota.nfNumero||'sem numero')+' - '+prodFmt(+nota.volumes||0,0)+' volumes</summary><div class="receb-arm-actions"><button class="receb-arm-btn red" type="button" onclick="removeRecebArmNota(\''+attrText(nota.id)+'\')">Remover NF</button></div>'+((nota.itens||[]).length?recebArmRenderItensTable(nota.itens,'',false):'')+recebArmNota997MiniReport(nota,data,qrpIndex)+'</details>').join('')+'</details>':'-';
+      return '<tr><th scope="row">'+excelText(item.name)+'</th><td>'+excelText(protocols||'-')+'</td><td>'+prodFmt(item.volumes,0)+'</td><td>'+prodFmt(item.skus,0)+'</td><td>'+notes+'</td></tr>';
+    }).join('');
+    return '<section class="receb-arm-carrier"><div class="receb-arm-carrier-head"><div><strong>'+excelText(group.name)+'</strong><div class="receb-arm-flow-meta">'+group.suppliers.length+' fornecedor(es) | '+prodFmt(group.volumes,0)+' volumes | '+prodFmt(group.skus,0)+' SKUs</div></div>'+controls+'</div><div class="receb-arm-carrier-table"><table class="receb-arm-tbl"><thead><tr><th>Fornecedor</th><th>Protocolo</th><th>Volumes</th><th>SKUs</th><th>Notas fiscais</th></tr></thead><tbody>'+rows+'</tbody><tfoot><tr><th colspan="2">Total do transportador</th><th>'+prodFmt(group.volumes,0)+'</th><th>'+prodFmt(group.skus,0)+'</th><th>'+group.notas.length+'</th></tr></tfoot></table></div></section>';
+  }).join('');
+}
+
 function recebArmAgendaSummary(rows){
   const summary={};
   RECEB_ARM_AGENDA_TIPOS.forEach(t=>{summary[t.key]={...t,skus:0,volumes:0,rows:[],explicit:false};});
   let totalExplicit=null;
+  let totalSkusExplicit=null;
   (Array.isArray(rows)?rows:[]).forEach(row=>{
     const tipoKey=recebArmAgendaTipoKey(row.tipo);
     const fornecedorKey=recebArmKey(row.fornecedor);
     if(fornecedorKey.includes('total de volumes')){
       totalExplicit=+row.volumes||0;
+      totalSkusExplicit=+row.skus||0;
       return;
     }
     if(!tipoKey||!summary[tipoKey])return;
@@ -8295,7 +8461,8 @@ function recebArmAgendaSummary(rows){
     item.volumes=item.rows.reduce((sum,row)=>sum+(+row.volumes||0),0);
   });
   const total=totalExplicit!==null?totalExplicit:Object.values(summary).reduce((sum,item)=>sum+(+item.volumes||0),0);
-  return{summary,total};
+  const totalSkus=totalSkusExplicit!==null?totalSkusExplicit:Object.values(summary).reduce((sum,item)=>sum+(+item.skus||0),0);
+  return{summary,total,totalSkus};
 }
 
 function recebArmToggleAgendaTipo(key){
@@ -8350,32 +8517,26 @@ function recebArm997AtualPendenteResumo(data){
 }
 
 function renderRecebArmKpis(data){
-  const el=document.getElementById('recebArmKpis');
-  if(!el)return;
-  const notas=recebArmUniqueNotas(data.notas||[]);
-  const screenDate=curDate||today();
-  const notasRecebidasHoje=notas.filter(n=>!n.carryFromDate&&(n.entradaData||screenDate)===screenDate).length;
-  const confFinal=notas.filter(n=>recebArmNormalizeStatus(n.confStatus)==='finalizado').length;
-  const armFinal=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)==='finalizado').length;
-  const confRun=notas.filter(n=>recebArmNormalizeStatus(n.confStatus)!=='finalizado').length;
-  const armRun=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)!=='finalizado').length;
+  const el=document.getElementById('recebArmKpis');if(!el)return;
+  const totals=recebArmCarrierTotals(data);
   const pend997=recebArm997AtualPendenteResumo(data);
   const kpis=[
-    ['Notas fiscais recebidas no dia',notasRecebidasHoje,'#ffd700'],
-    ['Notas fiscais em conferência',confRun,'#1e88e5'],
-    ['Notas fiscais 100% conferidas',confFinal,'#00e676'],
-    ['Notas fiscais em armazenagem',armRun,'#1e88e5'],
-    ['Notas fiscais 100% armazenadas',armFinal,'#00e676'],
-    ['Pendência de armazenagem',`SKUs: ${prodFmt(pend997.skus,0)}`,'#ff9500',`Volumes: ${prodFmt(pend997.volumes,0)}`]
+    ['Fornecedores recebidos',prodFmt(totals.received,0),'#ffd700'],
+    ['Fornecedores em conferencia',prodFmt(totals.conferencia,0),'#1e88e5'],
+    ['Fornecedores conferidos',prodFmt(totals.conferidos,0),'#00e676'],
+    ['Fornecedores em armazenagem',prodFmt(totals.armazenagem,0),'#1e88e5'],
+    ['Fornecedores armazenados',prodFmt(totals.armazenados,0),'#00e676'],
+    ['Pendencia de armazenagem','SKUs: '+prodFmt(pend997.skus,0),'#ff9500','Volumes: '+prodFmt(pend997.volumes,0)]
   ];
-  el.innerHTML=kpis.map(([label,value,color,sub])=>`<div class="receb-arm-kpi"><div class="lbl">${label}</div><div class="val" style="color:${color}">${value}</div>${sub?`<small style="color:#89b4d4;font-weight:bold">${excelText(sub)}</small>`:''}</div>`).join('');
+  el.innerHTML=kpis.map(([label,value,color,sub])=>'<div class="receb-arm-kpi"><div class="lbl">'+label+'</div><div class="val" style="color:'+color+'">'+value+'</div>'+(sub?'<small style="color:#89b4d4;font-weight:bold">'+excelText(sub)+'</small>':'')+'</div>').join('');
 }
 
 function renderRecebArmAgenda(data){
   const el=document.getElementById('recebArmAgenda');
   if(!el)return;
   const rows=recebArmFilteredRows(data.agendaRows||[]);
-  if(!rows.length){el.innerHTML='<div class="no-data" style="padding:18px">Sem agenda importada para este dia.</div>';return;}
+  const receivedTotals=recebArmReceivedTotalsHtml(data);
+  if(!rows.length){el.innerHTML=receivedTotals+'<div class="no-data" style="padding:18px">Sem agenda importada para este dia.</div>';return;}
   const {summary,total}=recebArmAgendaSummary(rows);
   const headers=RECEB_ARM_AGENDA_TIPOS.map(t=>summary[t.key]);
   const detailBlocks=headers.map(item=>`<div class="receb-arm-detail-block" id="recebArmAgendaDetalhe-${item.key}">
@@ -8386,7 +8547,7 @@ function renderRecebArmAgenda(data){
       </tbody></table>
     </div>
   </div>`).join('');
-  el.innerHTML=`<div class="receb-arm-resumo">
+  el.innerHTML=receivedTotals+`<div class="receb-arm-resumo">
     <table>
       <tbody>
         <tr><th>Centro de Distribuição</th><td colspan="6" style="background:#0d1c2e;color:#ff4c4c;text-align:left">GAM SAO JOSE DOS PINHAIS</td></tr>
@@ -8701,62 +8862,7 @@ function recebArmNota997FlowSummary(notas,data,index){
   </div>`;
 }
 
-function renderRecebArmFluxo(data){
-  const el=document.getElementById('recebArmFluxo');
-  if(!el)return;
-  const filter=recebArmKey(document.getElementById('recebArmFilter')?.value||'');
-  const groups=recebArmFlowGroups(data).filter(g=>!filter||recebArmKey([g.fornecedor,...g.agendaRows.map(r=>r.protocolo),...g.notas.map(n=>n.nfNumero)].join(' ')).includes(filter));
-  if(!groups.length){el.innerHTML='<div class="no-data" style="padding:18px">Importe a agenda para montar o fluxo por fornecedor.</div>';return;}
-  el.classList.add('receb-arm-flow-list');
-  el.innerHTML=groups.map(g=>{
-    const agendaVol=g.agendaRows.reduce((s,r)=>s+(+r.volumes||0),0);
-    const agendaSkus=g.agendaRows.reduce((s,r)=>s+(+r.skus||0),0);
-    const protocolos=[...new Set(g.agendaRows.map(r=>r.protocolo).filter(Boolean))];
-    const notas=recebArmUniqueNotas(g.notas);
-    const nfList=notas.map(n=>n.nfNumero||'sem NF').join(', ');
-    const volNf=notas.reduce((s,n)=>s+(+n.volumes||0),0);
-    const unNf=notas.reduce((s,n)=>s+(+n.unidades||0),0);
-    const nfSkus=notas.reduce((s,n)=>s+(Array.isArray(n.itens)?n.itens.length:0),0);
-    const agendadoVol=Math.max(agendaVol,volNf);
-    const agendadoSkus=Math.max(agendaSkus,nfSkus);
-    const confRun=notas.filter(n=>recebArmNormalizeStatus(n.confStatus)!=='finalizado');
-    const confOk=notas.filter(n=>recebArmNormalizeStatus(n.confStatus)==='finalizado');
-    const armRun=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)!=='finalizado');
-    const armOk=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)==='finalizado');
-    const qrpIndex=recebArm997PendingIndex(data,curDate||today());
-    const armProgressNotes=notas.filter(n=>recebArmNormalizeStatus(n.armStatus)!=='finalizado');
-    const notaCards=notas.map(n=>`<details class="receb-arm-item-mini"><summary>NF ${excelText(n.nfNumero||'sem número')} - ${prodFmt(+n.volumes||0,0)} cx / ${prodFmt(+n.unidades||0,0)} un</summary>
-      <div class="receb-arm-status-grid">
-        <div class="receb-arm-status"><label>Conferência</label>${recebArmStatusSelect(n.id,'confStatus',n.confStatus)}</div>
-        <div class="receb-arm-status"><label>Armazenagem</label>${recebArmStatusSelect(n.id,'armStatus',n.armStatus)}</div>
-      </div>
-      <div class="receb-arm-actions">
-        <button class="receb-arm-btn green" type="button" onclick="markRecebArmNota('${n.id}','confStatus','finalizado')">Conferência 100%</button>
-        <button class="receb-arm-btn" type="button" onclick="markRecebArmNota('${n.id}','armStatus','andamento')">Iniciar armazenagem</button>
-        <button class="receb-arm-btn green" type="button" onclick="markRecebArmNota('${n.id}','armStatus','finalizado')">Armazenagem 100%</button>
-        <button class="receb-arm-btn red" type="button" onclick="removeRecebArmNota('${n.id}')">Remover</button>
-      </div>
-      ${(n.itens||[]).length?recebArmRenderItensTable(n.itens,'',false):''}
-      ${recebArmNota997MiniReport(n,data,qrpIndex)}
-    </details>`).join('');
-    return `<div class="receb-arm-flow-row">
-      <div class="receb-arm-flow-main">
-        <div class="receb-arm-flow-forn">${excelText(g.fornecedor)}</div>
-        <div class="receb-arm-flow-meta">${protocolos.length?`Protocolo: ${excelText(protocolos.join(', '))}<br>`:''}Agenda: <b style="color:#ffd700">${prodFmt(agendadoVol,0)} vol.</b> / ${prodFmt(agendadoSkus,0)} SKUs<br>${notas.length?`NF: <b style="color:#00e5ff">${excelText(nfList)}</b><br>XML: ${prodFmt(volNf,0)} cx / ${prodFmt(unNf,0)} un`:''}</div>
-        ${notaCards}
-      </div>
-      ${recebArmFlowStep('Agendado',agendadoVol?prodFmt(agendadoVol,0)+' vol.':'Sem volume',notas.length?'ok':'wait',notas.length?'NF bipada':'Aguardando NF')}
-      <div class="receb-arm-flow-arrow">→</div>
-      ${recebArmFlowStep('Em conferência',confRun.length?confRun.map(n=>'NF '+excelText(n.nfNumero||'')).join('<br>'):'-',confRun.length?'run':'off')}
-      <div class="receb-arm-flow-arrow">→</div>
-      ${recebArmFlowStep('Conferência finalizada',confOk.length?confOk.map(n=>'NF '+excelText(n.nfNumero||'')).join('<br>'):'-',confOk.length?'ok':'off')}
-      <div class="receb-arm-flow-arrow">→</div>
-      ${recebArmFlowStep('Em armazenagem',recebArmNota997FlowSummary(armProgressNotes,data,qrpIndex),armProgressNotes.length?'run':(armRun.length?'run':'off'))}
-      <div class="receb-arm-flow-arrow">→</div>
-      ${recebArmFlowStep('Armazenagem finalizada',armOk.length?armOk.map(n=>'NF '+excelText(n.nfNumero||'')).join('<br>'):'-',armOk.length?'ok':'off')}
-    </div>`;
-  }).join('');
-}
+function renderRecebArmFluxo(data){renderRecebArmTransportadores(data);}
 
 function renderRecebArmPendTables(data){
   const selectedNota=renderRecebArmPendSelectors(data);
@@ -11601,8 +11707,12 @@ function exportRecebArmExcel(){
   const data=ensureRecebArm(day);
   const date=day.date||curDate||today();
   let html='<!doctype html><html><head><meta charset="utf-8"></head><body>';
-  html+='<h3>Resumo</h3><table border="1"><tr><th>Data</th><th>Notas</th><th>Conferência 100%</th><th>Armazenagem 100%</th><th>Pend. conferência</th><th>Pend. armazenagem</th></tr>';
-  html+=`<tr><td>${excelText(fmtDateShort(date))}</td><td>${(data.notas||[]).length}</td><td>${(data.notas||[]).filter(n=>n.confStatus==='finalizado').length}</td><td>${(data.notas||[]).filter(n=>n.armStatus==='finalizado').length}</td><td>${(data.pendConf||[]).length}</td><td>${prodFmt(recebArmPendArmTotal(data),0)}</td></tr></table>`;
+  const carrierTotals=recebArmCarrierTotals(data);
+  html+='<h3>Resumo</h3><table border="1"><tr><th>Data</th><th>Fornecedores recebidos</th><th>Em conferencia</th><th>Conferidos</th><th>Em armazenagem</th><th>Armazenados</th><th>Volumes recebidos</th><th>SKUs recebidos</th></tr>';
+  html+=`<tr><td>${excelText(fmtDateShort(date))}</td><td>${carrierTotals.received}</td><td>${carrierTotals.conferencia}</td><td>${carrierTotals.conferidos}</td><td>${carrierTotals.armazenagem}</td><td>${carrierTotals.armazenados}</td><td>${carrierTotals.volumes}</td><td>${carrierTotals.skus}</td></tr></table>`;
+  html+='<h3>Transportadores</h3><table border="1"><tr><th>Transportador</th><th>Agendamento confirmado</th><th>Status</th><th>Fornecedores</th><th>Volumes</th><th>SKUs</th></tr>';
+  carrierTotals.groups.forEach(group=>{html+=`<tr><td>${excelText(group.name)}</td><td>${group.received?'Sim':'Nao'}</td><td>${excelText(RECEB_ARM_CARRIER_STAGES[group.stage]||'Agendado')}</td><td>${excelText(group.suppliers.map(item=>item.name).join('; '))}</td><td>${group.volumes}</td><td>${group.skus}</td></tr>`;});
+  html+='</table>';
   const agendaSummary=recebArmAgendaSummary(data.agendaRows||[]);
   html+='<h3>Agenda - Volumetria por Tipo</h3><table border="1"><tr><th>Tipo</th><th>Volumes</th></tr>';
   RECEB_ARM_AGENDA_TIPOS.forEach(t=>{const item=agendaSummary.summary[t.key];html+=`<tr><td>${excelText(t.label)}</td><td>${item?item.volumes||0:0}</td></tr>`;});
@@ -11610,7 +11720,7 @@ function exportRecebArmExcel(){
   html+='<h3>Agenda - Detalhes</h3><table border="1"><tr><th>Protocolo</th><th>Fornecedor</th><th>Transportador</th><th>Tipo</th><th>SKUs</th><th>Volumes</th></tr>';
   (data.agendaRows||[]).filter(r=>!recebArmAgendaIsTotalRow(r)).forEach(r=>{html+=`<tr><td>${excelText(r.protocolo||'')}</td><td>${excelText(r.fornecedor||'')}</td><td>${excelText(r.transportador||'')}</td><td>${excelText(r.tipo||'')}</td><td>${r.skus||0}</td><td>${r.volumes||0}</td></tr>`;});
   html+='</table><h3>Notas</h3><table border="1"><tr><th>NF</th><th>Chave</th><th>Fornecedor</th><th>Protocolo</th><th>Status conferência</th><th>Status armazenagem</th><th>Itens lidos</th></tr>';
-  (data.notas||[]).forEach(n=>{html+=`<tr><td>${excelText(n.nfNumero||'')}</td><td>${excelText(n.chave||'')}</td><td>${excelText(n.fornecedor||'')}</td><td>${excelText(n.protocolo||'')}</td><td>${excelText(RECEB_ARM_STATUS[recebArmNormalizeStatus(n.confStatus)])}</td><td>${excelText(RECEB_ARM_STATUS[recebArmNormalizeStatus(n.armStatus)])}</td><td>${(n.itens||[]).length}</td></tr>`;});
+  (data.notas||[]).forEach(n=>{const status=recebArmNotaCarrierStatuses(n,data);html+=`<tr><td>${excelText(n.nfNumero||'')}</td><td>${excelText(n.chave||'')}</td><td>${excelText(n.fornecedor||'')}</td><td>${excelText(n.protocolo||'')}</td><td>${excelText(RECEB_ARM_STATUS[status.confStatus])}</td><td>${excelText(RECEB_ARM_STATUS[status.armStatus])}</td><td>${(n.itens||[]).length}</td></tr>`;});
   html+='</table><h3>Itens da NF x 997</h3><table border="1"><tr><th>NF</th><th>Item</th><th>COD GAM</th><th>Código NF</th><th>Descrição</th><th>Caixas NF</th><th>Unidades NF</th><th>Pendente 997 un.</th><th>Pendente 997 vol.</th><th>% armazenado</th><th>% pendente</th><th>Status</th><th>Vínculo</th></tr>';
   const qrpIndex=recebArm997PendingIndex(data,date);
   (data.notas||[]).forEach(n=>recebArmNota997Rows(n,data,qrpIndex).forEach(r=>{
