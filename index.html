@@ -1415,6 +1415,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
           <button class="receb-arm-btn gray" type="button" onclick="clearRecebArmAgenda()">Limpar agenda</button>
         </div>
         <div class="receb-arm-msg" id="recebArmAgendaMsg"></div>
+        <div class="receb-arm-msg" id="recebArmAgendaFileInfo"></div>
         <div class="receb-arm-agenda" id="recebArmAgenda"></div>
       </div>
     </div>
@@ -2405,10 +2406,22 @@ function compactDayForStorage(day){
   return copy;
 }
 
+function compactRecebArmAgendaForLocalStorage(data){
+  if(!data||typeof data!=='object')return data;
+  return {
+    agendaRows:Array.isArray(data.agendaRows)?data.agendaRows:[],
+    agendaFileName:data.agendaFileName||'',
+    agendaImportedAt:+data.agendaImportedAt||0,
+    _agendaUpdatedAt:+data._agendaUpdatedAt||0,
+    transportadores:data.transportadores||{},
+    _updatedAt:+data._updatedAt||0
+  };
+}
+
 function compactDayForFastLocalStorage(day){
   const copy=compactDayForStorage(day);
   if(!copy||typeof copy!=='object')return copy;
-  delete copy.recebArm;
+  if(copy.recebArm)copy.recebArm=compactRecebArmAgendaForLocalStorage(copy.recebArm);
   delete copy.inventario;
   return copy;
 }
@@ -3436,8 +3449,7 @@ function mergeRecebArm(current,next){
     ...a,
     ...b,
     transportadores:mergeRecebArmTransportadores(a.transportadores,b.transportadores),
-    agendaRows:mergeRecebArmAgenda(a,b),
-    _agendaUpdatedAt:Math.max(+a._agendaUpdatedAt||0,+b._agendaUpdatedAt||0),
+    ...recebArmAgendaSnapshot(a,b),
     notas:mergeByIdOrIndex(a.notas,b.notas,'id'),
     pendConf:mergeByIdOrIndex(a.pendConf,b.pendConf,'id'),
     pendArm:mergeByIdOrIndex(a.pendArm,b.pendArm,'id'),
@@ -6428,8 +6440,11 @@ async function importRecebArmAgenda(ev){
     }).filter(Boolean);
     const day=recebArmDay();
     const data=ensureRecebArm(day);
+    if(!agendaRows.some(row=>!recebArmAgendaIsTotalRow(row)))throw new Error('Nenhum fornecedor encontrado na agenda.');
     data.agendaRows=agendaRows;
     data._agendaUpdatedAt=Math.max(Date.now(),(+data._agendaUpdatedAt||0)+1);
+    data.agendaFileName=file.name;
+    data.agendaImportedAt=Date.now();
     markLocalUserEdit(300000);
     recebArmTouch(day);
     recebArmMsg('recebArmAgendaMsg',`${agendaRows.length} linha(s) da agenda importadas. NFs de dias anteriores nao entram automaticamente neste recebimento.`,false);
@@ -6448,6 +6463,8 @@ function clearRecebArmAgenda(){
   const data=ensureRecebArm(day);
   data.agendaRows=[];
   data._agendaUpdatedAt=Math.max(Date.now(),(+data._agendaUpdatedAt||0)+1);
+  data.agendaFileName='';
+  data.agendaImportedAt=0;
   markLocalUserEdit(300000);
   recebArmTouch(day);
   renderRecebArm();
@@ -8249,6 +8266,12 @@ function mergeRecebArmAgenda(current,next){
   if(ats||bts)return (bts>=ats?next:current).agendaRows||[];
   return mergeByIdOrIndex(current.agendaRows,next.agendaRows,'id');
 }
+function recebArmAgendaSnapshot(current,next){
+  const ats=+current._agendaUpdatedAt||0,bts=+next._agendaUpdatedAt||0;
+  const selected=(ats||bts)?(bts>=ats?next:current):(next.agendaFileName?next:current);
+  return {agendaRows:mergeRecebArmAgenda(current,next),_agendaUpdatedAt:Math.max(ats,bts),
+    agendaFileName:selected.agendaFileName||'',agendaImportedAt:+selected.agendaImportedAt||0};
+}
 function recebArmCarrierDraft(date,records){
   try{
     const key='cdgam_receb_transportadores_v1';
@@ -8481,9 +8504,14 @@ function renderRecebArmKpis(data){
 function renderRecebArmAgenda(data){
   const el=document.getElementById('recebArmAgenda');
   if(!el)return;
+  const fileInfo=document.getElementById('recebArmAgendaFileInfo');
+  if(fileInfo){
+    const count=(data.agendaRows||[]).filter(row=>!recebArmAgendaIsTotalRow(row)).length;
+    fileInfo.textContent=count?'Agenda anexada: '+(data.agendaFileName||'agenda salva')+' | '+count+' fornecedor(es)/protocolo(s)':'';
+  }
   const rows=recebArmFilteredRows(data.agendaRows||[]);
   const receivedTotals=recebArmReceivedTotalsHtml(data);
-  if(!rows.length){el.innerHTML=receivedTotals+'<div class="no-data" style="padding:18px">Sem agenda importada para este dia.</div>';return;}
+  if(!rows.length){el.innerHTML=receivedTotals+'<div class="no-data" style="padding:18px">'+((data.agendaRows||[]).length?'Nenhum fornecedor corresponde ao filtro.':'Sem agenda importada para este dia.')+'</div>';return;}
   const {summary,total}=recebArmAgendaSummary(rows);
   const headers=RECEB_ARM_AGENDA_TIPOS.map(t=>summary[t.key]);
   const detailBlocks=headers.map(item=>`<div class="receb-arm-detail-block" id="recebArmAgendaDetalhe-${item.key}">
