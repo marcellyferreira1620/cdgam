@@ -5299,6 +5299,11 @@ function switchTab(id){
   document.querySelectorAll('.tab-body').forEach(t=>t.classList.remove('act'));
   const el=document.getElementById('tb-'+id);if(el)el.classList.add('act');
   saveAreaState(id);
+  if(id==='dash'){
+    const day=getDay(curDate)||emptyDay(curDate||today());
+    renderDashCharts(day);
+    renderDashTables(day);
+  }
   if(id==='hist')renderHist();
   if(id==='comp')renderComp();
   if(id==='rotas')renderRotasTab();
@@ -5644,6 +5649,7 @@ function renderProdSetoresChart(){
 }
 
 function renderProdSetoresDash(day){
+  if(activeTab()!=='proddash')return;
   const canvas=document.getElementById('cProdSetoresDash');
   if(!canvas||!day)return;
   ensureProdSetores(day);
@@ -6039,6 +6045,7 @@ function renderProdDiaMediaResumo(day){
 }
 
 function renderProdDiurnoDash(dayArg){
+  if(activeTab()!=='proddashdia')return;
   const day=dayArg||getDay(curDate)||emptyDay(curDate||today());
   const chartsWrap=document.getElementById('prodDiaDashCharts');
   const resumo=document.getElementById('prodDiaHoraResumo');
@@ -11980,6 +11987,7 @@ function epmSeriesFromHd(hd){
 function isEpmMetric(m){return m==='Erros Sep. Med.';}
 function metricDisplayName(m){return isEpmMetric(m)?'EPM Sep. Med.':m;}
 function renderDashCharts(day){
+  if(activeTab()!=='dash')return;
   const hd=day.hd||{};
   const lm=dv(hd,'Linhas Med.'),vMed=dv(hd,'Vol. Med.'),uMed=dv(hd,'Unid. Med.');
   const lp=dv(hd,'Linhas Perf.'),vPerf=dv(hd,'Vol. Perf.'),uPerf=dv(hd,'Unid. Perf.');
@@ -12344,6 +12352,7 @@ function renderDashCharts(day){
 
 // ── DOCA BALANCE CHART ────────────────────────────────────
 function renderRouteClosure(day){
+  if(activeTab()!=='dash')return;
   const hd=day.hd||{};
   const espMetrics=['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.','Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.'];
   const entradas=HOURS.map((_,i)=>{
@@ -12489,6 +12498,7 @@ function renderRouteClosure(day){
 }
 
 function renderRouteClosureCd2(day){
+  if(activeTab()!=='dash')return;
   const hd=day.hd||{};
   const rotas=buildRotasMerged(day);
   const baseMetric=r=>routeMetricKeyCd2(r);
@@ -12614,6 +12624,7 @@ function renderRouteClosureCd2(day){
 }
 
 function renderDocaBalance(day){
+  if(activeTab()!=='dash')return;
   const hd=day.hd||{};
   const capDoca=nightProcessCapacity(day,'capVE');
   const espMetrics=['Vol. Especial','Vol. Esp. Frac.','Vol. Esp. Med.','Vol. Esp. Perf.','Vol. Fraldas Cx Fech.','Vol. Fraldas Frac.'];
@@ -12758,6 +12769,7 @@ function renderDocaBalance(day){
 
 // ── DASHBOARD TABLES ──────────────────────────────────────
 function renderDashTables(day){
+  if(activeTab()!=='dash')return;
   const hd=day.hd||{};
   const CAP_VALS={'Linhas Med.':day.capLM,'Vol. Med.':day.capVMed||575,'Unid. Med.':day.capUMed||10000,
     'Linhas Perf.':day.capLP,'Vol. Perf.':day.capVPerf||425,'Unid. Perf.':day.capUPerf||6666,'Erros Sep. Med.':day.capErros,
@@ -14224,10 +14236,11 @@ function renderCurrentDay(day){
   refreshOpenPrevisaoEncerramento(day);
   renderProdSetoresDash(day);
   renderProdDiurnoDash(day);
-  renderRecebArm();
-  renderBoletim();
-  renderDevolucao();
-  renderInventario();
+  const tab=activeTab();
+  if(tab==='recebarm')renderRecebArm();
+  if(tab==='boletim')renderBoletim();
+  if(tab==='devolucao')renderDevolucao();
+  if(tab==='inventario')renderInventario();
 }
 function prepNewDay(){
   clearTimeout(autoSaveTimer);
