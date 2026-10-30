@@ -2419,11 +2419,12 @@ function compactRecebArmAgendaForLocalStorage(data){
 }
 
 function compactDayForFastLocalStorage(day){
-  const copy=compactDayForStorage(day);
-  if(!copy||typeof copy!=='object')return copy;
+  if(!day||typeof day!=='object')return day;
+  // Remove heavy modules before cloning, not after serializing them.
+  const copy={...day};
   if(copy.recebArm)copy.recebArm=compactRecebArmAgendaForLocalStorage(copy.recebArm);
   delete copy.inventario;
-  return copy;
+  return JSON.parse(JSON.stringify(copy));
 }
 
 function compactDbForStorage(snapshot,limitDays){
@@ -2438,8 +2439,11 @@ function compactDbForStorage(snapshot,limitDays){
 }
 
 function compactDbForLocalStorage(snapshot,limitDays){
-  const compact=compactDbForStorage(snapshot,limitDays);
-  compact.days=(compact.days||[]).map(compactDayForFastLocalStorage);
+  const src=snapshot&&Array.isArray(snapshot.days)?snapshot:{days:[]};
+  const maxDays=limitDays===undefined?LOCAL_CACHE_DAYS:limitDays;
+  let days=src.days;
+  if(maxDays&&days.length>maxDays)days=[...days].sort((a,b)=>(a.date||'').localeCompare(b.date||'')).slice(-maxDays);
+  const compact={...src,days:days.map(compactDayForFastLocalStorage)};
   delete compact.fluxogramas;
   return compact;
 }
@@ -3892,12 +3896,19 @@ function encodeFirebasePayload(payload){
 }
 
 async function fbRestReadPayload(){
-  const r=await fetch(FB_REST_URL+'?t='+Date.now(),{cache:'no-store'});
-  if(!r.ok)throw new Error(`Firebase REST HTTP ${r.status}`);
-  let payload=decodeFirebasePayload(await r.json());
-  payload=await hydratePayloadRotasFromShadow(payload).catch(()=>payload);
-  payload=await hydratePayloadRecebArm997FromShadow(payload).catch(()=>payload);
-  payload=await hydratePayloadInventarioFromShadow(payload).catch(()=>payload);
+  const [main,rotas,recebArm997,inventario]=await Promise.all([
+    fetch(FB_REST_URL+'?t='+Date.now(),{cache:'no-store'}).then(r=>{
+      if(!r.ok)throw new Error(`Firebase REST HTTP ${r.status}`);
+      return r.json();
+    }),
+    fbRestReadRotasShadow().catch(()=>({})),
+    fbRestReadRecebArm997Shadow().catch(()=>({})),
+    fbRestReadInventarioShadow().catch(()=>({}))
+  ]);
+  let payload=decodeFirebasePayload(main);
+  payload=await hydratePayloadRotasFromShadow(payload,rotas).catch(()=>payload);
+  payload=await hydratePayloadRecebArm997FromShadow(payload,recebArm997).catch(()=>payload);
+  payload=await hydratePayloadInventarioFromShadow(payload,inventario).catch(()=>payload);
   return payload;
 }
 
@@ -3991,9 +4002,9 @@ async function fbRestReadRotasShadow(){
   return await r.json().catch(()=>({}))||{};
 }
 
-async function hydratePayloadRotasFromShadow(payload){
+async function hydratePayloadRotasFromShadow(payload,providedShadows){
   if(!payload||!Array.isArray(payload.days)||!payload.days.length)return payload;
-  const shadows=await fbRestReadRotasShadow().catch(()=>({}));
+  const shadows=providedShadows===undefined?await fbRestReadRotasShadow().catch(()=>({})):providedShadows;
   if(!shadows||typeof shadows!=='object')return payload;
   let changed=false;
   const days=payload.days.map(day=>{
@@ -4098,9 +4109,9 @@ async function fbRestReadRecebArm997Shadow(){
   return await r.json().catch(()=>({}))||{};
 }
 
-async function hydratePayloadRecebArm997FromShadow(payload){
+async function hydratePayloadRecebArm997FromShadow(payload,providedShadows){
   if(!payload||!Array.isArray(payload.days)||!payload.days.length)return payload;
-  const shadows=await fbRestReadRecebArm997Shadow().catch(()=>({}));
+  const shadows=providedShadows===undefined?await fbRestReadRecebArm997Shadow().catch(()=>({})):providedShadows;
   if(!shadows||typeof shadows!=='object')return payload;
   let changed=false;
   const days=payload.days.map(day=>{
@@ -4180,9 +4191,9 @@ async function fbRestReadInventarioShadow(){
   return await r.json().catch(()=>({}))||{};
 }
 
-async function hydratePayloadInventarioFromShadow(payload){
+async function hydratePayloadInventarioFromShadow(payload,providedShadows){
   if(!payload||!Array.isArray(payload.days)||!payload.days.length)return payload;
-  const shadows=await fbRestReadInventarioShadow().catch(()=>({}));
+  const shadows=providedShadows===undefined?await fbRestReadInventarioShadow().catch(()=>({})):providedShadows;
   if(!shadows||typeof shadows!=='object')return payload;
   let changed=false;
   const days=payload.days.map(day=>{
