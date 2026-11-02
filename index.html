@@ -4557,7 +4557,7 @@ function queueCloudMergeSave(remote){
   setTimeout(()=>{if(typeof sbSave==='function')sbSave(false).catch(()=>{});},delay+140);
 }
 
-function save(replaceDays=false){
+function save(replaceDays=false,deferCloud=false){
   if(!ensureNightOperationFormulaGuard('save'))return false;
   rememberCurrentDate(curDate);
   const stored=storedDbSnapshot();
@@ -4575,6 +4575,7 @@ function save(replaceDays=false){
   }
   pendingCloudSave=true;
   // Firebase e a fonte ao vivo entre computadores.
+  if(deferCloud){queueNightFieldCloudSave();return true;}
   if(fbConnected&&fbDb){
     saveToFirebase(replaceDays).catch(()=>{});
     startFirebaseRestPolling(false);
@@ -5301,6 +5302,7 @@ function selectArea(area,initialTab){
 }
 
 function switchTab(id){
+  flushNightFieldCloudSave();
   const previousTab=activeTab();
   if((previousTab==='adm'||previousTab==='preench')&&['dash','hist','comp','rotas','proddash','prodsetores','previsaoenc'].includes(id)){
     persistDayNow();
@@ -5362,6 +5364,7 @@ function buildDayNav(){
 }
 function selectDay(dt){
   if(!dt)return;
+  flushNightFieldCloudSave();
   setCurrentDate(dt);buildDayNav();
   const day=getDay(dt);
   if(day){renderKPIs(day);renderFlowBar(day);renderDashCharts(day);renderDashTables(day);renderRotasTblFull(day);refreshOpenPrevisaoEncerramento(day);renderProdSetoresDash(day);renderProdDiurnoDash(day);}
@@ -5511,9 +5514,7 @@ function saveProdSetoresField(sec,hour,field,value){
   setCurrentDate(day.date);
   saveNightDayDraft(day);
   saveLocalDb(db);
-  pendingCloudSave=true;
-  setTimeout(()=>saveToFirebaseRest(false).catch(()=>{}),40);
-  setTimeout(()=>{if(typeof sbSave==='function')sbSave(false).catch(()=>{});},120);
+  queueNightFieldCloudSave();
   renderProdSetoresRowCalcs(sec,hour);
   clearTimeout(window.__prodSetoresChartTimer);
   window.__prodSetoresChartTimer=setTimeout(()=>{
@@ -13854,13 +13855,34 @@ function syncComparableValue(value){
 }
 
 let nightFieldCloudSaveTimer=null;
-function queueNightFieldCloudSave(delay=80){
-  pendingCloudSave=true;
+let nightFieldCloudDeadlineTimer=null;
+let nightFieldCloudSavePending=false;
+const nightRouteCloudDays=new Map();
+function flushNightFieldCloudSave(){
+  if(!nightFieldCloudSavePending)return false;
   clearTimeout(nightFieldCloudSaveTimer);
-  nightFieldCloudSaveTimer=setTimeout(()=>{
-    saveToFirebaseRest(false).catch(()=>{});
-    setTimeout(()=>{if(typeof sbSave==='function')sbSave(false).catch(()=>{});},80);
-  },delay);
+  clearTimeout(nightFieldCloudDeadlineTimer);
+  nightFieldCloudSaveTimer=null;
+  nightFieldCloudDeadlineTimer=null;
+  nightFieldCloudSavePending=false;
+  if(nightRouteCloudDays.size){
+    const days=[...nightRouteCloudDays].map(([date,fallback])=>{
+      const latest=getDay(date)||fallback;
+      return {...latest,rotas:completeRotasForStorage(latest),_updatedAt:+latest._updatedAt||Date.now()};
+    });
+    nightRouteCloudDays.clear();
+    fbRestWriteRotasShadow({days,savedAt:Date.now()}).catch(()=>{});
+  }
+  saveToFirebaseRest(false).catch(()=>{});
+  setTimeout(()=>{if(typeof sbSave==='function')sbSave(false).catch(()=>{});},80);
+  return true;
+}
+function queueNightFieldCloudSave(){
+  pendingCloudSave=true;
+  nightFieldCloudSavePending=true;
+  clearTimeout(nightFieldCloudSaveTimer);
+  nightFieldCloudSaveTimer=setTimeout(flushNightFieldCloudSave,750);
+  if(nightFieldCloudDeadlineTimer===null)nightFieldCloudDeadlineTimer=setTimeout(flushNightFieldCloudSave,3000);
 }
 
 function persistHoraInputNow(inp){
@@ -13905,7 +13927,7 @@ function persistHoraInputNow(inp){
   setCurrentDate(day.date);
   saveNightDayDraft(day);
   saveLocalDb(db);
-  queueNightFieldCloudSave(60);
+  queueNightFieldCloudSave();
   return day;
 }
 
@@ -13998,7 +14020,7 @@ function persistNightSingleFieldNow(el){
   setCurrentDate(dt);
   saveNightDayDraft(day);
   saveLocalDb(db);
-  queueNightFieldCloudSave(60);
+  queueNightFieldCloudSave();
 }
 
 function markNightFormUpdateStamps(existing,day){
@@ -14339,8 +14361,11 @@ function installNightImmediatePersistence(){
   window.__nightImmediatePersistenceReady=true;
   document.addEventListener('input',scheduleNightImmediateSave,true);
   document.addEventListener('change',scheduleNightImmediateSave,true);
-  window.addEventListener('beforeunload',()=>{try{saveNightImmediately();}catch(_){}});
-  document.addEventListener('visibilitychange',()=>{if(document.hidden){try{saveNightImmediately();}catch(_){}}});
+  document.addEventListener('focusout',event=>{
+    if(event.target&&event.target.closest&&event.target.closest('#tb-adm,#tb-preench,#tb-rotas,#tb-prodsetores'))flushNightFieldCloudSave();
+  });
+  window.addEventListener('beforeunload',()=>{try{saveNightImmediately();}catch(_){}finally{flushNightFieldCloudSave();}});
+  document.addEventListener('visibilitychange',()=>{if(document.hidden){try{saveNightImmediately();}catch(_){}finally{flushNightFieldCloudSave();}}});
 }
 function saveDay(){
   markLocalUserEdit();
@@ -14430,8 +14455,6 @@ function buildRotasMerged(day){
   });
 }
 
-let routeCloudSaveTimer=null;
-
 function completeRotasForStorage(day){
   const saved=Array.isArray(day&&day.rotas)?day.rotas:[];
   const savedByCod={};
@@ -14470,16 +14493,8 @@ function saveRouteDayLocally(day){
 
 function queueRouteCloudSave(day){
   if(!day||!day.date)return;
-  pendingCloudSave=true;
-  const date=day.date;
-  clearTimeout(routeCloudSaveTimer);
-  routeCloudSaveTimer=setTimeout(()=>{
-    const latest=getDay(date)||day;
-    const payloadDay={...latest,rotas:completeRotasForStorage(latest),_updatedAt:+latest._updatedAt||Date.now()};
-    fbRestWriteRotasShadow({days:[payloadDay],savedAt:Date.now()}).catch(()=>{});
-    saveToFirebaseRest(false).catch(()=>{});
-    setTimeout(()=>{if(typeof sbSave==='function')sbSave(false).catch(()=>{});},80);
-  },30);
+  nightRouteCloudDays.set(day.date,day);
+  queueNightFieldCloudSave();
 }
 
 function saveRotaField(cod,field,val){
@@ -16096,7 +16111,7 @@ function persistPreenchInputsNow(changedMetric,changedIndex){
   day._updatedAt=ts;
   setCurrentDate(day.date);
   saveNightDayDraft(day);
-  save();
+  save(false,true);
   return day;
 }
 
