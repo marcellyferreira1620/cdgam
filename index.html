@@ -837,6 +837,11 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
 .prod-dia-table tr:nth-child(even) td{background:#122033}
 .prod-dia-table input{width:72px;background:#eef6ff;border:1px solid #9cc3df;color:#00385f;padding:3px 5px;border-radius:3px;font-size:10px;text-align:center;font-weight:bold}
 .prod-dia-table .matricula-input{width:90px}
+.prod-dia-table .prod-dia-name-input{width:100%;min-width:190px;text-align:left;font-weight:normal}
+.prod-dia-toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;padding:8px}
+.prod-dia-goals{display:flex;gap:8px 18px;flex-wrap:wrap;padding:10px 12px;background:#e7f3f4;color:#174553;font-size:12px;line-height:1.5;border-bottom:1px solid #b8d5d8}
+.prod-dia-goals b{color:#064f3a}
+.prod-dia-target{color:#9be6cf;font-weight:bold;white-space:nowrap}
 .prod-dia-result{display:block;margin-top:2px;color:#ffd700;font-weight:bold;font-size:10px}
 .prod-dia-del{background:#e94560;color:#fff;border:none;border-radius:3px;padding:3px 7px;font-weight:bold;cursor:pointer;font-size:10px}
 .prod-dia-add{background:#00a86b;color:#fff;border:none;border-radius:4px;padding:5px 10px;font-weight:bold;cursor:pointer;font-size:11px}
@@ -3377,7 +3382,14 @@ function mergeProdDiaPerson(current,next){
   else if(aMatTs>bMatTs)out.matricula=aMatCleared?'':(hasMatA?a.matricula:(hasMatB?b.matricula:''));
   else if(bMatCleared||aMatCleared)out.matricula='';
   else out.matricula=hasMatB?(b.matricula??''):(hasMatA?(a.matricula??''):(b.matricula??a.matricula??''));
-  out.nome=b.nome??a.nome??'';
+  const aNomeTs=Math.max(+aTs.nome||0,+aClearedAt.nome||0);
+  const bNomeTs=Math.max(+bTs.nome||0,+bClearedAt.nome||0);
+  const aNomeCleared=(+aClearedAt.nome||0)>0&&(+aClearedAt.nome||0)>=(+aTs.nome||0);
+  const bNomeCleared=(+bClearedAt.nome||0)>0&&(+bClearedAt.nome||0)>=(+bTs.nome||0);
+  if(bNomeTs>aNomeTs)out.nome=bNomeCleared?'':String(b.nome??'');
+  else if(aNomeTs>bNomeTs)out.nome=aNomeCleared?'':String(a.nome??'');
+  else if(aNomeCleared||bNomeCleared)out.nome='';
+  else out.nome=String(b.nome||a.nome||'');
   const values=[];
   for(let i=0;i<PROD_DIA_HOURS.length;i++){
     const key='v'+i;
@@ -3423,6 +3435,8 @@ function mergeProdDiurno(current,next){
   metrics.forEach(key=>{
     const a=(current&&current[key])||{};
     const b=(next&&next[key])||{};
+    const deletedPeople={...(a._deletedPeople||{})};
+    Object.entries(b._deletedPeople||{}).forEach(([id,ts])=>{deletedPeople[id]=Math.max(+deletedPeople[id]||0,+ts||0);});
     const peopleByKey={};
     const addPeople=(people,source)=>{
       (Array.isArray(people)?people:[]).forEach((p,i)=>{
@@ -3432,7 +3446,7 @@ function mergeProdDiurno(current,next){
     };
     addPeople(a.people,'a');
     addPeople(b.people,'b');
-    out[key]={...a,...b,people:Object.values(peopleByKey)};
+    out[key]={...a,...b,_deletedPeople:deletedPeople,people:Object.values(peopleByKey).filter(person=>!deletedPeople[person.id])};
   });
   return out;
 }
@@ -5850,35 +5864,23 @@ function prodDiaDefaultName(metricKey,matricula){
 function ensureProdDiurno(day){
   if(!day.prodDiurno||typeof day.prodDiurno!=='object')day.prodDiurno=emptyProdDiurno();
   PROD_DIA_METRICS.forEach(metric=>{
-    if(!day.prodDiurno[metric.key]||typeof day.prodDiurno[metric.key]!=='object')day.prodDiurno[metric.key]={people:[]};
+    if(!day.prodDiurno[metric.key]||typeof day.prodDiurno[metric.key]!=='object')day.prodDiurno[metric.key]={people:prodDiaDefaultPeople(metric.key)};
     const block=day.prodDiurno[metric.key];
-    if(!Array.isArray(block.people))block.people=[];
-    const defaults=prodDiaDefaultPeople(metric.key);
-    if(!block.people.length)block.people=defaults;
-    block.people=block.people.map(person=>{
+    if(!Array.isArray(block.people))block.people=prodDiaDefaultPeople(metric.key);
+    const deletedPeople=block._deletedPeople||{};
+    block.people=block.people.filter(person=>!deletedPeople[person.id]).map(person=>{
       const values=Array.isArray(person.values)?person.values:[];
       const matricula=String(person.matricula||'');
       return{
+        ...person,
         id:person.id||prodDiaPersonId(metric.key,matricula),
         matricula,
-        nome:person.nome||prodDiaDefaultName(metric.key,matricula),
+        nome:Object.prototype.hasOwnProperty.call(person,'nome')?String(person.nome??''):prodDiaDefaultName(metric.key,matricula),
         values:PROD_DIA_HOURS.map((_,i)=>values[i]??''),
         ...(person._fieldUpdatedAt?{_fieldUpdatedAt:person._fieldUpdatedAt}:{_fieldUpdatedAt:{}}),
         ...(person._fieldClearedAt?{_fieldClearedAt:person._fieldClearedAt}:{})
       };
     });
-    if(defaults.length&&block.people.length===1&&!prodDiaHasInput(block.people[0]))block.people=[];
-    const byMatricula=new Map(block.people.filter(p=>String(p.matricula||'').trim()).map(p=>[String(p.matricula),p]));
-    defaults.forEach(defaultPerson=>{
-      const current=byMatricula.get(String(defaultPerson.matricula));
-      if(current){
-        current.nome=current.nome||defaultPerson.nome;
-        current.id=current.id||defaultPerson.id;
-      }else{
-        block.people.push(defaultPerson);
-      }
-    });
-    if(!block.people.length)block.people.push(prodDiaEmptyPerson());
   });
   return day.prodDiurno;
 }
@@ -5935,13 +5937,15 @@ function prodDiaMediaHora(person){
 }
 
 function prodDiaTouch(day,person,field,value){
-  const ts=Date.now();
+  const previous=Math.max(+person._updatedAt||0,...Object.values(person._fieldUpdatedAt||{}).map(Number),...Object.values(person._fieldClearedAt||{}).map(Number));
+  const ts=Math.max(Date.now(),previous+1);
+  person._updatedAt=ts;
   let currentValue=value;
   if(currentValue===undefined){
-    if(field==='matricula')currentValue=person.matricula;
+    if(field==='matricula'||field==='nome')currentValue=person[field];
     else if(/^v\d+$/.test(field)&&Array.isArray(person.values))currentValue=person.values[+field.slice(1)];
   }
-  const hasValue=field==='matricula'?String(currentValue??'').trim()!=='':prodFieldHasValue(currentValue);
+  const hasValue=(field==='matricula'||field==='nome')?String(currentValue??'').trim()!=='':prodFieldHasValue(currentValue);
   person._fieldUpdatedAt={...(person._fieldUpdatedAt||{})};
   person._fieldClearedAt={...(person._fieldClearedAt||{})};
   if(hasValue){
@@ -5957,16 +5961,36 @@ function prodDiaTouch(day,person,field,value){
   setCurrentDate(day.date);
 }
 
+function persistProdDiaEdit(day){
+  markLocalUserEdit(300000);
+  saveNightDayDraft(day);
+  saveLocalDb(db);
+  queueNightFieldCloudSave();
+}
+
 function saveProdDiaMatricula(metricKey,personId,value){
   let day=prodDiaWorkingDay();
   const person=prodDiaPerson(day,metricKey,personId);
   if(!person)return;
   person.matricula=value;
-  person.nome=prodDiaDefaultName(metricKey,value)||person.nome||'';
+  const defaultName=prodDiaDefaultName(metricKey,value);
+  if(defaultName&&!person.nome&&!person._fieldClearedAt?.nome){person.nome=defaultName;prodDiaTouch(day,person,'nome');}
   prodDiaTouch(day,person,'matricula');
-  save();
+  persistProdDiaEdit(day);
+  const nameInput=document.querySelector(`[data-prod-dia-name="${metricKey}"][data-person="${personId}"]`);
+  if(nameInput)nameInput.value=person.nome;
+  renderProdDiaTargets(day,metricKey);
   renderProdDiurnoDash(day);
   buildDayNav();
+}
+
+function saveProdDiaNome(metricKey,personId,value){
+  const day=prodDiaWorkingDay(),person=prodDiaPerson(day,metricKey,personId);
+  if(!person)return;
+  person.nome=String(value??'');
+  prodDiaTouch(day,person,'nome');
+  persistProdDiaEdit(day);
+  renderProdDiaTargets(day,metricKey);
 }
 
 function saveProdDiaValue(metricKey,personId,hourIndex,value){
@@ -5975,7 +5999,7 @@ function saveProdDiaValue(metricKey,personId,hourIndex,value){
   if(!person)return;
   person.values[hourIndex]=value===''?'':+value||0;
   prodDiaTouch(day,person,'v'+hourIndex);
-  save();
+  persistProdDiaEdit(day);
   renderProdDiaPersonResults(metricKey,personId);
   renderProdDiurnoDash(day);
   buildDayNav();
@@ -5986,7 +6010,7 @@ function addProdDiaPerson(metricKey){
   const data=day.prodDiurno;
   data[metricKey].people.push(prodDiaEmptyPerson());
   day._updatedAt=Date.now();
-  save();
+  persistProdDiaEdit(day);
   renderProdDiurno();
   renderProdDiurnoDash(day);
   buildDayNav();
@@ -5996,10 +6020,12 @@ function removeProdDiaPerson(metricKey,personId){
   let day=getDay(curDate);
   if(!day)return;
   const data=ensureProdDiurno(day);
+  if(!data[metricKey]||!data[metricKey].people.some(person=>person.id===personId))return;
+  data[metricKey]._deletedPeople={...(data[metricKey]._deletedPeople||{}),[personId]:Date.now()};
   data[metricKey].people=data[metricKey].people.filter(p=>p.id!==personId);
-  if(!data[metricKey].people.length)data[metricKey].people.push(prodDiaEmptyPerson());
   day._updatedAt=Date.now();
-  save();
+  persistProdDiaEdit(day);
+  flushNightFieldCloudSave();
   renderProdDiurno();
   renderProdDiurnoDash(day);
   buildDayNav();
@@ -6016,6 +6042,20 @@ function renderProdDiaPersonResults(metricKey,personId){
   if(total)total.textContent=prodFmt(prodDiaTotal(person),0);
 }
 
+function prodDiaTargets(day,metricKey){
+  const applies=metricKey==='recebItens'||metricKey==='armItens';
+  const skus=recebArmAgendaSummary(day.recebArm?.agendaRows||[]).totalSkus;
+  const people=prodDiaChartPeople(day,metricKey).length;
+  const daily=applies&&skus>0&&people>0?skus/people:null;
+  return {applies,skus,people,hours:7.5,teamHourly:applies&&skus>0?skus/7.5:null,daily,hourly:daily===null?null:daily/7.5};
+}
+
+function renderProdDiaTargets(day,metricKey){
+  const goal=prodDiaTargets(day,metricKey);
+  const values={skus:prodFmt(goal.skus,0),people:prodFmt(goal.people,0),teamHourly:prodFmt(goal.teamHourly,2),daily:prodFmt(goal.daily,2),hourly:prodFmt(goal.hourly,2)};
+  document.querySelectorAll(`[data-prod-dia-goal="${metricKey}"]`).forEach(el=>{el.textContent=values[el.dataset.goalValue]??'';});
+}
+
 function renderProdDiurno(){
   const wrap=document.getElementById('prodDiaTables');
   if(!wrap)return;
@@ -6023,20 +6063,23 @@ function renderProdDiurno(){
   let html='';
   PROD_DIA_METRICS.forEach(metric=>{
     const people=prodDiaPeople(day,metric.key);
+    const goal=prodDiaTargets(day,metric.key);
     html+=`<div class="prod-dia-block">
       <div class="prod-dia-head"><div>${metric.setor} — ${metric.label}</div><span>Acumulado cheio informado | resultado/h calculado</span></div>
-      <div style="padding:7px 8px"><button type="button" class="prod-dia-add" onclick="addProdDiaPerson('${metric.key}')">Adicionar matrícula</button></div>
+      <div class="prod-dia-toolbar"><button type="button" class="prod-dia-add" onclick="addProdDiaPerson('${metric.key}')">Adicionar colaborador</button></div>
+      ${goal.applies?`<div class="prod-dia-goals"><span>Agenda: <b data-prod-dia-goal="${metric.key}" data-goal-value="skus">${prodFmt(goal.skus,0)}</b> SKUs</span><span>Jornada: <b>7,5 h</b></span><span>Equipe: <b data-prod-dia-goal="${metric.key}" data-goal-value="people">${goal.people}</b></span><span>Meta equipe/h: <b data-prod-dia-goal="${metric.key}" data-goal-value="teamHourly">${prodFmt(goal.teamHourly,2)}</b> SKUs</span></div>`:''}
       <div class="prod-dia-table-wrap"><table class="prod-dia-table"><thead><tr><th>Matrícula</th><th>Nome</th>`;
     PROD_DIA_HOURS.forEach(h=>{html+=`<th>${h}</th>`;});
-    html+='<th>Total dia</th><th></th></tr></thead><tbody>';
+    html+='<th>Total dia</th>'+(goal.applies?'<th>Meta/dia<br>por pessoa</th><th>Meta/h<br>por pessoa</th>':'')+'<th></th></tr></thead><tbody>';
     people.forEach(person=>{
-      html+=`<tr><td><input class="matricula-input" value="${attrText(person.matricula||'')}" oninput="saveProdDiaMatricula('${metric.key}','${person.id}',this.value)" placeholder="matrícula"/></td><td style="min-width:210px;font-weight:bold;color:#89b4d4;text-align:left">${excelText(person.nome||'')}</td>`;
+      html+=`<tr data-prod-dia-person="${metric.key}" data-person="${attrText(person.id)}"><td><input class="matricula-input" aria-label="Matrícula" value="${attrText(person.matricula||'')}" oninput="saveProdDiaMatricula('${metric.key}','${person.id}',this.value)" placeholder="matrícula"/></td><td><input class="prod-dia-name-input" aria-label="Nome do colaborador" data-prod-dia-name="${metric.key}" data-person="${attrText(person.id)}" value="${attrText(person.nome||'')}" oninput="saveProdDiaNome('${metric.key}','${person.id}',this.value)" placeholder="Nome do colaborador"/></td>`;
       PROD_DIA_HOURS.forEach((_,i)=>{
         const v=person.values&&person.values[i]!==undefined?person.values[i]:'';
         html+=`<td><input type="number" min="0" value="${v}" oninput="saveProdDiaValue('${metric.key}','${person.id}',${i},this.value)" placeholder="0"/><span class="prod-dia-result" data-prod-dia-result="${metric.key}" data-person="${person.id}" data-hour="${i}">${prodFmt(prodDiaResult(person,i),0)}</span></td>`;
       });
-      html+=`<td style="font-weight:bold;color:#00e5ff" data-prod-dia-total="${metric.key}" data-person="${person.id}">${prodFmt(prodDiaTotal(person),0)}</td><td><button type="button" class="prod-dia-del" onclick="removeProdDiaPerson('${metric.key}','${person.id}')">Excluir</button></td></tr>`;
+      html+=`<td style="font-weight:bold;color:#00e5ff" data-prod-dia-total="${metric.key}" data-person="${person.id}">${prodFmt(prodDiaTotal(person),0)}</td>${goal.applies?`<td class="prod-dia-target" data-prod-dia-goal="${metric.key}" data-goal-value="daily">${prodFmt(goal.daily,2)}</td><td class="prod-dia-target" data-prod-dia-goal="${metric.key}" data-goal-value="hourly">${prodFmt(goal.hourly,2)}</td>`:''}<td><button type="button" class="prod-dia-del" onclick="removeProdDiaPerson('${metric.key}','${person.id}')">Excluir</button></td></tr>`;
     });
+    if(!people.length)html+=`<tr><td colspan="${PROD_DIA_HOURS.length+4+(goal.applies?2:0)}" style="padding:14px;color:#89b4d4">Nenhum colaborador cadastrado.</td></tr>`;
     html+='</tbody></table></div></div>';
   });
   wrap.innerHTML=html;
@@ -6051,7 +6094,7 @@ function populateProdDiaDashSelects(){
 }
 
 function prodDiaChartPeople(day,metricKey){
-  return prodDiaPeople(day,metricKey).filter(p=>String(p.matricula||'').trim()||prodDiaTotal(p)>0);
+  return prodDiaPeople(day,metricKey).filter(p=>String(p.matricula||'').trim()||String(p.nome||'').trim()||prodDiaTotal(p)>0);
 }
 
 function renderProdDiaHoraResumo(day,metricKey){
@@ -6083,29 +6126,34 @@ function renderProdDiaDashChart(day,metric,hourIndex){
   if(!canvas)return;
   const chartKey=`prodDiaHora_${metric.key}`;
   const people=prodDiaChartPeople(day,metric.key);
-  const labels=people.map(p=>String(p.matricula||'Sem matrícula'));
+  const labels=people.map(p=>String(p.matricula||p.nome||'Sem identificação'));
   const hourData=people.map(p=>prodDiaResult(p,hourIndex));
+  const goal=prodDiaTargets(day,metric.key);
+  const datasets=[{label:`${metric.short} - ${PROD_DIA_HOURS[hourIndex]}`,data:hourData,backgroundColor:hourData.map(value=>goal.hourly===null?'#1e88e5':value===null?'#a6bcc9':value>=goal.hourly?'#00a86b':'#e94560'),borderRadius:4,valueLabels:hourData.map(v=>v===null?'':prodFmt(v,0))}];
+  if(goal.hourly!==null)datasets.push({type:'line',label:`Meta individual/h: ${prodFmt(goal.hourly,2)} SKUs`,data:people.map(()=>goal.hourly),borderColor:'#b07900',borderDash:[6,4],borderWidth:2,pointRadius:3,pointBackgroundColor:'#b07900',fill:false,valueLabels:people.map(()=>'')});
   if(CH[chartKey]){CH[chartKey].destroy();delete CH[chartKey];}
   CH[chartKey]=new Chart(canvas,{type:'bar',
-    data:{labels,datasets:[{label:`${metric.short} - ${PROD_DIA_HOURS[hourIndex]}`,data:hourData,backgroundColor:'#1e88e5',borderRadius:4,valueLabels:hourData.map(v=>v===null?'':prodFmt(v,0))}]},
-    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24,right:8,left:4}},plugins:{legend:{labels:{color:'#00385f',font:{size:10,weight:'bold'}}}},scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45},grid:{color:'rgba(6,35,61,0.08)'}},y:{beginAtZero:true,suggestedMax:prodChartMax(hourData),ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'},title:{display:true,text:'Resultado da hora',color:'#00385f',font:{size:9,weight:'bold'}}}}}
+    data:{labels,datasets},
+    options:{responsive:true,maintainAspectRatio:false,layout:{padding:{top:24,right:8,left:4}},plugins:{legend:{labels:{color:'#00385f',font:{size:10,weight:'bold'}}}},scales:{x:{ticks:{color:'#00385f',font:{size:9,weight:'bold'},maxRotation:45},grid:{color:'rgba(6,35,61,0.08)'}},y:{beginAtZero:true,suggestedMax:prodChartMax([...hourData,goal.hourly]),ticks:{color:'#00385f',font:{size:9,weight:'bold'}},grid:{color:'rgba(6,35,61,0.12)'},title:{display:true,text:'Resultado da hora',color:'#00385f',font:{size:9,weight:'bold'}}}}}
   });
 }
 
 function renderProdDiaMediaResumo(day){
   const wrap=document.getElementById('prodDiaMediaResumo');
   if(!wrap)return;
-  let html='<table><thead><tr><th>Indicador</th><th>Matrícula</th><th>Total dia</th><th>Horas preenchidas</th><th>Média/h</th></tr></thead><tbody>';
+  let html='<table><thead><tr><th>Indicador</th><th>Matrícula</th><th>Nome</th><th>Total dia</th><th>Horas preenchidas</th><th>Média/h</th><th>Meta/dia (SKUs)</th><th>Meta/h (SKUs)</th><th>% meta/h</th></tr></thead><tbody>';
   let hasRows=false;
   PROD_DIA_METRICS.forEach(metric=>{
+    const goal=prodDiaTargets(day,metric.key);
     prodDiaChartPeople(day,metric.key).forEach(person=>{
       hasRows=true;
       const filled=prodDiaFilledHours(person);
       const media=prodDiaMediaHora(person);
-      html+=`<tr><td style="font-weight:bold;color:#00385f">${excelText(metric.short)}</td><td style="font-weight:bold">${excelText(person.matricula||'Sem matrícula')}</td><td style="font-weight:bold;color:#00a86b">${prodFmt(prodDiaTotal(person),0)}</td><td>${filled}</td><td style="font-weight:bold;color:#1e88e5">${prodFmt(media,1)}</td></tr>`;
+      const efficiency=goal.hourly>0&&media!==null?media/goal.hourly*100:null;
+      html+=`<tr><td style="font-weight:bold;color:#00385f">${excelText(metric.short)}</td><td style="font-weight:bold">${excelText(person.matricula||'Sem matrícula')}</td><td>${excelText(person.nome||'')}</td><td style="font-weight:bold;color:#00a86b">${prodFmt(prodDiaTotal(person),0)}</td><td>${filled}</td><td style="font-weight:bold;color:#1e88e5">${prodFmt(media,1)}</td><td>${prodFmt(goal.daily,2)}</td><td>${prodFmt(goal.hourly,2)}</td><td>${efficiency===null?'-':prodFmt(efficiency,1)+'%'}</td></tr>`;
     });
   });
-  if(!hasRows)html+='<tr><td colspan="5" style="text-align:center;color:#6a9fc0;font-weight:bold">Sem dados preenchidos para calcular média/h.</td></tr>';
+  if(!hasRows)html+='<tr><td colspan="9" style="text-align:center;color:#6a9fc0;font-weight:bold">Sem dados preenchidos para calcular média/h.</td></tr>';
   html+='</tbody></table>';
   wrap.innerHTML=html;
 }
@@ -6132,8 +6180,9 @@ function renderProdDiurnoDash(dayArg){
 function exportProdDiurnoExcel(){
   const day=getDay(curDate)||emptyDay(curDate||today());
   ensureProdDiurno(day);
-  let rows='<tr><th>Data</th><th>Setor</th><th>Indicador</th><th>Matrícula</th><th>Nome</th><th>Horário</th><th>Acumulado informado</th><th>Resultado da hora</th><th>Total do dia da matrícula</th></tr>';
+  let rows='<tr><th>Data</th><th>Setor</th><th>Indicador</th><th>Matrícula</th><th>Nome</th><th>Horário</th><th>Acumulado informado</th><th>Resultado da hora</th><th>Total do dia da matrícula</th><th>SKUs da agenda</th><th>Jornada (h)</th><th>Meta/dia individual (SKUs)</th><th>Meta/h individual (SKUs)</th></tr>';
   PROD_DIA_METRICS.forEach(metric=>{
+    const goal=prodDiaTargets(day,metric.key);
     prodDiaPeople(day,metric.key).forEach(person=>{
       PROD_DIA_HOURS.forEach((hour,i)=>{
         rows+=`<tr>
@@ -6146,6 +6195,7 @@ function exportProdDiurnoExcel(){
           <td>${excelText(person.values&&person.values[i]!==undefined?person.values[i]:0)}</td>
           <td>${excelText(prodFmt(prodDiaResult(person,i),0))}</td>
           <td>${excelText(prodFmt(prodDiaTotal(person),0))}</td>
+          <td>${excelText(prodFmt(goal.skus,0))}</td><td>7,5</td><td>${excelText(prodFmt(goal.daily,2))}</td><td>${excelText(prodFmt(goal.hourly,2))}</td>
         </tr>`;
       });
     });
@@ -14444,7 +14494,7 @@ function installNightImmediatePersistence(){
   document.addEventListener('input',scheduleNightImmediateSave,true);
   document.addEventListener('change',scheduleNightImmediateSave,true);
   document.addEventListener('focusout',event=>{
-    if(event.target&&event.target.closest&&event.target.closest('#tb-adm,#tb-preench,#tb-rotas,#tb-prodsetores'))flushNightFieldCloudSave();
+    if(event.target&&event.target.closest&&event.target.closest('#tb-adm,#tb-preench,#tb-rotas,#tb-prodsetores,#tb-proddia'))flushNightFieldCloudSave();
   });
   window.addEventListener('beforeunload',()=>{try{saveNightImmediately();}catch(_){}finally{flushNightFieldCloudSave();}});
   document.addEventListener('visibilitychange',()=>{if(document.hidden){try{saveNightImmediately();}catch(_){}finally{flushNightFieldCloudSave();}}});
