@@ -8614,14 +8614,13 @@ function recebArmStatusSummary(data,groups){
     ['agendado','NÃO CHEGOU','#fee2e2','#7f1d1d','#dc2626'],
     ['recebido','CHEGOU/AGUARDANDO NO PÁTIO','#e0f2fe','#075075','#0284c7'],
     ['conferencia','CONFERÊNCIA','#fff0b3','#624400','#c28b00'],
-    ['conferido','CONFERÊNCIA CONCLUÍDA','#d5f4ef','#11594b','#138a73'],
     ['armazenagem','ARMAZENAGEM','#dbeafe','#173e7a','#2563eb'],
     ['armazenado','FINALIZADA','#bbefc8','#134c29','#16843d']
   ];
   const rows=definitions.map(([key,label,tint,ink,accent])=>({key,label,tint,ink,accent,fornecedores:0,skus:0,volumes:0}));
   const byStage=Object.fromEntries(rows.map(row=>[row.key,row]));
   (groups||recebArmCarrierGroups(data)).forEach(group=>{
-    const row=byStage[group.stage]||byStage.agendado;
+    const row=byStage[group.stage==='conferido'?'conferencia':group.stage]||byStage.agendado;
     row.fornecedores+=group.suppliers.length;
     row.skus+=group.skus;
     row.volumes+=group.volumes;
