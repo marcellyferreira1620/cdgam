@@ -1480,7 +1480,7 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
     </div>
 
     <div class="receb-arm-panel">
-      <div class="receb-arm-head"><strong>Fluxo por transportador</strong><span>Agendamento | conferencia | armazenagem</span></div>
+      <div class="receb-arm-head"><strong>Fluxo por transportador</strong><span>Agendamento | separação | conferência | armazenagem</span></div>
       <div class="receb-arm-body">
         <div class="receb-arm-groups" id="recebArmFluxo"></div>
       </div>
@@ -8382,7 +8382,7 @@ function recebArmAgendaIsTotalRow(row){
   return fornecedor.includes('total de ')||fornecedor.includes('total do ')||transportador.includes('total de ')||transportador.includes('total do ');
 }
 
-const RECEB_ARM_CARRIER_STAGES={recebido:'Recebido',conferencia:'Em conferencia',conferido:'Conferencia concluida',armazenagem:'Em armazenagem',armazenado:'Armazenagem concluida'};
+const RECEB_ARM_CARRIER_STAGES={recebido:'Recebido',separacao:'Em separação',conferencia:'Em conferencia',conferido:'Conferencia concluida',armazenagem:'Em armazenagem',armazenado:'Armazenagem concluida'};
 function recebArmCarrierKey(value){return recebArmKey(value).replace(/[^a-z0-9]+/g,' ').trim()||'sem transportador';}
 function mergeRecebArmAgenda(current,next){
   const ats=+current._agendaUpdatedAt||0,bts=+next._agendaUpdatedAt||0;
@@ -8613,6 +8613,7 @@ function recebArmStatusSummary(data,groups){
   const definitions=[
     ['agendado','NÃO CHEGOU','#fee2e2','#7f1d1d','#dc2626'],
     ['recebido','CHEGOU/AGUARDANDO NO PÁTIO','#e0f2fe','#075075','#0284c7'],
+    ['separacao','EM SEPARAÇÃO','#f3e8ff','#5b217a','#9333ea'],
     ['conferencia','CONFERÊNCIA','#fff0b3','#624400','#c28b00'],
     ['armazenagem','ARMAZENAGEM','#dbeafe','#173e7a','#2563eb'],
     ['armazenado','FINALIZADA','#bbefc8','#134c29','#16843d']
