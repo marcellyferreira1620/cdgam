@@ -1949,6 +1949,9 @@ const LOCAL_CACHE_FALLBACK_DAYS=15;
 const LOCAL_BACKUP_DAYS=5;
 const LOCAL_DRAFT_DAYS=5;
 const LOCAL_DRAFT_FALLBACK_DAYS=2;
+const localCacheVerifiedDays=new Map();
+const localCacheProtectedDates=new Set();
+let localCacheLastVerifiedAt=0;
 const STORE_FLUXOGRAMAS=false;
 const PWD='gam2025';
 const NEW_RULES_FROM='2026-06-02';
@@ -2029,8 +2032,11 @@ function setCurrentDate(dt){
 function saveNightDayDraft(day){
   try{
     if(!day||!day.date)return;
+    localCacheProtectedDates.add(day.date);
     const clean=compactDayForFastLocalStorage(stripTransientDayFlags(day));
-    localStorage.setItem(NIGHT_DAY_DRAFT_PREFIX+day.date,JSON.stringify(clean));
+    const encoded=JSON.stringify(clean);
+    try{localStorage.setItem(NIGHT_DAY_DRAFT_PREFIX+day.date,encoded);}
+    catch(error){cleanupRedundantLocalCache();localStorage.setItem(NIGHT_DAY_DRAFT_PREFIX+day.date,encoded);}
     cleanupNightDayDrafts(LOCAL_DRAFT_DAYS);
   }catch(e){
     console.warn('Draft local da producao noturna nao salvo:',e.message);
@@ -2049,7 +2055,11 @@ function cleanupNightDayDrafts(keep=LOCAL_DRAFT_DAYS){
     drafts
       .sort((a,b)=>(b.date||'').localeCompare(a.date||''))
       .slice(Math.max(+keep||0,0))
-      .forEach(item=>localStorage.removeItem(item.key));
+      .forEach(item=>{
+        if(item.date===curDate)return;
+        const raw=localStorage.getItem(item.key);
+        if(raw&&localCacheVerifiedDays.get(item.date)===raw)localStorage.removeItem(item.key);
+      });
   }catch(e){}
 }
 
@@ -2312,6 +2322,7 @@ function load(){
     const raw=localStorage.getItem(SK);
     const parsed=raw?JSON.parse(raw):null;
     db=(parsed&&Array.isArray(parsed.days))?parsed:{days:[]};
+    db.days.forEach(day=>{if(day&&day.date)localCacheProtectedDates.add(day.date);});
   }catch(e){
     console.error('Load error:',e);
     db={days:[]};
@@ -2322,6 +2333,7 @@ function load(){
   cleanupNightDayDrafts(LOCAL_DRAFT_DAYS);
   restoreNightDayDrafts('load');
   restoreBestLocalBackupIfNeeded('load');
+  cleanupRedundantLocalCache();
 }
 
 function getLocalUsersCache(){
@@ -2518,29 +2530,100 @@ function compactDbForCloudStorage(snapshot){
   return compactDbForStorage(snapshot,0);
 }
 
-function saveLocalDb(snapshot=db){
-  const writeCompact=(limit)=>{
-    const encoded=JSON.stringify(compactDbForLocalStorage(snapshot,limit));
-    try{localStorage.setItem(SK,encoded);}
-    catch(e){
-      localStorage.removeItem(SK);
-      localStorage.setItem(SK,encoded);
+function cleanupRedundantLocalCache(){
+  let freed=0;
+  try{
+    const raw=localStorage.getItem(SK_BACKUPS);
+    const current=raw?JSON.parse(raw):null;
+    if(current){
+      const entries=Array.isArray(current.items)?[...current.items]:[];
+      if(current.payload)entries.push({at:current.at,label:current.label,hash:current.hash,payload:current.payload});
+      const seen=new Set(),items=[];
+      entries.forEach(originalEntry=>{
+        let entry=originalEntry;
+        if(!entry||!entry.payload)return;
+        if(Array.isArray(entry.payload.days))entry={...entry,payload:{...entry.payload,days:entry.payload.days.filter(day=>localCacheVerifiedDays.get(day.date)!==JSON.stringify(day))}};
+        const signature=JSON.stringify(entry.payload);
+        if(seen.has(signature))return;
+        seen.add(signature);items.push(entry);
+      });
+      if(items.length){
+        const compact={...current,items};
+        ['at','label','hash','payload'].forEach(key=>{delete compact[key];});
+        const encoded=JSON.stringify(compact);
+        if(encoded.length<raw.length){localStorage.setItem(SK_BACKUPS,encoded);freed+=raw.length-encoded.length;}
+      }
     }
+    const stored=storedDbSnapshot();
+    const copies=new Map((stored?.days||[]).filter(day=>day&&day.date).map(day=>[day.date,JSON.stringify(day)]));
+    const keys=[];for(let i=0;i<localStorage.length;i++)keys.push(localStorage.key(i));
+    keys.filter(key=>key&&key.startsWith(NIGHT_DAY_DRAFT_PREFIX)).forEach(key=>{
+      const date=key.slice(NIGHT_DAY_DRAFT_PREFIX.length);
+      if(date===curDate)return;
+      const encoded=localStorage.getItem(key);
+      if(encoded&&copies.get(date)===encoded){localStorage.removeItem(key);freed+=encoded.length;}
+    });
+    const carrierKey='cdgam_receb_transportadores_v1',carrierRaw=localStorage.getItem(carrierKey);
+    if(carrierRaw){
+      const records=JSON.parse(carrierRaw);
+      (stored?.days||[]).forEach(day=>{
+        if(day.date!==curDate&&records[day.date]&&JSON.stringify(records[day.date])===JSON.stringify(day.recebArm?.transportadores||{}))delete records[day.date];
+      });
+      const encoded=JSON.stringify(records);
+      if(encoded.length<carrierRaw.length){localStorage.setItem(carrierKey,encoded);freed+=carrierRaw.length-encoded.length;}
+    }
+  }catch(error){console.warn('Limpeza conservadora do cache adiada:',error.message);}
+  return freed;
+}
+
+function confirmLocalCacheCloudCopies(payload){
+  if(!payload||!Array.isArray(payload.days)||!payload.days.length)return false;
+  const now=Date.now();
+  if(localCacheLastVerifiedAt&&now-localCacheLastVerifiedAt<60000)return false;
+  const recent=new Set(payload.days.filter(day=>day&&day.date).map(day=>day.date).sort().slice(-LOCAL_CACHE_DAYS));
+  payload.days.forEach(day=>{
+    if(!day||!day.date||(!recent.has(day.date)&&!localCacheProtectedDates.has(day.date)&&day.date!==curDate))return;
+    localCacheVerifiedDays.set(day.date,JSON.stringify(compactDayForFastLocalStorage(day)));
+  });
+  localCacheLastVerifiedAt=now;
+  return true;
+}
+
+function safeLocalCacheSnapshot(snapshot,limit){
+  const src=snapshot&&Array.isArray(snapshot.days)?snapshot:{days:[]};
+  const newest=new Set(src.days.map(day=>day.date).sort().slice(-LOCAL_CACHE_DAYS));
+  const candidates=src.days.filter(day=>newest.has(day.date)||day.date===curDate||localCacheProtectedDates.has(day.date));
+  const compact=compactDbForLocalStorage({...src,days:candidates},0);
+  const keep=limit===LOCAL_CACHE_FALLBACK_DAYS?3:7;
+  const recent=new Set(compact.days.map(day=>day.date).sort().slice(-keep));
+  compact.days=compact.days.filter(day=>{
+    if(recent.has(day.date)||day.date===curDate||day.date===today())return true;
+    if(localCacheVerifiedDays.get(day.date)!==JSON.stringify(day))return true;
+    localCacheProtectedDates.delete(day.date);
+    return false;
+  });
+  return compact;
+}
+
+function saveLocalDb(snapshot=db){
+  if(curDate)localCacheProtectedDates.add(curDate);
+  const writeCompact=(limit)=>{
+    const encoded=JSON.stringify(safeLocalCacheSnapshot(snapshot,limit));
+    localStorage.setItem(SK,encoded);
   };
   try{
     writeCompact(LOCAL_CACHE_DAYS);
     return true;
   }catch(e){
     try{
+      cleanupRedundantLocalCache();
       cleanupNightDayDrafts(LOCAL_DRAFT_FALLBACK_DAYS);
-      localStorage.removeItem(SK_BACKUPS);
       writeCompact(LOCAL_CACHE_FALLBACK_DAYS);
-      console.warn('Backups locais limpos para liberar espaco:',e.message);
+      console.warn('Cópias redundantes do cache removidas:',e.message);
       return true;
     }catch(e2){
-      try{localStorage.removeItem(SK);}catch(_){}
       console.error('Falha ao salvar cache local:',e2);
-      showSyncStatus('Nuvem ativa - cache local cheio',false);
+      showSyncStatus('Cache local cheio - mantenha a página aberta e confira a sincronização',true);
       return false;
     }
   }
@@ -2550,6 +2633,8 @@ function saveLocalBackup(snapshot,label){
   try{
     if(!snapshot||!Array.isArray(snapshot.days)||!snapshot.days.length)return;
     const payload={...compactDbForLocalStorage(snapshot,LOCAL_BACKUP_DAYS),savedAt:snapshot.savedAt||0,label:label||'auto'};
+    payload.days=payload.days.filter(day=>localCacheVerifiedDays.get(day.date)!==JSON.stringify(day));
+    if(!payload.days.length)return;
     const encoded=JSON.stringify(payload);
     const raw=localStorage.getItem(SK_BACKUPS);
     const current=raw?JSON.parse(raw):null;
@@ -2560,7 +2645,7 @@ function saveLocalBackup(snapshot,label){
       :(current&&current.payload?[current]:[]);
     if(list.some(item=>item&&item.hash===hash))return;
     const items=[entry,...list].slice(0,2);
-    localStorage.setItem(SK_BACKUPS,JSON.stringify({...entry,items}));
+    localStorage.setItem(SK_BACKUPS,JSON.stringify({items}));
   }catch(e){}
 }
 
@@ -4596,6 +4681,11 @@ function applyRemoteData(remote){
   }
   if(!remote.days||!Array.isArray(remote.days))return changed;
   if(shouldRejectOlderCloud(remote.days,'remote-apply'))return changed;
+  if(confirmLocalCacheCloudCopies(remote)){
+    saveLocalDb(db);
+    cleanupRedundantLocalCache();
+    cleanupNightDayDrafts(LOCAL_DRAFT_DAYS);
+  }
   const previousLatest=maxDayDate(db.days);
   const previousCurrent=curDate;
   const remoteLatest=maxDayDate(remote.days);
