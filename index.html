@@ -2629,6 +2629,28 @@ function saveLocalDb(snapshot=db){
   }
 }
 
+let localDbCacheWriteTimer=null;
+let localDbCacheDeadlineTimer=null;
+let localDbCacheWritePending=false;
+let localDbCacheNeedsFullSave=false;
+function queueLocalDbCacheWrite(fullSave=false){
+  localDbCacheWritePending=true;
+  localDbCacheNeedsFullSave=localDbCacheNeedsFullSave||fullSave;
+  clearTimeout(localDbCacheWriteTimer);
+  localDbCacheWriteTimer=setTimeout(flushLocalDbCacheWrite,450);
+  if(localDbCacheDeadlineTimer===null)localDbCacheDeadlineTimer=setTimeout(flushLocalDbCacheWrite,2000);
+}
+function flushLocalDbCacheWrite(){
+  if(!localDbCacheWritePending)return false;
+  clearTimeout(localDbCacheWriteTimer);clearTimeout(localDbCacheDeadlineTimer);
+  localDbCacheWriteTimer=null;localDbCacheDeadlineTimer=null;
+  const fullSave=localDbCacheNeedsFullSave;
+  localDbCacheWritePending=false;localDbCacheNeedsFullSave=false;
+  const saved=fullSave?save(false,true)!==false:saveLocalDb(db);
+  if(!saved){localDbCacheWritePending=true;localDbCacheNeedsFullSave=fullSave;}
+  return saved;
+}
+
 function saveLocalBackup(snapshot,label){
   try{
     if(!snapshot||!Array.isArray(snapshot.days)||!snapshot.days.length)return;
@@ -5692,7 +5714,7 @@ function saveProdSetoresField(sec,hour,field,value){
   day._updatedAt=ts;
   setCurrentDate(day.date);
   saveNightDayDraft(day);
-  saveLocalDb(db);
+  queueLocalDbCacheWrite();
   queueNightFieldCloudSave();
   renderProdSetoresRowCalcs(sec,hour);
   clearTimeout(window.__prodSetoresChartTimer);
@@ -6077,7 +6099,7 @@ function prodDiaTouch(day,person,field,value){
 function persistProdDiaEdit(day){
   markLocalUserEdit(300000);
   saveNightDayDraft(day);
-  saveLocalDb(db);
+  queueLocalDbCacheWrite();
   queueNightFieldCloudSave();
 }
 
@@ -14217,6 +14239,7 @@ let nightFieldCloudDeadlineTimer=null;
 let nightFieldCloudSavePending=false;
 const nightRouteCloudDays=new Map();
 function flushNightFieldCloudSave(){
+  flushLocalDbCacheWrite();
   if(!nightFieldCloudSavePending)return false;
   clearTimeout(nightFieldCloudSaveTimer);
   clearTimeout(nightFieldCloudDeadlineTimer);
@@ -14284,7 +14307,7 @@ function persistHoraInputNow(inp){
   day._updatedAt=ts;
   setCurrentDate(day.date);
   saveNightDayDraft(day);
-  saveLocalDb(db);
+  queueLocalDbCacheWrite();
   queueNightFieldCloudSave();
   return day;
 }
@@ -14377,7 +14400,7 @@ function persistNightSingleFieldNow(el){
   db.days.sort((a,b)=>a.date.localeCompare(b.date));
   setCurrentDate(dt);
   saveNightDayDraft(day);
-  saveLocalDb(db);
+  queueLocalDbCacheWrite();
   queueNightFieldCloudSave();
 }
 
@@ -14845,7 +14868,7 @@ function saveRouteDayLocally(day){
   }else db.days.push(stripTransientDayFlags(day));
   db.days.sort((a,b)=>(a.date||'').localeCompare(b.date||''));
   saveNightDayDraft(getDay(day.date)||day);
-  saveLocalDb(db);
+  queueLocalDbCacheWrite();
   return true;
 }
 
@@ -16469,7 +16492,8 @@ function persistPreenchInputsNow(changedMetric,changedIndex){
   day._updatedAt=ts;
   setCurrentDate(day.date);
   saveNightDayDraft(day);
-  save(false,true);
+  queueLocalDbCacheWrite(true);
+  queueNightFieldCloudSave();
   return day;
 }
 
