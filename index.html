@@ -1330,6 +1330,8 @@ input::placeholder,textarea::placeholder{color:#6f8fab}
   </div>
   <div class="separator" id="compPalletTitle">Paletes por transportadora</div>
   <div class="tbl-wrap" id="compPalletTbl"></div>
+  <div class="separator">Pontualidade das saídas de caminhão</div>
+  <div class="tbl-wrap" id="compDepartureTbl"></div>
   <div class="separator" id="compMonthTitle">Comparativo mensal — média realizada por hora</div>
   <div class="chart-grid" style="grid-template-columns:1fr">
     <div class="chart-box"><div class="chart-ttl">Média do mês — todos os indicadores</div><div style="position:relative;height:260px"><canvas id="cCompResumo" role="img" aria-label="Media mensal de todos os indicadores"></canvas></div><div class="tbl-wrap" id="compFinishPanel" style="margin:8px 0 0"></div></div>
@@ -13789,11 +13791,46 @@ function renderCompPallets(days,ym){
   el.innerHTML=`<table aria-label="Paletes por dia e transportadora"><thead><tr><th scope="col">Dia</th><th scope="col">CERESUL</th><th scope="col">RONDOLOG</th><th scope="col">SÃO GABRIEL</th><th scope="col">Total do dia</th><th scope="col">Acumulado no mês</th></tr></thead><tbody>${rows.length?rows.map(row=>`<tr><th scope="row" style="white-space:nowrap">${fmtDateShort(row.date)}</th>${cells(row)}</tr>`).join(''):'<tr><td colspan="6">Sem dados para este mês</td></tr>'}</tbody><tfoot><tr><th scope="row">TOTAL DO MÊS</th>${cells({...totals,accumulated:totals.total})}</tr></tfoot></table>`;
 }
 
+function compDepartureSummary(days,through){
+  return ['2026-10','2026-11'].map(month=>{
+    const monthEnd=month==='2026-10'?'2026-10-31':'2026-11-30';
+    const end=through<monthEnd?through:monthEnd;
+    let activeDays=0,onTime=0,late=0;
+    days.forEach(day=>{
+      if(String(day.date||'').slice(0,7)!==month||day.date>end)return;
+      let dayOnTime=0,dayLate=0;
+      buildRotasMerged(day).forEach(route=>{
+        const delay=calcAtraso(route.hPrev,route.hReal);
+        if(delay===null)return;
+        if(delay>0)dayLate++;else dayOnTime++;
+      });
+      const departures=dayOnTime+dayLate;
+      if(!departures)return;
+      activeDays++;onTime+=dayOnTime;late+=dayLate;
+    });
+    const departures=onTime+late;
+    return {month,end,activeDays,onTime,late,departures,onTimePercent:departures?onTime/departures*100:null,latePercent:departures?late/departures*100:null};
+  });
+}
+
+function renderCompDepartures(days){
+  const el=document.getElementById('compDepartureTbl');if(!el)return;
+  const through=new Date().toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo',day:'2-digit',month:'2-digit',year:'numeric'}).split('/').reverse().join('-');
+  const pct=value=>value===null?'—':prodFmt(value,2)+'%';
+  const rows=compDepartureSummary(days,through).map(row=>{
+    const period=compMonthLabel(row.month)+(row.month==='2026-11'&&row.end>='2026-11-01'&&row.end<'2026-11-30'?' · até '+fmtDateShort(row.end):'');
+    return `<tr><th scope="row">${period}</th><td>${row.activeDays}</td><td>${row.departures}</td><td>${row.onTime}</td><td>${row.late}</td><td style="color:#087647;font-weight:bold">${pct(row.onTimePercent)}</td><td style="color:#b42338;font-weight:bold">${pct(row.latePercent)}</td></tr>`;
+  }).join('');
+  el.innerHTML=`<table aria-label="Pontualidade das saídas por mês" style="min-width:650px"><thead><tr><th scope="col">Mês</th><th scope="col">Dias com saída</th><th scope="col">Saídas registradas</th><th scope="col">No prazo</th><th scope="col">Atrasadas</th><th scope="col">% no prazo</th><th scope="col">% atrasadas</th></tr></thead><tbody>${rows}</tbody></table>`;
+}
+
 function renderComp(){
   destroyCompCharts();
   const ym=compReferenceMonth();
   updateCompMonthSelect(ym);
-  const days=sortedDays().filter(d=>String(d.date||'').slice(0,7)===ym);
+  const history=sortedDays();
+  const days=history.filter(d=>String(d.date||'').slice(0,7)===ym);
+  renderCompDepartures(history);
   renderCompPallets(days,ym);
   const title=document.getElementById('compMonthTitle');
   if(title)title.textContent=`Comparativo mensal — média realizada por hora — ${compMonthLabel(ym)}`;
