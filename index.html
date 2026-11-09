@@ -6226,24 +6226,41 @@ function prodDiaReportNumber(value){
   return Number.isFinite(number)&&Number.isInteger(number)&&number>=0?number:null;
 }
 
-function parseProdDiaReport(workbook,metricKey='recebItens'){
+function prodDiaReportDate(value,workbook){
+  if(typeof value==='number'){
+    const parsed=XLSX.SSF.parse_date_code(value,{date1904:!!workbook.Workbook?.WBProps?.date1904});
+    return parsed?`${parsed.y}-${String(parsed.m).padStart(2,'0')}-${String(parsed.d).padStart(2,'0')}`:'';
+  }
+  const text=String(value??'').trim();
+  const br=text.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s|$)/);
+  if(br)return `${br[3]}-${br[2].padStart(2,'0')}-${br[1].padStart(2,'0')}`;
+  return text.match(/^\d{4}-\d{2}-\d{2}(?=$|[T ])/)?.[0]||'';
+}
+
+function parseProdDiaReport(workbook,metricKey='recebItens',dayDate=''){
   const isStorage=metricKey==='armItens';
   const found=new Map();
+  let storageDateColumn=false;
   for(const name of workbook.SheetNames){
     const rows=XLSX.utils.sheet_to_json(workbook.Sheets[name],{header:1,defval:'',raw:true});
-    const wrongReport=isStorage?/quantidade de .*?(bipes|conferidos)/:/quantidade de .*?(bipes|armazenados)/;
-    if(rows.some(row=>row.some(cell=>wrongReport.test(prodDiaReportKey(cell)))))throw new Error(isStorage?'Selecione o relatório de itens armazenados por armazenador.':'Selecione o relatório de itens conferidos por conferente.');
-    let nameColumn=-1,valueColumn=-1,matriculaColumn=-1,header=-1;
+    if(isStorage){
+      const hasTitle=pattern=>rows.some(row=>row.some(cell=>pattern.test(prodDiaReportKey(cell))));
+      if(hasTitle(/^quantidade de bipes?\b/))throw new Error('Este arquivo é de bipes. Selecione o relatório de itens armazenados por armazenador.');
+      if(hasTitle(/^quantidade de itens conferidos\b/))throw new Error('Este arquivo é de conferência. Selecione o relatório de itens armazenados por armazenador.');
+    }else if(rows.some(row=>row.some(cell=>/quantidade de .*?(bipes|armazenados)/.test(prodDiaReportKey(cell)))))throw new Error('Selecione o relatório de itens conferidos por conferente.');
+    let nameColumn=-1,valueColumn=-1,matriculaColumn=-1,dateColumn=-1,header=-1;
     for(let i=0;i<rows.length;i++){
       const keys=rows[i].map(prodDiaReportKey);
       const n=keys.findIndex(key=>key==='nome'||key.startsWith('nome ')||key==='colaborador');
       const v=keys.findIndex(key=>['valor','acumulado','quantidade','total'].includes(key));
-      if(n>=0&&v>=0){nameColumn=n;valueColumn=v;matriculaColumn=keys.findIndex(key=>key==='matricula');header=i;break;}
+      if(n>=0&&v>=0){nameColumn=n;valueColumn=v;matriculaColumn=keys.findIndex(key=>key==='matricula');dateColumn=isStorage&&dayDate?keys.findIndex(key=>key==='data'):-1;header=i;break;}
     }
     if(header<0)continue;
+    if(dateColumn>=0)storageDateColumn=true;
     rows.slice(header+1).forEach(row=>{
       const nome=String(row[nameColumn]??'').trim(),key=prodDiaReportKey(nome),raw=row[valueColumn];
       if(!key||key==='total'||key.startsWith('total ')||raw===''||raw===null||raw===undefined)return;
+      if(dateColumn>=0&&prodDiaReportDate(row[dateColumn],workbook)!==dayDate)return;
       const acumulado=prodDiaReportNumber(raw);
       if(acumulado===null)throw new Error('Valor acumulado inválido para '+nome+'.');
       const previous=found.get(key);
@@ -6251,6 +6268,7 @@ function parseProdDiaReport(workbook,metricKey='recebItens'){
       found.set(key,{nome,key,matricula:matriculaColumn<0?'':String(row[matriculaColumn]??'').trim(),acumulado});
     });
   }
+  if(!found.size&&storageDateColumn)throw new Error('Nenhum item armazenado para '+dayDate.split('-').reverse().join('/')+' neste relatório. Confira o dia na tela e o período do arquivo.');
   if(!found.size)throw new Error('Não encontrei as colunas Nome e Valor no relatório.');
   return [...found.values()];
 }
@@ -6308,7 +6326,7 @@ async function importProdDiaReport(event,metricKey='recebItens'){
     if(typeof XLSX==='undefined')throw new Error('O leitor de Excel não carregou. Atualize a página.');
     setMessage('Lendo relatório...',false);
     const workbook=XLSX.read(await file.arrayBuffer(),{type:'array',raw:true});
-    const records=parseProdDiaReport(workbook,metricKey);
+    const records=parseProdDiaReport(workbook,metricKey,dayDate);
     if((curDate||today())!==dayDate)throw new Error('O dia na tela mudou. Selecione novamente o relatório no dia correto.');
     const day=prodDiaWorkingDay(),result=applyProdDiaReport(day,hourIndex,records,metricKey);
     prodDiaReportHourSelections[metricKey]=hourIndex;
