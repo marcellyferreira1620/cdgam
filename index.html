@@ -2099,12 +2099,14 @@ const BAR_VALUE_LABEL_PLUGIN={
     ctx.save();
     ctx.textAlign='center';
     ctx.textBaseline='middle';
-    ctx.font='bold 9px Arial';
     const placed=[];
     const overlaps=(a,b)=>a.left<b.right&&a.right>b.left&&a.top<b.bottom&&a.bottom>b.top;
     chart.data.datasets.forEach((dataset,datasetIndex)=>{
       const meta=chart.getDatasetMeta(datasetIndex);
       if(!meta||meta.hidden||meta.type!=='bar')return;
+      const fontSize=dataset.valueLabelFontSize||9;
+      const lineHeight=fontSize+2;
+      ctx.font=`bold ${fontSize}px Arial`;
       meta.data.forEach((bar,i)=>{
         const raw=Array.isArray(dataset.data)?dataset.data[i]:null;
         const n=Number(raw);
@@ -2113,7 +2115,7 @@ const BAR_VALUE_LABEL_PLUGIN={
         const lines=label.split('\n');
         const props=bar.getProps(['x','y','base','width','height'],true);
         const textW=Math.max(...lines.map(line=>ctx.measureText(line).width));
-        const boxW=textW+8,boxH=4+(lines.length*11),r=3;
+        const boxW=textW+8,boxH=4+lines.length*lineHeight,r=3;
         const horizontal=chart.options&&chart.options.indexAxis==='y';
         let x=props.x;
         let y=props.y;
@@ -2121,8 +2123,8 @@ const BAR_VALUE_LABEL_PLUGIN={
           x=Math.max(props.x,props.base)+boxW/2+4;
           if(x+boxW/2>chartArea.right)x=Math.max(Math.max(props.x,props.base)-boxW/2-4,chartArea.left+boxW/2);
         }else{
-          y=Math.min(props.y,props.base)-9;
-          if(y<chartArea.top+boxH/2)y=Math.max(props.y+10,chartArea.top+boxH/2);
+          y=Math.min(props.y,props.base)-fontSize;
+          if(y<chartArea.top+boxH/2)y=Math.max(props.y+fontSize+1,chartArea.top+boxH/2);
         }
         if(x-boxW/2<chartArea.left)x=chartArea.left+boxW/2;
         if(x+boxW/2>chartArea.right)x=chartArea.right-boxW/2;
@@ -2154,8 +2156,8 @@ const BAR_VALUE_LABEL_PLUGIN={
         ctx.quadraticCurveTo(x-boxW/2,y-boxH/2,x-boxW/2+r,y-boxH/2);
         ctx.fill();
         ctx.fillStyle='#06111f';
-        const firstY=y-((lines.length-1)*5.5);
-        lines.forEach((line,lineIdx)=>ctx.fillText(line,x,firstY+(lineIdx*11)));
+        const firstY=y-(lines.length-1)*lineHeight/2;
+        lines.forEach((line,lineIdx)=>ctx.fillText(line,x,firstY+lineIdx*lineHeight));
         const bottomLabel=dataset.bottomValueLabels&&dataset.bottomValueLabels[i]?String(dataset.bottomValueLabels[i]):'';
         if(bottomLabel&&!horizontal){
           const bottomLines=bottomLabel.split('\n');
@@ -6379,7 +6381,10 @@ function renderProdDiaDashChart(day,metric,hourIndex){
   const labels=people.map(p=>String(p.matricula||p.nome||'Sem identificação'));
   const hourData=people.map(p=>prodDiaResult(p,hourIndex));
   const goal=prodDiaTargets(day,metric.key);
-  const datasets=[{label:`${metric.short} - ${PROD_DIA_HOURS[hourIndex]}`,data:hourData,backgroundColor:hourData.map(value=>goal.hourly===null?'#1e88e5':value===null?'#a6bcc9':value>=goal.hourly?'#00a86b':'#e94560'),borderRadius:4,valueLabels:hourData.map(v=>v===null?'':prodFmt(v,0))}];
+  const isRecebimento=metric.key==='recebItens';
+  const metColor=isRecebimento?'#1565c0':'#00a86b';
+  const belowColor=isRecebimento?'#d32f2f':'#e94560';
+  const datasets=[{label:`${metric.short} - ${PROD_DIA_HOURS[hourIndex]}`,data:hourData,backgroundColor:hourData.map(value=>goal.hourly===null?'#1e88e5':value===null?'#a6bcc9':value>=goal.hourly?metColor:belowColor),borderRadius:4,valueLabels:hourData.map(v=>v===null?'':prodFmt(v,0)),valueLabelFontSize:isRecebimento?13:9}];
   if(goal.hourly!==null)datasets.push({type:'line',label:`Meta individual/h: ${prodFmt(goal.hourly,2)} SKUs`,data:people.map(()=>goal.hourly),borderColor:'#b07900',borderDash:[6,4],borderWidth:2,pointRadius:3,pointBackgroundColor:'#b07900',fill:false,valueLabels:people.map(()=>'')});
   if(CH[chartKey]){CH[chartKey].destroy();delete CH[chartKey];}
   CH[chartKey]=new Chart(canvas,{type:'bar',
