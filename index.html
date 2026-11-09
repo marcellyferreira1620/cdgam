@@ -5984,8 +5984,12 @@ function prodDiaPersonId(metricKey,matricula){
   return clean?`${metricKey||'prodDia'}-${clean}`:'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
 }
 
+function prodDiaUsesReport(metricKey){
+  return metricKey==='recebItens'||metricKey==='armItens';
+}
+
 function prodDiaDefaultPeople(metricKey){
-  if(metricKey==='recebItens')return [];
+  if(prodDiaUsesReport(metricKey))return [];
   const list=PROD_DIA_PEOPLE[metricKey]||[];
   return list.length?list.map(person=>prodDiaEmptyPerson({...person,id:prodDiaPersonId(metricKey,person.matricula)})):[prodDiaEmptyPerson()];
 }
@@ -6182,10 +6186,10 @@ function renderProdDiaPersonResults(metricKey,personId){
 }
 
 function prodDiaTargets(day,metricKey){
-  const applies=metricKey==='recebItens'||metricKey==='armItens';
+  const applies=prodDiaUsesReport(metricKey);
   const skus=recebArmAgendaSummary(day.recebArm?.agendaRows||[]).totalSkus;
   const count=day.prodDiurno?.[metricKey]?.teamSize;
-  const people=metricKey==='recebItens'?(Number.isInteger(+count)&&+count>0?+count:0):prodDiaChartPeople(day,metricKey).length;
+  const people=applies&&Number.isInteger(+count)&&+count>0?+count:0;
   const daily=applies&&skus>0&&people>0?skus/people:null;
   return {applies,skus,people,hours:7.5,teamHourly:applies&&skus>0?skus/7.5:null,daily,hourly:daily===null?null:daily/7.5};
 }
@@ -6197,7 +6201,7 @@ function renderProdDiaTargets(day,metricKey){
 }
 
 function saveProdDiaTeamSize(metricKey,value){
-  if(metricKey!=='recebItens')return;
+  if(!prodDiaUsesReport(metricKey))return;
   const clean=String(value??'').trim();
   if(clean!==''&&(!Number.isInteger(+clean)||+clean<1))return;
   const day=prodDiaWorkingDay(),block=day.prodDiurno[metricKey];
@@ -6222,11 +6226,13 @@ function prodDiaReportNumber(value){
   return Number.isFinite(number)&&Number.isInteger(number)&&number>=0?number:null;
 }
 
-function parseProdDiaReport(workbook){
+function parseProdDiaReport(workbook,metricKey='recebItens'){
+  const isStorage=metricKey==='armItens';
   const found=new Map();
   for(const name of workbook.SheetNames){
     const rows=XLSX.utils.sheet_to_json(workbook.Sheets[name],{header:1,defval:'',raw:true});
-    if(rows.some(row=>row.some(cell=>/quantidade de .*?(bipes|armazenados)/.test(prodDiaReportKey(cell)))))throw new Error('Selecione o relatório de itens conferidos por conferente.');
+    const wrongReport=isStorage?/quantidade de .*?(bipes|conferidos)/:/quantidade de .*?(bipes|armazenados)/;
+    if(rows.some(row=>row.some(cell=>wrongReport.test(prodDiaReportKey(cell)))))throw new Error(isStorage?'Selecione o relatório de itens armazenados por armazenador.':'Selecione o relatório de itens conferidos por conferente.');
     let nameColumn=-1,valueColumn=-1,matriculaColumn=-1,header=-1;
     for(let i=0;i<rows.length;i++){
       const keys=rows[i].map(prodDiaReportKey);
@@ -6249,10 +6255,11 @@ function parseProdDiaReport(workbook){
   return [...found.values()];
 }
 
-function applyProdDiaReport(day,hourIndex,records){
+function applyProdDiaReport(day,hourIndex,records,metricKey='recebItens'){
+  if(!prodDiaUsesReport(metricKey))throw new Error('Indicador inválido para importação.');
   if(!Number.isInteger(hourIndex)||hourIndex<0||hourIndex>=PROD_DIA_HOURS.length)throw new Error('Selecione o horário do relatório.');
   if(!Array.isArray(records)||!records.length)throw new Error('O relatório está vazio.');
-  const block=ensureProdDiurno(day).recebItens;
+  const block=ensureProdDiurno(day)[metricKey];
   const byName=new Map(block.people.map(person=>[prodDiaReportKey(person.nome),person]));
   const prepared=records.map(record=>{
     const key=prodDiaReportKey(record.nome);
@@ -6268,7 +6275,7 @@ function applyProdDiaReport(day,hourIndex,records){
   });
   const included=new Set(prepared.map(record=>record.key));
   block._deletedPeople={...block._deletedPeople};
-  block.people=block.people.filter(person=>{
+  if(metricKey==='recebItens')block.people=block.people.filter(person=>{
     const keep=included.has(prodDiaReportKey(person.nome))||person._fromReport||person.values.some(value=>prodFieldHasValue(value)&&+value>0);
     if(!keep)block._deletedPeople[person.id]=Date.now();
     return keep;
@@ -6276,7 +6283,7 @@ function applyProdDiaReport(day,hourIndex,records){
   prepared.forEach(record=>{
     let person=record.current;
     if(!person){
-      let id='recebItens-report-'+record.key.replace(/ /g,'-');
+      let id=metricKey+'-report-'+record.key.replace(/ /g,'-');
       while(block._deletedPeople[id])id+='-r'+block._deletedPeople[id];
       person=prodDiaEmptyPerson({id,nome:record.nome,matricula:record.matricula});block.people.push(person);
     }
@@ -6288,19 +6295,23 @@ function applyProdDiaReport(day,hourIndex,records){
   return {people:prepared.length,total:prepared.reduce((sum,record)=>sum+record.acumulado,0)};
 }
 
-async function importProdDiaReport(event){
-  const input=event.target,file=input.files&&input.files[0];if(!file)return;
-  const dayDate=curDate||today();
-  const hourIndex=Number(document.getElementById('prodDiaReportHour')?.value);
-  const setMessage=(message,error)=>{const el=document.getElementById('prodDiaImportMessage');if(el){el.textContent=message;el.style.color=error?'#ff879b':'#98e4c4';}};
+function prodDiaReportSuffix(metricKey){
+  return metricKey==='armItens'?'Arm':'';
+}
+
+async function importProdDiaReport(event,metricKey='recebItens'){
+  const input=event.target,file=input.files&&input.files[0];if(!file||!prodDiaUsesReport(metricKey))return;
+  const dayDate=curDate||today(),suffix=prodDiaReportSuffix(metricKey);
+  const hourIndex=Number(document.getElementById('prodDiaReportHour'+suffix)?.value);
+  const setMessage=(message,error)=>{const el=document.getElementById('prodDiaImportMessage'+suffix);if(el){el.textContent=message;el.style.color=error?'#ff879b':'#98e4c4';}};
   try{
     if(typeof XLSX==='undefined')throw new Error('O leitor de Excel não carregou. Atualize a página.');
     setMessage('Lendo relatório...',false);
     const workbook=XLSX.read(await file.arrayBuffer(),{type:'array',raw:true});
-    const records=parseProdDiaReport(workbook);
+    const records=parseProdDiaReport(workbook,metricKey);
     if((curDate||today())!==dayDate)throw new Error('O dia na tela mudou. Selecione novamente o relatório no dia correto.');
-    const day=prodDiaWorkingDay(),result=applyProdDiaReport(day,hourIndex,records);
-    prodDiaReportHourSelections.recebItens=hourIndex;
+    const day=prodDiaWorkingDay(),result=applyProdDiaReport(day,hourIndex,records,metricKey);
+    prodDiaReportHourSelections[metricKey]=hourIndex;
     renderProdDiurno();renderProdDiurnoDash(day);flushNightFieldCloudSave();
     setMessage(result.people+' colaboradores · acumulado: '+prodFmt(result.total,0)+' · posição '+PROD_DIA_HOURS[hourIndex],false);
   }catch(error){setMessage(error.message||'Não consegui importar o relatório.',true);}
@@ -6313,13 +6324,14 @@ function renderProdDiurno(){
   const day=prodDiaWorkingDay();
   let html='';
   PROD_DIA_METRICS.forEach(metric=>{
-    const report=metric.key==='recebItens';
+    const report=prodDiaUsesReport(metric.key);
+    const suffix=prodDiaReportSuffix(metric.key),role=metric.key==='armItens'?'Armazenadores':'Conferentes';
     const people=report?prodDiaChartPeople(day,metric.key):prodDiaPeople(day,metric.key);
     const goal=prodDiaTargets(day,metric.key);
     html+=`<div class="prod-dia-block">
       <div class="prod-dia-head"><div>${metric.setor} — ${metric.label}</div><span>Acumulado cheio informado | resultado/h calculado</span></div>
-      ${report?`<div class="prod-dia-toolbar"><label>Conferentes do dia<input id="prodDiaTeamSize" type="number" min="1" step="1" value="${attrText(day.prodDiurno.recebItens.teamSize??'')}" placeholder="Quantidade" oninput="saveProdDiaTeamSize('recebItens',this.value)"></label><label>Horário do relatório<select id="prodDiaReportHour" onchange="prodDiaReportHourSelections.recebItens=Number(this.value)">${PROD_DIA_HOURS.map((hour,i)=>`<option value="${i}" ${i===(prodDiaReportHourSelections.recebItens??0)?'selected':''}>${hour}</option>`).join('')}</select></label><label>Relatório de conferentes<input id="prodDiaReportFile" type="file" accept=".xls,.xlsx,.csv" onchange="importProdDiaReport(event)"></label></div><div id="prodDiaImportMessage" class="prod-dia-import-message" role="status" aria-live="polite"></div>`:`<div class="prod-dia-toolbar"><button type="button" class="prod-dia-add" onclick="addProdDiaPerson('${metric.key}')">Adicionar colaborador</button></div>`}
-      ${goal.applies?`<div class="prod-dia-goals"><span>Agenda: <b data-prod-dia-goal="${metric.key}" data-goal-value="skus">${prodFmt(goal.skus,0)}</b> SKUs</span><span>Jornada: <b>7,5 h</b></span><span>Equipe: <b data-prod-dia-goal="${metric.key}" data-goal-value="people">${goal.people}</b></span><span>Meta equipe/h: <b data-prod-dia-goal="${metric.key}" data-goal-value="teamHourly">${prodFmt(goal.teamHourly,2)}</b> SKUs</span></div>`:''}
+      ${report?`<div class="prod-dia-toolbar"><label>${role} do dia<input id="prodDiaTeamSize${suffix}" type="number" min="1" step="1" value="${attrText(day.prodDiurno[metric.key].teamSize??'')}" placeholder="Quantidade" oninput="saveProdDiaTeamSize('${metric.key}',this.value)"></label><label>Horário do relatório<select id="prodDiaReportHour${suffix}" onchange="prodDiaReportHourSelections['${metric.key}']=Number(this.value)">${PROD_DIA_HOURS.map((hour,i)=>`<option value="${i}" ${i===(prodDiaReportHourSelections['${metric.key}']??0)?'selected':''}>${hour}</option>`).join('')}</select></label><label>Relatório de ${role.toLowerCase()}<input id="prodDiaReportFile${suffix}" type="file" accept=".xls,.xlsx,.csv" onchange="importProdDiaReport(event,'${metric.key}')"></label></div><div id="prodDiaImportMessage${suffix}" class="prod-dia-import-message" role="status" aria-live="polite"></div>`:`<div class="prod-dia-toolbar"><button type="button" class="prod-dia-add" onclick="addProdDiaPerson('${metric.key}')">Adicionar colaborador</button></div>`}
+      ${goal.applies?`<div class="prod-dia-goals"><span>Agenda: <b data-prod-dia-goal="${metric.key}" data-goal-value="skus">${prodFmt(goal.skus,0)}</b> SKUs</span><span>Jornada: <b>7,5 h</b></span><span>Equipe: <b data-prod-dia-goal="${metric.key}" data-goal-value="people">${goal.people}</b></span><span>Meta equipe/h: <b data-prod-dia-goal="${metric.key}" data-goal-value="teamHourly">${prodFmt(goal.teamHourly,2)}</b> SKUs</span>${metric.key==='armItens'?`<span>Meta por pessoa/h: <b data-prod-dia-goal="${metric.key}" data-goal-value="hourly">${prodFmt(goal.hourly,2)}</b> SKUs</span>`:''}</div>`:''}
       <div class="prod-dia-table-wrap"><table class="prod-dia-table"><thead><tr>${report?'<th>Colaborador</th>':'<th>Matrícula</th><th>Nome</th>'}`;
     PROD_DIA_HOURS.forEach(h=>{html+=`<th>${h}</th>`;});
     html+='<th>Total dia</th>'+(goal.applies?'<th>Meta/dia<br>por pessoa</th><th>Meta/h<br>por pessoa</th>':'')+(report?'':'<th></th>')+'</tr></thead><tbody>';
@@ -6346,7 +6358,7 @@ function populateProdDiaDashSelects(){
 }
 
 function prodDiaChartPeople(day,metricKey){
-  return prodDiaPeople(day,metricKey).filter(p=>metricKey==='recebItens'?(p._fromReport||p.values.some(value=>prodFieldHasValue(value)&&+value>0)):(String(p.matricula||'').trim()||String(p.nome||'').trim()||prodDiaTotal(p)>0));
+  return prodDiaPeople(day,metricKey).filter(p=>metricKey==='recebItens'?(p._fromReport||p.values.some(value=>prodFieldHasValue(value)&&+value>0)):metricKey==='armItens'?(p._fromReport||p.values.some(prodFieldHasValue)):(String(p.matricula||'').trim()||String(p.nome||'').trim()||prodDiaTotal(p)>0));
 }
 
 function renderProdDiaHoraResumo(day,metricKey){
