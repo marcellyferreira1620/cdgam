@@ -4725,24 +4725,6 @@ function applyRemoteData(remote){
   if(shouldAutoSelectCloudDate(previousCurrent,previousLatest,remoteLatest))setCurrentDate(remoteLatest);
   saveLocalDb(db);
   changed=true;
-  buildDayNav();
-  const day=getDay(curDate)||latestDay();
-  if(day){
-    if(!curDate)setCurrentDate(day.date);
-    const tab=activeTab();
-    const editing=isEditingDataField();
-    renderKPIs(day);renderFlowBar(day);renderDashCharts(day);
-    renderDashTables(day);renderRotasTbl(day,'rotasTbl');
-    if(!(tab==='rotas'&&editing))renderRotasTbl(day,'rotasTblFull');
-    updateRotasKPIs(day);
-    refreshOpenPrevisaoEncerramento(day);
-    if(tab==='proddash')renderProdSetoresDash(day);
-    if(tab==='proddashdia')renderProdDiurnoDash(day);
-    if(tab==='proddia'&&!editing)renderProdDiurno();
-    if(tab==='recebarm'&&!editing)renderRecebArm();
-    if(tab==='inventario'&&!editing)renderInventario();
-    if(adminOk&&tab==='adm'&&!editing)loadFormFrom(day);
-  }
   return changed;
 }
 
@@ -5310,23 +5292,27 @@ function syncSystemForecastAutoFields(day){
     el.dataset.autoValue=autoVal;
   });
 }
-function sumHoraInput(metric){
-  const inputs=[...document.querySelectorAll(`#hTblBody input[data-m="${metric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i);
-  if(!inputs.length)return 0;
-  if(isRouteMetric(metric)){
-    const totalMetric=routeTotalMetricKeyFor(metric);
-    const totals=[...document.querySelectorAll(`#hTblBody input[data-m="${totalMetric}"]`)].sort((a,b)=>+a.dataset.i-+b.dataset.i).map(inp=>inp.value!==''?+inp.value:'');
-    const pending=inputs.map(inp=>inp.value!==''?+inp.value:'');
-    return routePendingToDone(pending,totals,routeInitialTotal(getDay(currentFormDate()),metric)).reduce((s,v)=>s+(v===''?0:+v),0);
+function readNightSummaryTotals(date){
+  const active=new Set(activeHourMetrics(date));
+  const totals=new Map();
+  const lastIndex=new Map();
+  const wanted=new Set([...REAL_AUTO,...MEDIA_HORA_AUTO].map(({m})=>m).filter(m=>active.has(m)));
+  const cumulative=new Set([...wanted].filter(m=>isDeltaMetric(m,date)));
+  const body=document.getElementById('hTblBody');
+  for(const input of body?.querySelectorAll('input[data-m]')||[]){
+    const metric=input.dataset.m;
+    if(!wanted.has(metric)||input.value==='')continue;
+    const value=+input.value;
+    if(cumulative.has(metric)){
+      const index=+input.dataset.i;
+      if(index<(lastIndex.get(metric)??-1))continue;
+      lastIndex.set(metric,index);
+      totals.set(metric,value);
+    }else{
+      totals.set(metric,(totals.get(metric)??0)+value);
+    }
   }
-  if(isDeltaMetric(metric,currentFormDate())){
-    // inputs contêm acumulados → o último valor preenchido = total acumulado
-    let last=0;
-    inputs.forEach(inp=>{if(inp.value!=='')last=+inp.value;});
-    return last;
-  }
-  let s=0;inputs.forEach(inp=>{if(inp.value!=='')s+=+inp.value;});
-  return s;
+  return {active,totals};
 }
 
 // ── AUTH (novo sistema — mantido para compatibilidade interna) ──
@@ -5339,7 +5325,7 @@ function liveUpdate(opts){
   liveTimer=setTimeout(()=>{
     updateRealAuto();
     syncSystemForecastAutoFields();
-    const day=readFormAsDay();
+    const day=readFormAsDay({preview:true});
     if(day){
       document.getElementById('liveBadge').style.display='inline';
       renderKPIs(day);
@@ -5356,15 +5342,16 @@ function liveUpdate(opts){
 function updateRealAuto(){
   const grid=document.getElementById('realAutoGrid');
   if(!grid)return;
+  const {active,totals}=readNightSummaryTotals(currentFormDate());
   grid.innerHTML='';
-  REAL_AUTO.filter(({m})=>activeHourMetrics(currentFormDate()).includes(m)).forEach(({lbl,m})=>{
-    const val=sumHoraInput(m);
+  REAL_AUTO.filter(({m})=>active.has(m)).forEach(({lbl,m})=>{
+    const val=totals.get(m)??0;
     const div=document.createElement('div');
     div.className='real-auto-item';
     div.innerHTML=`<span style="font-size:10px;color:#89b4d4">${lbl}</span><span style="font-size:12px;font-weight:bold;color:#00e676">${val.toLocaleString('pt-BR')}</span>`;
     grid.appendChild(div);
   });
-  updateMediaHoraAuto();
+  updateMediaHoraAuto(active,totals);
 }
 function timeToDec(v){
   if(!v)return null;
@@ -5389,12 +5376,12 @@ function fmtMediaHora(v){
   const opts=v>=10?{maximumFractionDigits:0}:{minimumFractionDigits:1,maximumFractionDigits:1};
   return v.toLocaleString('pt-BR',opts)+'/h';
 }
-function updateMediaHoraAuto(){
+function updateMediaHoraAuto(active,totals){
   const grid=document.getElementById('mediaHoraGrid');
   if(!grid)return;
   grid.innerHTML='';
-  MEDIA_HORA_AUTO.filter(({m})=>activeHourMetrics(currentFormDate()).includes(m)).forEach(({lbl,m,ini,fim})=>{
-    const realizado=sumHoraInput(m);
+  MEDIA_HORA_AUTO.filter(({m})=>active.has(m)).forEach(({lbl,m,ini,fim})=>{
+    const realizado=totals.get(m)??0;
     const horas=workedHoursFromInputs(ini,fim);
     const media=horas?realizado/horas:null;
     const div=document.createElement('div');
@@ -5526,6 +5513,7 @@ function switchTab(id){
   if(id==='comp')renderComp();
   if(id==='rotas')renderRotasTab();
   if(id==='preench')renderPreench();
+  if(id==='adm')updateRealAuto();
   if(id==='proddash'){renderProdSetoresChart();renderProdSetoresDash(getDay(curDate)||emptyDay(curDate||today()));}
   if(id==='prodsetores')renderProdSetores();
   if(id==='previsaoenc')renderPrevisaoEncTab();
@@ -5544,10 +5532,13 @@ function buildDayNav(){
   const sel=document.getElementById('daySelect');
   const info=document.getElementById('dayCurrentInfo');
   if(!sel)return;
-  sel.innerHTML='';
+  const currentToday=today();
+  const dayOptionsKey=currentToday+'|'+days.map(day=>day.date).join('|');
+  const rebuildOptions=sel.dataset.dayOptionsKey!==dayOptionsKey;
   if(!days.length){
     sel.disabled=true;
-    sel.innerHTML='<option value="">Sem dias salvos</option>';
+    if(rebuildOptions)sel.innerHTML='<option value="">Sem dias salvos</option>';
+    sel.dataset.dayOptionsKey=dayOptionsKey;
     if(info)info.textContent='';
     return;
   }
@@ -5555,13 +5546,18 @@ function buildDayNav(){
   const latest=days[days.length-1];
   const hasCurrent=days.some(d=>d.date===curDate);
   if(!hasCurrent)setCurrentDate(latest.date);
-  [...days].reverse().forEach(d=>{
-    const opt=document.createElement('option');
-    opt.value=d.date;
-    opt.textContent=fmtDateShort(d.date)+(d.date===today()?' — HOJE':'');
-    sel.appendChild(opt);
-  });
-  sel.value=curDate;
+  if(rebuildOptions){
+    const options=document.createDocumentFragment();
+    [...days].reverse().forEach(d=>{
+      const opt=document.createElement('option');
+      opt.value=d.date;
+      opt.textContent=fmtDateShort(d.date)+(d.date===currentToday?' — HOJE':'');
+      options.appendChild(opt);
+    });
+    sel.replaceChildren(options);
+    sel.dataset.dayOptionsKey=dayOptionsKey;
+  }
+  if(sel.value!==curDate)sel.value=curDate;
   if(info){
     const current=getDay(curDate);
     info.textContent=current?`${days.length} dia(s) salvos · mostrando ${fmtDate(current.date)}`:`${days.length} dia(s) salvos`;
@@ -5602,10 +5598,9 @@ function refreshFromDb(){
   const editing=isEditingDataField();
   buildDayNav();
   if(day){
-    renderKPIs(day);renderFlowBar(day);renderDashCharts(day);renderDashTables(day);
-    renderRotasTbl(day,'rotasTbl');
-    if(!(tab==='rotas'&&editing))renderRotasTbl(day,'rotasTblFull');
-    updateRotasKPIs(day);
+    renderKPIs(day);renderFlowBar(day);
+    if(tab==='dash'){renderDashCharts(day);renderDashTables(day);}
+    if(tab==='rotas'&&editing)updateRotasKPIs(day);
     refreshOpenPrevisaoEncerramento(day);
   }
   if(tab==='hist')renderHist();
@@ -14534,14 +14529,14 @@ function markNightFormUpdateStamps(existing,day){
   return day;
 }
 
-function readFormAsDay(){
+function readFormAsDay({preview=false}={}){
   const dt=document.getElementById('iData').value;if(!dt)return null;
   const existing=getDay(dt);
   const savedRotas=existing&&Array.isArray(existing.rotas)?JSON.parse(JSON.stringify(existing.rotas)):null;
-  const savedProdSetores=existing&&existing.prodSetores?JSON.parse(JSON.stringify(existing.prodSetores)):null;
-  const savedProdDiurno=existing&&existing.prodDiurno?JSON.parse(JSON.stringify(existing.prodDiurno)):null;
+  const savedProdSetores=!preview&&existing&&existing.prodSetores?JSON.parse(JSON.stringify(existing.prodSetores)):null;
+  const savedProdDiurno=!preview&&existing&&existing.prodDiurno?JSON.parse(JSON.stringify(existing.prodDiurno)):null;
   const savedPrevisaoEncerramento=existing&&existing.previsaoEncerramento?JSON.parse(JSON.stringify(existing.previsaoEncerramento)):null;
-  const savedRecebArm=existing&&existing.recebArm?JSON.parse(JSON.stringify(existing.recebArm)):null;
+  const savedRecebArm=!preview&&existing&&existing.recebArm?JSON.parse(JSON.stringify(existing.recebArm)):null;
   const newRules=useNewRules(dt);
   const simpleOp=useSimpleOperational(dt);
   const totalLinesOp=useTotalLinesOperational(dt);
@@ -14656,7 +14651,7 @@ function readFormAsDay(){
     ...(savedPrevisaoEncerramento?{previsaoEncerramento:savedPrevisaoEncerramento}:{}),
     ...(savedRecebArm?{recebArm:savedRecebArm}:{})
   };
-  return markNightFormUpdateStamps(existing,day);
+  return preview?day:markNightFormUpdateStamps(existing,day);
 }
 function loadFormFrom(day){
   if(!day)day=emptyDay();
@@ -16573,11 +16568,9 @@ function preenchInput(inp){
   const main=document.querySelector(`#hTblBody input[data-m="${m}"][data-i="${i}"]`);
   if(main){main.value=inp.value;onHoraInput(main);}
   updatePreenchRouteDone(m);
-  updateRealAuto();
   const st=document.getElementById('preenchStatus');
   if(st){st.textContent='⏳ Salvando...';st.style.color='#ffd700';}
   const saved=persistPreenchInputsNow(m,+inp.dataset.i)||persistDayNow();
-  if(saved&&routeFromAnyMetric(m)){renderRouteClosure(saved);renderRouteClosureCd2(saved);renderDashTables(saved);}
   if(st&&saved){st.textContent='✅ Salvo';st.style.color='#00e676';}
   setTimeout(()=>{const s=document.getElementById('preenchStatus');if(s)s.textContent='';},3000);
 }
