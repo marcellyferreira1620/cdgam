@@ -13747,11 +13747,14 @@ function renderCompRouteCharts(days,labels){
   const host=document.getElementById('compRouteCharts');
   if(!host)return;
   Object.keys(CH).filter(k=>k.startsWith('compRoute_')).forEach(k=>{CH[k].destroy();delete CH[k];});
-  host.innerHTML=ROTAS_FIXAS.map((route,idx)=>`
+  host.innerHTML=ROTAS_FIXAS.map((route,idx)=>{
+    const times=days.length?[...new Set(days.map(day=>routeScheduledTime(route,day.date)))]:[routeScheduledTime(route)];
+    return `
     <div class="chart-box">
-      <div class="chart-ttl">Rota ${escAttr(route.cod)} - ${escAttr(route.cidade)} <span style="font-size:9px;font-weight:normal;color:#6a9fc0">Prev. ${escAttr(route.hPrev)}</span></div>
+      <div class="chart-ttl">Rota ${escAttr(route.cod)} - ${escAttr(route.cidade)} <span style="font-size:9px;font-weight:normal;color:#6a9fc0">Prev. ${escAttr(times.join(' / '))}</span></div>
       <div style="position:relative;height:230px"><canvas id="${compRouteChartId(idx)}" role="img" aria-label="Volume diario e atraso da rota ${escAttr(route.cod)}"></canvas></div>
-    </div>`).join('');
+    </div>`;
+  }).join('');
   ROTAS_FIXAS.forEach((route,idx)=>{
     const canvas=document.getElementById(compRouteChartId(idx));
     if(!canvas)return;
@@ -14893,11 +14896,15 @@ function buildRotasMerged(day){
   return ROTAS_FIXAS.map(rf=>{
     const cod=normalizeRouteCode(rf.cod);
     const s=savedByCod[cod]||{};
-    return{cod,cidade:rf.cidade,hPrev:rf.hPrev,
+    return{cod,cidade:rf.cidade,hPrev:routeScheduledTime(rf,day?.date),
       tipo:s.tipo||'TRUCK',placa:s.placa||'',
       vol:s.vol??'',paletes:s.paletes??'',
       hReal:cleanRotaRealHora(s.hReal),obs:s.obs||''};
   });
+}
+
+function routeScheduledTime(route,date){
+  return route.cod==='106'&&(!date||date>='2026-11-12')?'01:30':route.hPrev;
 }
 
 function completeRotasForStorage(day){
@@ -14911,7 +14918,7 @@ function completeRotasForStorage(day){
   return ROTAS_FIXAS.map(rf=>{
     const cod=normalizeRouteCode(rf.cod);
     const s=savedByCod[cod]||{};
-    const out={...s,cod,cidade:rf.cidade,hPrev:rf.hPrev};
+    const out={...s,cod,cidade:rf.cidade,hPrev:routeScheduledTime(rf,day?.date)};
     if(out.hReal!==undefined)out.hReal=cleanRotaRealHora(out.hReal);
     return out;
   });
