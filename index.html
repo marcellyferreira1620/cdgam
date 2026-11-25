@@ -3940,7 +3940,8 @@ function preferCloudFilledDay(localDay,remoteDay,forceCloudFilled=false){
     if(cloudValueFilled(remote[key]))out[key]=overlayCloudFilledValue(out[key],remote[key]);
   });
   out.date=remote.date||out.date;
-  out._fieldUpdatedAt={...((local&&local._fieldUpdatedAt)||{}),...((remote&&remote._fieldUpdatedAt)||{})};
+  // The merge already chose the latest timestamp for each field.
+  // Spreading remote stamps here would let a later stale pull undo a local edit.
   out._hdUpdatedAt=mergeHourUpdatedAt(local,remote)||out._hdUpdatedAt;
   out._hdClearedAt=mergeHourClearedAt(local,remote)||out._hdClearedAt;
   const ts=Math.max(+(local&&local._updatedAt)||0,+(remote&&remote._updatedAt)||0,+(merged&&merged._updatedAt)||0);
