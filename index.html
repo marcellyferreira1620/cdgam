@@ -2031,6 +2031,7 @@ function setCurrentDate(dt){
   return curDate;
 }
 
+let lastNightDraftCleanupAt=Date.now();
 function saveNightDayDraft(day){
   try{
     if(!day||!day.date)return;
@@ -2039,7 +2040,10 @@ function saveNightDayDraft(day){
     const encoded=JSON.stringify(clean);
     try{localStorage.setItem(NIGHT_DAY_DRAFT_PREFIX+day.date,encoded);}
     catch(error){cleanupRedundantLocalCache();localStorage.setItem(NIGHT_DAY_DRAFT_PREFIX+day.date,encoded);}
-    cleanupNightDayDrafts(LOCAL_DRAFT_DAYS);
+    if(Date.now()-lastNightDraftCleanupAt>=60000){
+      lastNightDraftCleanupAt=Date.now();
+      cleanupNightDayDrafts(LOCAL_DRAFT_DAYS);
+    }
   }catch(e){
     console.warn('Draft local da producao noturna nao salvo:',e.message);
   }
@@ -14069,6 +14073,10 @@ function deltaHintHtml(delta,label='resultado/hora'){
   if(delta===''||delta===null||delta===undefined)return '';
   return `<span class="delta-label">${label}</span><span class="delta-val">${Number(delta).toLocaleString('pt-BR')}</span>`;
 }
+function updateNightDeltaHint(hint,delta,label){
+  const html=deltaHintHtml(delta,label);
+  if(hint.innerHTML!==html)hint.innerHTML=html;
+}
 function horaInputValues(metric){
   return [...document.querySelectorAll(`#hTblBody input[data-m="${metric}"]`)]
     .sort((a,b)=>+a.dataset.i-+b.dataset.i)
@@ -14087,7 +14095,7 @@ function refreshEpmHintsFromTable(){
     let hint=td.querySelector('.delta-hint');
     if(!hint){hint=document.createElement('div');hint.className='delta-hint';td.appendChild(hint);}
     hint.classList.toggle('delta-empty',epmVals[idx]===null);
-    hint.innerHTML=deltaHintHtml(epmVals[idx],'EPM/hora');
+    updateNightDeltaHint(hint,epmVals[idx],'EPM/hora');
     colorCellByDelta(el,'Erros Sep. Med.',epmVals[idx]);
   });
 }
@@ -14189,7 +14197,7 @@ function onHoraInput(inp){
       let hint=td.querySelector('.delta-hint');
       if(!hint){hint=document.createElement('div');hint.className='delta-hint';td.appendChild(hint);}
       hint.classList.toggle('delta-empty',done[idx]==='');
-      hint.innerHTML=deltaHintHtml(done[idx],'feito/hora');
+      updateNightDeltaHint(hint,done[idx],'feito/hora');
       const current=pending[idx];
       td.style.background=current!==''&&carried[idx]!==''&&current>carried[idx]?'rgba(180,20,20,.5)':current===0?'rgba(0,100,50,.45)':'';
     });
@@ -14209,7 +14217,7 @@ function onHoraInput(inp){
       let hint=td.querySelector('.delta-hint');
       if(!hint){hint=document.createElement('div');hint.className='delta-hint';td.appendChild(hint);}
       hint.classList.toggle('delta-empty',resultVals[idx]===''||resultVals[idx]===null);
-      hint.innerHTML=deltaHintHtml(resultVals[idx],resultLabel);
+      updateNightDeltaHint(hint,resultVals[idx],resultLabel);
       // Recolorir célula baseado no delta desta hora
       colorCellByDelta(el,m,resultVals[idx]);
     });
@@ -14811,7 +14819,10 @@ function installNightImmediatePersistence(){
   document.addEventListener('input',scheduleNightImmediateSave,true);
   document.addEventListener('change',scheduleNightImmediateSave,true);
   document.addEventListener('focusout',event=>{
-    if(event.target&&event.target.closest&&event.target.closest('#tb-adm,#tb-preench,#tb-rotas,#tb-prodsetores,#tb-proddia'))flushNightFieldCloudSave();
+    if(event.target&&event.target.closest&&event.target.closest('#tb-adm,#tb-preench,#tb-rotas,#tb-prodsetores,#tb-proddia')){
+      // Let the next field receive focus before preparing the cache/cloud payload.
+      setTimeout(flushNightFieldCloudSave,0);
+    }
   });
   window.addEventListener('beforeunload',()=>{try{saveNightImmediately();}catch(_){}finally{flushNightFieldCloudSave();}});
   document.addEventListener('visibilitychange',()=>{if(document.hidden){try{saveNightImmediately();}catch(_){}finally{flushNightFieldCloudSave();}}});
